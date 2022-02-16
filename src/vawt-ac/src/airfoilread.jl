@@ -191,7 +191,7 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         # Extract the top level header information
         line = readline(f) #Title
         tc = parse(Float64, split(readline(f))[end]) #tc ratio
-        AOA0 = parse(Float64, split(readline(f))[end]) #zero lift aoa
+        AOA0 = parse(Float64, split(readline(f))[end])*pi/180 #zero lift aoa
         for line in eachline(f)
             if !isempty(line) && split(line)[1]=="Reynolds"
                 alphaOrig = Float64[]
@@ -242,8 +242,8 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         dalpha=alpha-env.alpha_last[1] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
         # if length(REs)>1
-            aoaStallPos = FLOWMath.akima(REs,aoaStallPosVec,Re)
-            aoaStallNeg = FLOWMath.akima(REs,aoaStallNegVec,Re)
+            aoaStallPos = FLOWMath.akima(REs,aoaStallPosVec,Re)*pi/180
+            aoaStallNeg = FLOWMath.akima(REs,aoaStallNegVec,Re)*pi/180
         # else
         #     aoaStallPos = aoaStallPosVec[1]
         #     aoaStallNeg = aoaStallNegVec[1]

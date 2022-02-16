@@ -157,7 +157,10 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
 end
 
 
-function deformTurb(azi;newOmega=-1,newVinf=-1) # each of these is size ntheta x nslices
+function deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
+bld_z=-1,
+bld_twist=-1,
+steady=false) # each of these is size ntheta x nslices
     # @warn "this function is untested"
     global turbslices
     global envslices
@@ -165,7 +168,11 @@ function deformTurb(azi;newOmega=-1,newVinf=-1) # each of these is size ntheta x
     ntheta = turbslices[1].ntheta
     # Get the last step's blade index.
     dtheta = 2*pi/ntheta
-    n_steps = max(1,round(Int,azi/dtheta) - last_step1)
+    if steady
+        n_steps = 1
+    else
+        n_steps = max(1,round(Int,azi/dtheta) - last_step1)
+    end
     last_azi = last_step1*dtheta
     if n_steps == 1
         azi_used = [azi]
@@ -183,13 +190,15 @@ function deformTurb(azi;newOmega=-1,newVinf=-1) # each of these is size ntheta x
         dstep_bld = Int(turbslices[1].ntheta/turbslices[1].B)
 
         # Calculate new delta
-        # delta3D = zero(bld_x)
-        # for ibld = turbslices[1].B
-        #     delta_xs = bld_x[ibld,2:end] - bld_x[ibld,1:end-1]
-        #     delta_zs = bld_z[ibld,2:end] - bld_z[ibld,1:end-1]
-        #
-        #     delta3D[ibld,:] = atan.(delta_xs./delta_zs)
-        # end
+        if bld_x != -1 && bld_z != -1
+            delta3D = zeros(Real,turbslices[1].B,length(bld_x[1,:])-1)
+            for ibld = turbslices[1].B
+                delta_xs = bld_x[ibld,2:end] - bld_x[ibld,1:end-1]
+                delta_zs = bld_z[ibld,2:end] - bld_z[ibld,1:end-1]
+
+                delta3D[ibld,:] = atan.(delta_xs./delta_zs)
+            end
+        end
 
         # Apply the new values to the structs at each slice
         for islice = 1:length(turbslices)
@@ -201,11 +210,18 @@ function deformTurb(azi;newOmega=-1,newVinf=-1) # each of these is size ntheta x
                 elseif bld_idx == 0
                     bld_idx = 1
                 end
-                # turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
-                # turbslices[islice].z = bld_z[ibld,islice]
-                # # turbslices[islice].chord = chord[islice]
-                # turbslices[islice].twist[bld_idx] = bld_twist[ibld,islice]
-                # turbslices[islice].delta[bld_idx] = delta3D[islice]
+
+                if bld_x != -1 && bld_z != -1
+                    turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
+                    # turbslices[islice].z[islice] = bld_z[ibld,islice]
+                    # turbslices[islice].chord = chord[islice]
+                    turbslices[islice].delta[bld_idx] = delta3D[ibld,islice]
+                end
+
+                if bld_twist != -1
+                    turbslices[islice].twist[bld_idx] = bld_twist[ibld,islice]
+                end
+
                 if bld_idx == 0
                     println("here")
                 end
@@ -262,7 +278,7 @@ Runs a previously initialized aero model (see ?setupTurb) in the unsteady mode (
 * `torque`: Array(ntheta)Turbine torque (N-m) (alternative calculation method from Mz-base)
 
 """
-function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),azi=-1.0)
+function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),azi=-1.0,verbosity=0)
 
     global us_param
     global turbslices
@@ -315,9 +331,9 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     step1 = 0 #initialize scope
     for istep = 1:n_steps#(itime,time) in enumerate(timevec)
 
-        # if time%10<0.1
-            # println("Time $time of $(tnew)")
-        # end
+        if verbosity>0
+            println("istep $istep of $(n_steps)")
+        end
 
         step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
 
@@ -434,13 +450,13 @@ Runs a previously initialized aero model (see ?setupTurb) in the steady state mo
 * `torque`: Array(ntheta)Turbine torque (N-m) (alternative calculation method from Mz-base)
 
 """
-function steadyTurb(omega,Vinf)
+function steadyTurb(;omega = -1,Vinf = -1)
 
     # global us_param #TODO: add turbulence lookup option for steady?
     global turbslices
     global envslices
 
-    RPM = omega/2/pi*60
+    # RPM = omega/2/pi*60
     B = turbslices[1].B
     Nslices = length(turbslices)
     ntheta = turbslices[1].ntheta
@@ -455,6 +471,7 @@ function steadyTurb(omega,Vinf)
     Vloc = zeros(Real,Nslices,ntheta)
     Re = zeros(Real,Nslices,ntheta)
     thetavec = zeros(Real,Nslices,ntheta)
+    delta = zeros(Real,B,Nslices)
 
     Fx = zeros(Real,Nslices,ntheta)
     Fy = zeros(Real,Nslices,ntheta)
@@ -468,10 +485,14 @@ function steadyTurb(omega,Vinf)
 
     for islice = 1:Nslices
 
-        envslices[islice].V_x[:] .= Vinf
-        envslices[islice].V_y[:] .= 0.0
-        envslices[islice].V_z[:] .= 0.0
-        turbslices[islice].omega .= omega
+        if Vinf != -1
+            envslices[islice].V_x[:] .= Vinf
+        end
+        # envslices[islice].V_y[:] .= 0.0
+        # envslices[islice].V_z[:] .= 0.0
+        if omega != -1
+            turbslices[islice].omega .= omega
+        end
 
         CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc[islice,:],
         CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl[islice,:], cd_af[islice,:],
@@ -497,9 +518,10 @@ function steadyTurb(omega,Vinf)
                 Tp[iblade,islice,step1] = Tp_temp[bld_idx]
                 Zp[iblade,islice,step1] = Zp_temp[bld_idx]
                 alpha[iblade,islice,step1] = alpha_temp[bld_idx]
+                delta[iblade,islice] = turbslices[islice].delta[bld_idx]
             end
         end
-        integralpower[islice] = B/(2*pi)*VAWTAero.pInt(thetavec, Tp_temp.*r.*omega)
+        integralpower[islice] = B/(2*pi)*VAWTAero.pInt(thetavec, Tp_temp.*r.*turbslices[islice].omega)
         integraltorque[islice] = B/(2*pi)*VAWTAero.pInt(thetavec, Tp_temp.*r)
     end
 
@@ -527,5 +549,6 @@ function steadyTurb(omega,Vinf)
     torque = VAWTAero.trapz(z3D,integraltorque)
     power2 = mean(Mz_base)*mean(abs.(omega))
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque
+    global z3Dnorm
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta
 end

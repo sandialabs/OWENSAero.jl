@@ -1,11 +1,11 @@
 # import PyPlot
 # PyPlot.close("all")
-# import VAWTAero
+import VAWTAero
 using Test
 import HDF5
 
 path,_ = splitdir(@__FILE__)
-include("$(path)/../src/VAWTAero.jl")
+# include("$(path)/../src/VAWTAero.jl")
 
 global Radius
 
@@ -22,7 +22,7 @@ function aerowrapper(chord;TSR=6.0,ifw=false,bladelength=110.0)
     shapeY_raw = zrotor./150*bladelength
     B = 3
 
-    VAWTAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,TSR,Vinf;afname = "$(path)/airfoils/NACA_0015.dat")
+    VAWTAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,TSR,Vinf;afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV")
 
     global Radius = maximum(shapeX_raw)
     omega = Vinf/Radius*TSR
@@ -224,7 +224,7 @@ mytime2 = HDF5.h5read(file2,"time")
 #
 # PyPlot.figure()
 # PyPlot.plot(1:length(Fy_base2),Fy_base2,label="old")
-# PyPlot.plot(1:length(Fx_base),-Fx_base,".-",label="new")
+# PyPlot.plot(1:length(Fy_base),-Fy_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Fy_base")
 #
@@ -331,7 +331,7 @@ Mx_baseSteady,
 My_baseSteady,
 Mz_baseSteady,
 powerSteady,
-power2Steady = VAWTAero.steadyTurb(omega,Vinf)
+power2Steady = VAWTAero.steadyTurb(;omega,Vinf)
 
 idx_start = 1
 filename = "$path/data/steadyFullTurb.h5"
@@ -394,6 +394,12 @@ power2SteadyOld = HDF5.h5read(fileSteadyOld,"power2")
 # PyPlot.plot(1:length(ZpSteady[1,15,:]),ZpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Zp")
+#
+# PyPlot.figure()
+# PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,label="old")
+# PyPlot.plot(1:length(alphaSteady[1,15,:]),alphaSteady[1,15,:].*180/pi,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("alpha")
 
 atol = 1e-4
 for ii = 1:length(CPSteadyOld)
