@@ -1,6 +1,7 @@
 global dt = 0.0 #might not be used
 global timelast = 0.0
 global last_step1 = 0
+global last_azi = 0.0
 global z3D
 global z3Dnorm
 global us_param
@@ -79,7 +80,10 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"))
 
-    global timelast=0.0
+    global dt = 0.0 #might not be used
+    global timelast = 0.0
+    global last_step1 = 0
+    global last_azi = 0.0
 
     if length(chord) == 1
         chord = chord.*ones(Real,Nslices)
@@ -293,8 +297,11 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
     global timelast #make avalaible in this scope
     global last_step1 # = round(Int,timelast*RPM/60*ntheta)
+    global last_azi
     if azi == -1.0
         n_steps = max(1,round(Int,(tnew-timelast)/ts))
+        ts_base = 2*pi/(omega[1]*ntheta)
+        azi = last_azi + n_steps * dtheta * ts/ts_base
     else
         n_steps = max(1,round(Int,azi/dtheta) - last_step1)
     end
@@ -408,9 +415,10 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
     end
 
-    if timelast != tnew #Allow for iterative solves at the same timestep
+    if (azi-last_azi) >= dtheta*(1-1e-6) #Allow for iterative solves but TIMESTEP CANNOT BE LESS THAN THE AZIMUTHAL DISCRETIZATION UNTIL AN INTERPOLATION SCHEME IS MADE
         timelast = tnew
         last_step1 = step1
+        last_azi = azi
     end
 
     return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta
