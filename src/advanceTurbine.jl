@@ -15,6 +15,10 @@ global TpL
 global TpU
 global ZpL
 global ZpU
+global XpL
+global YpL
+global XpU
+global YpU
 global alphaL
 global alphaU
 global clL
@@ -43,8 +47,6 @@ global Mz_baseL
 global Mz_baseU
 global power2L
 global power2U
-global torqueL
-global torqueU
 global powerL
 global powerU
 global delta = nothing
@@ -211,7 +213,22 @@ function deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
 bld_z=-1,
 bld_twist=-1,
 steady=false) # each of these is size ntheta x nslices
-    # @warn "this function is untested"
+
+
+    global z3D
+    # Interpolate to the vertical positions
+    if bld_x!=-1 && bld_z!=-1
+        bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
+        for ibld = 1:length(bld_x[:,1])
+            bld_x_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0)
+        end
+        bld_x = bld_x_temp
+        bld_z = zero(bld_x) #TODO: a better way to do this.
+        for ibld = 1:length(bld_x[:,1])
+            bld_z[ibld,:] = z3D.-1.0
+        end
+    end
+
     global turbslices
     global envslices
     global last_step1
@@ -230,8 +247,6 @@ steady=false) # each of these is size ntheta x nslices
         azi_used = LinRange(last_azi,azi,n_steps)
     end
 
-
-
     for istep = 1:n_steps
         bld1_idx = round(Int,azi_used[istep]/dtheta)%ntheta #step1%ntheta
         if bld1_idx == 0
@@ -241,12 +256,13 @@ steady=false) # each of these is size ntheta x nslices
 
         # Calculate new delta
         if bld_x != -1 && bld_z != -1
-            delta3D = zeros(Real,turbslices[1].B,length(bld_x[1,:])-1)
+            delta3D = zeros(Real,turbslices[1].B,length(bld_x[1,:]))
             for ibld = turbslices[1].B
                 delta_xs = bld_x[ibld,2:end] - bld_x[ibld,1:end-1]
                 delta_zs = bld_z[ibld,2:end] - bld_z[ibld,1:end-1]
 
-                delta3D[ibld,:] = atan.(delta_xs./delta_zs)
+                delta3D[ibld,1:end-1] = atan.(delta_xs./delta_zs)
+                delta3D[ibld,end] = delta3D[ibld,end-1]
             end
         end
 
@@ -254,10 +270,8 @@ steady=false) # each of these is size ntheta x nslices
         for islice = 1:length(turbslices)
             for ibld = 1:turbslices[1].B
 
-                bld_idx = bld1_idx+dstep_bld*(ibld-1)
-                if bld_idx > ntheta
-                    bld_idx -= ntheta
-                elseif bld_idx == 0
+                bld_idx = (bld1_idx+dstep_bld*(ibld-1))%(ntheta-1)
+                if bld_idx == 0
                     bld_idx = 1
                 end
 
@@ -269,12 +283,9 @@ steady=false) # each of these is size ntheta x nslices
                 end
 
                 if bld_twist != -1
-                    turbslices[islice].twist[bld_idx] = bld_twist[ibld,islice]
+                    turbslices[islice].twist[bld_idx] = bld_twist[ibld,islice] #TODO: include geometric twist if not zero
                 end
 
-                if bld_idx == 0
-                    println("here")
-                end
                 if newOmega != -1
                     turbslices[islice].omega[bld_idx] = newOmega #Omega is the same for all blades and all slices at a given point in time
                 end
@@ -356,6 +367,8 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     Rp = zeros(B,Nslices,n_steps)
     Tp = zeros(B,Nslices,n_steps)
     Zp = zeros(B,Nslices,n_steps)
+    Xp = zeros(B,Nslices,n_steps)
+    Yp = zeros(B,Nslices,n_steps)
     Vloc = zeros(B,Nslices,n_steps)
     alpha = zeros(B,Nslices,n_steps)
     delta = zeros(B,Nslices)
@@ -429,6 +442,8 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
                 Rp[iblade,islice,step_idx] = Rp_temp[bld_idx]
                 Tp[iblade,islice,step_idx] = Tp_temp[bld_idx]
+                Xp[iblade,islice,step_idx] = -Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
+                Yp[iblade,islice,step_idx] = Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
                 Zp[iblade,islice,step_idx] = Zp_temp[bld_idx]
                 Vloc[iblade,islice,step_idx] = Vloc_temp[bld_idx]
                 alpha[iblade,islice,step_idx] = alpha_temp[bld_idx]
@@ -461,13 +476,13 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
     end
 
-    if (azi-last_azi) >= dtheta*(1-1e-6) #Allow for iterative solves but TIMESTEP CANNOT BE LESS THAN THE AZIMUTHAL DISCRETIZATION UNTIL AN INTERPOLATION SCHEME IS MADE
+    if timelast != tnew #(azi-last_azi) >= dtheta*(1-1e-6) #use this for new method:
         timelast = tnew
         last_step1 = step1
         last_azi = azi
     end
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp
 end
 
 
@@ -607,7 +622,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta
 end
 
-function AdvanceTurbineInterpolate(t;azi=-1)
+function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     global CPL
     global CPU
@@ -617,6 +632,10 @@ function AdvanceTurbineInterpolate(t;azi=-1)
     global TpU
     global ZpL
     global ZpU
+    global XpL
+    global YpL
+    global XpU
+    global YpU
     global alphaL
     global alphaU
     global clL
@@ -645,8 +664,8 @@ function AdvanceTurbineInterpolate(t;azi=-1)
     global Mz_baseU
     global power2L
     global power2U
-    global torqueL
-    global torqueU
+
+
     global powerL
     global powerU
     global z3Dnorm
@@ -659,66 +678,68 @@ function AdvanceTurbineInterpolate(t;azi=-1)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta
-    if aziL_save != aziL # do it on the first round or if it has changed
-        if aziL == aziU_save # if the bottom is now what was the top, swap and don't recalculate
+    if aziL_save != aziL || alwaysrecalc # do it on the first round or if it has changed
+        if aziL == aziU_save && !alwaysrecalc # if the bottom is now what was the top, swap and don't recalculate
             aziL_save = aziU_save
-            CPL[:] = CPU[:]
-            RpL[:] = RpU[:]
-            TpL[:] = TpU[:]
-            ZpL[:] = ZpU[:]
-            alphaL[:] = alphaU[:]
-            clL[:] = clU[:]
-            cd_afL[:] = cd_afU[:]
-            VlocL[:] = VlocU[:]
-            ReL[:] = ReU[:]
-            thetavecL[:] = thetavecU[:]
-            Fx_baseL[:] = Fx_baseU[:]
-            Fy_baseL[:] = Fy_baseU[:]
-            Fz_baseL[:] = Fz_baseU[:]
-            Mx_baseL[:] = Mx_baseU[:]
-            My_baseL[:] = My_baseU[:]
-            Mz_baseL[:] = Mz_baseU[:]
-            powerL = powerU
-            power2L = power2U
-            torqueL = torqueU
+             CPL[:,end] = CPU[:,end]
+             RpL[:,:,end] = RpU[:,:,end]
+             TpL[:,:,end] = TpU[:,:,end]
+             ZpL[:,:,end] = ZpU[:,:,end]
+             XpL[:,:,end] = XpU[:,:,end]
+             YpL[:,:,end] = YpU[:,:,end]
+             alphaL[:,:,end] = alphaU[:,:,end]
+             clL[:,end] = clU[:,end]
+             cd_afL[:,end] = cd_afU[:,end]
+             VlocL[:,:,end] = VlocU[:,:,end]
+             ReL[:,end] = ReU[:,end]
+             thetavecL[:,end] = thetavecU[:,end]
+             Fx_baseL[end] = Fx_baseU[end]
+             Fy_baseL[end] = Fy_baseU[end]
+             Fz_baseL[end] = Fz_baseU[end]
+             Mx_baseL[end] = Mx_baseU[end]
+             My_baseL[end] = My_baseU[end]
+             Mz_baseL[end] = Mz_baseU[end]
+             powerL[end] = powerU[end]
+             power2L[end] = power2U[end]
         else
             aziL_save = aziL
 
             CPL,RpL,TpL,ZpL,alphaL,clL,cd_afL,VlocL,ReL,thetavecL,ntheta,Fx_baseL,
-            Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,torqueL,_,
-            delta = advanceTurb(t;azi=aziL)
+            Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,_,_,
+            delta,XpL,YpL = advanceTurb(t;azi=aziL)
         end
     end
 
     aziU = ceil(azi/dtheta)*dtheta
 
-    if aziU==aziL && aziU_save != nothing
-        CPU[:] = CPL[:]
-        RpU[:] = RpL[:]
-        TpU[:] = TpL[:]
-        ZpU[:] = ZpL[:]
-        alphaU[:] = alphaL[:]
-        clU[:] = clL[:]
-        cd_afU[:] = cd_afL[:]
-        VlocU[:] = VlocL[:]
-        ReU[:] = ReL[:]
-        thetavecU[:] = thetavecL[:]
-        Fx_baseU[:] = Fx_baseL[:]
-        Fy_baseU[:] = Fy_baseL[:]
-        Fz_baseU[:] = Fz_baseL[:]
-        Mx_baseU[:] = Mx_baseL[:]
-        My_baseU[:] = My_baseL[:]
-        Mz_baseU[:] = Mz_baseL[:]
-        powerU = powerL
-        power2U = power2L
-        torqueU = torqueL
+    if aziU==aziL && aziU_save != nothing && !alwaysrecalc
+        CPU[:,end] = CPL[:,end]
+        RpU[:,:,end] = RpL[:,:,end]
+        TpU[:,:,end] = TpL[:,:,end]
+        ZpU[:,:,end] = ZpL[:,:,end]
+        XpU[:,:,end] = XpL[:,:,end]
+        YpU[:,:,end] = YpL[:,:,end]
+        alphaU[:,:,end] = alphaL[:,:,end]
+        clU[:,end] = clL[:,end]
+        cd_afU[:,end] = cd_afL[:,end]
+        VlocU[:,:,end] = VlocL[:,:,end]
+        ReU[:,end] = ReL[:,end]
+        thetavecU[:,end] = thetavecL[:,end]
+        Fx_baseU[end] = Fx_baseL[end]
+        Fy_baseU[end] = Fy_baseL[end]
+        Fz_baseU[end] = Fz_baseL[end]
+        Mx_baseU[end] = Mx_baseL[end]
+        My_baseU[end] = My_baseL[end]
+        Mz_baseU[end] = Mz_baseL[end]
+        powerU[end] = powerL[end]
+        power2U[end] = power2L[end]
     else
-        if aziU_save != aziU # Do the same for the top
+        if aziU_save != aziU || alwaysrecalc # Do the same for the top
             aziU_save = aziU
 
             CPU,RpU,TpU,ZpU,alphaU,clU,cd_afU,VlocU,ReU,thetavecU,ntheta,Fx_baseU,
-            Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,torqueU,_,
-            delta = advanceTurb(t;azi=aziU)
+            Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,_,_,
+            delta,XpU,YpU = advanceTurb(t;azi=aziU)
         end
     end
 
@@ -731,6 +752,8 @@ function AdvanceTurbineInterpolate(t;azi=-1)
     Rp = zeros(Real,NBlade,Nslices,n_steps)
     Tp = zeros(Real,NBlade,Nslices,n_steps)
     Zp = zeros(Real,NBlade,Nslices,n_steps)
+    Xp = zeros(Real,NBlade,Nslices,n_steps)
+    Yp = zeros(Real,NBlade,Nslices,n_steps)
     Vloc = zeros(Real,NBlade,Nslices,n_steps)
     alpha = zeros(Real,NBlade,Nslices,n_steps)
     delta = zeros(Real,NBlade,Nslices)
@@ -751,6 +774,8 @@ function AdvanceTurbineInterpolate(t;azi=-1)
             Rp[iblade,islice,:] .= RpL[iblade,islice,end] .+ fraction.*(RpU[iblade,islice,end].-RpL[iblade,islice,end])
             Tp[iblade,islice,:] .= TpL[iblade,islice,end] .+ fraction.*(TpU[iblade,islice,end].-TpL[iblade,islice,end])
             Zp[iblade,islice,:] .= ZpL[iblade,islice,end] .+ fraction.*(ZpU[iblade,islice,end].-ZpL[iblade,islice,end])
+            Xp[iblade,islice,:] .= XpL[iblade,islice,end] .+ fraction.*(XpU[iblade,islice,end].-XpL[iblade,islice,end])
+            Yp[iblade,islice,:] .= YpL[iblade,islice,end] .+ fraction.*(YpU[iblade,islice,end].-YpL[iblade,islice,end])
             alpha[iblade,islice,:] .= alphaL[iblade,islice,end] .+ fraction.*(alphaU[iblade,islice,end].-alphaL[iblade,islice,end])
             Vloc[iblade,islice,:] .= VlocL[iblade,islice,end] .+ fraction.*(VlocU[iblade,islice,end].-VlocL[iblade,islice,end])
             thetavec[iblade,:] .= thetavecL[iblade,end] .+ fraction.*(thetavecU[iblade,end].-thetavecL[iblade,end])
@@ -761,15 +786,14 @@ function AdvanceTurbineInterpolate(t;azi=-1)
         Re[islice,:] .= ReL[islice,end] .+ fraction.*(ReU[islice,end].-ReL[islice,end])
     end
 
-    Fx_base = Fx_baseL .+ fraction.*(Fx_baseU.-Fx_baseL)
-    Fy_base = Fy_baseL .+ fraction.*(Fy_baseU.-Fy_baseL)
-    Fz_base = Fz_baseL .+ fraction.*(Fz_baseU.-Fz_baseL)
-    Mx_base = Mx_baseL .+ fraction.*(Mx_baseU.-Mx_baseL)
-    My_base = My_baseL .+ fraction.*(My_baseU.-My_baseL)
-    Mz_base = Mz_baseL .+ fraction.*(Mz_baseU.-Mz_baseL)
-    power = powerL + fraction*(powerU-powerL)
-    power2 = power2L + fraction*(power2U-power2L)
-    torque = torqueL + fraction*(torqueU-torqueL)
+    Fx_base = Fx_baseL[end] .+ fraction.*(Fx_baseU[end].-Fx_baseL[end])
+    Fy_base = Fy_baseL[end] .+ fraction.*(Fy_baseU[end].-Fy_baseL[end])
+    Fz_base = Fz_baseL[end] .+ fraction.*(Fz_baseU[end].-Fz_baseL[end])
+    Mx_base = Mx_baseL[end] .+ fraction.*(Mx_baseU[end].-Mx_baseL[end])
+    My_base = My_baseL[end] .+ fraction.*(My_baseU[end].-My_baseL[end])
+    Mz_base = Mz_baseL[end] .+ fraction.*(Mz_baseU[end].-Mz_baseL[end])
+    power = powerL[end] + fraction*(powerU[end]-powerL[end])
+    power2 = power2L[end] + fraction*(power2U[end]-power2L[end])
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,nothing,z3Dnorm,delta,Xp,Yp
 end
