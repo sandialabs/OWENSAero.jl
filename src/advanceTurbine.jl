@@ -1,7 +1,9 @@
 global dt = 0.0 #might not be used
-global timelast = 0.0
 global last_step1 = 0
 global last_azi = 0.0
+global last_stepL = 0
+global last_stepU = 0
+global timelast = 0
 global z3D
 global z3Dnorm
 global us_param
@@ -126,9 +128,11 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"))
 
     global dt = 0.0 #might not be used
-    global timelast = 0.0
     global last_step1 = 0
+    global last_stepL = 0
+    global last_stepU = 0
     global last_azi = 0.0
+    global timelast = 0.0
     global delta = nothing
     global aziL_save = nothing
     global aziU_save = nothing
@@ -339,8 +343,8 @@ Runs a previously initialized aero model (see ?setupTurb) in the unsteady mode (
 * `torque`: Array(ntheta)Turbine torque (N-m) (alternative calculation method from Mz-base)
 
 """
-function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),azi=-1.0,verbosity=0)
-
+function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),azi=-1.0,verbosity=0,alwaysrecalc=nothing,last_step=nothing)
+    global timelast
     global us_param
     global turbslices
     global envslices
@@ -352,8 +356,10 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     ntheta = turbslices[1].ntheta
     dtheta = 2*pi/(ntheta)
 
-    global timelast #make avalaible in this scope
     global last_step1 # = round(Int,timelast*RPM/60*ntheta)
+    if last_step!=nothing
+        last_step1 = last_step
+    end
     global last_azi
     if azi == -1.0
         n_steps = max(1,round(Int,(tnew-timelast)/ts))
@@ -388,11 +394,6 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     power = zeros(n_steps)
     power2 = zeros(n_steps)
 
-    if tnew-ts<timelast || n_steps == 1
-        timevec = tnew
-    else
-        timevec = timelast+ts:ts:tnew
-    end
     rev_step = 0
     step1 = 0 #initialize scope
     for istep = 1:n_steps#(itime,time) in enumerate(timevec)
@@ -476,13 +477,16 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
     end
 
-    if timelast != tnew #(azi-last_azi) >= dtheta*(1-1e-6) #use this for new method:
-        timelast = tnew
+    if (azi-last_azi) >= dtheta*(1-1e-6)
         last_step1 = step1
         last_azi = azi
     end
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp
+    if timelast != tnew
+        timelast = tnew
+    end
+
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp,step1
 end
 
 
@@ -623,7 +627,8 @@ function steadyTurb(;omega = -1,Vinf = -1)
 end
 
 function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
-
+    global last_stepL
+    global last_stepU
     global CPL
     global CPU
     global RpL
@@ -706,7 +711,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPL,RpL,TpL,ZpL,alphaL,clL,cd_afL,VlocL,ReL,thetavecL,ntheta,Fx_baseL,
             Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,_,_,
-            delta,XpL,YpL = advanceTurb(t;azi=aziL)
+            delta,XpL,YpL,last_stepL = advanceTurb(t;azi=aziL,last_step=last_stepL)
         end
     end
 
@@ -739,7 +744,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPU,RpU,TpU,ZpU,alphaU,clU,cd_afU,VlocU,ReU,thetavecU,ntheta,Fx_baseU,
             Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,_,_,
-            delta,XpU,YpU = advanceTurb(t;azi=aziU)
+            delta,XpU,YpU,last_stepU = advanceTurb(t;azi=aziU,last_step=last_stepU)
         end
     end
 
