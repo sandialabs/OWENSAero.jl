@@ -116,7 +116,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
 
     Ab = chord * 1.0 # Assuming unit section height
 
-    # Instantaneous Forces (Unit Height)
+    # Instantaneous Forces (Unit Height) #Based on this, radial is inward and tangential is in direction of rotation
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
     Rp = cn.*q_loc # Ning Eq. 27 # Negate to match cactus frame of reference
     Tp = -rotation*ct.*q_loc/cos(delta) # Ning Eq. 27 # Negate to match cactus frame of reference

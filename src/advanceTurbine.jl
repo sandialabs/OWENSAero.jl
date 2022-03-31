@@ -434,8 +434,8 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
                     bld_idx = Int(bld_idx-ntheta)
                 end
 
-                Fx[islice] += -Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
-                Fy[islice] += Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
+                Fx[islice] += Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
+                Fy[islice] += -Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
                 Fz[islice] += Zp_temp[bld_idx]
                 Mx[islice] += Zp_temp[bld_idx].*r[bld_idx].*cos.(thetavec_temp[bld_idx])
                 My[islice] += Zp_temp[bld_idx].*r[bld_idx].*sin.(thetavec_temp[bld_idx])
@@ -443,8 +443,8 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
 
                 Rp[iblade,islice,step_idx] = Rp_temp[bld_idx]
                 Tp[iblade,islice,step_idx] = Tp_temp[bld_idx]
-                Xp[iblade,islice,step_idx] = -Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
-                Yp[iblade,islice,step_idx] = Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) + Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
+                Xp[iblade,islice,step_idx] = Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
+                Yp[iblade,islice,step_idx] = -Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
                 Zp[iblade,islice,step_idx] = Zp_temp[bld_idx]
                 Vloc[iblade,islice,step_idx] = Vloc_temp[bld_idx]
                 alpha[iblade,islice,step_idx] = alpha_temp[bld_idx]
@@ -468,7 +468,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         Fy_base[step_idx] = VAWTAero.trapz(z3D,Fy)
         Fz_base[step_idx] = VAWTAero.trapz(z3D,Fz)
 
-        Mx_base[step_idx] = VAWTAero.trapz(z3D,(Fy.*z3D)+Mx)
+        Mx_base[step_idx] = VAWTAero.trapz(z3D,(-Fy.*z3D)+Mx)
         My_base[step_idx] = VAWTAero.trapz(z3D,(Fx.*z3D)+My)
         Mz_base[step_idx] = VAWTAero.trapz(z3D,Mz)
 

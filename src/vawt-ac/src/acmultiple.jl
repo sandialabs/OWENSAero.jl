@@ -321,7 +321,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     sigma = B*chord./r
     q = sigma./(4*pi).*cn./cos.(delta).*(W./V_wind).^2 #divide by slope to get 3D to 2D transformation normal to radial
 
-    # instantaneous forces
+    # instantaneous forces #Based on this, radial is inward and tangential is in direction of rotation
     qdyn = 0.5*rho*W.^2
     Rp = cn.*qdyn*chord
     Tp = rotation*ct.*qdyn.*chord./cos.(delta)
