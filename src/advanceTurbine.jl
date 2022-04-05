@@ -261,7 +261,7 @@ steady=false) # each of these is size ntheta x nslices
         # Calculate new delta
         if bld_x != -1 && bld_z != -1
             delta3D = zeros(Real,turbslices[1].B,length(bld_x[1,:]))
-            for ibld = turbslices[1].B
+            for ibld = 1:turbslices[1].B
                 delta_xs = bld_x[ibld,2:end] - bld_x[ibld,1:end-1]
                 delta_zs = bld_z[ibld,2:end] - bld_z[ibld,1:end-1]
 
@@ -707,11 +707,14 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
              powerL[end] = powerU[end]
              power2L[end] = power2U[end]
         else
-            aziL_save = aziL
 
             CPL,RpL,TpL,ZpL,alphaL,clL,cd_afL,VlocL,ReL,thetavecL,ntheta,Fx_baseL,
             Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,_,_,
-            delta,XpL,YpL,last_stepL = advanceTurb(t;azi=aziL,last_step=last_stepL)
+            delta,XpL,YpL,last_step = advanceTurb(t;azi=aziL,last_step=last_stepL)
+            if aziL_save != aziL
+                last_stepL = last_step
+            end
+            aziL_save = aziL
         end
     end
 
@@ -740,11 +743,14 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
         power2U[end] = power2L[end]
     else
         if aziU_save != aziU || alwaysrecalc # Do the same for the top
-            aziU_save = aziU
 
             CPU,RpU,TpU,ZpU,alphaU,clU,cd_afU,VlocU,ReU,thetavecU,ntheta,Fx_baseU,
             Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,_,_,
-            delta,XpU,YpU,last_stepU = advanceTurb(t;azi=aziU,last_step=last_stepU)
+            delta,XpU,YpU,last_step = advanceTurb(t;azi=aziU,last_step=last_stepU)
+            if aziU_save != aziU
+                last_stepU = last_step
+            end
+            aziU_save = aziU
         end
     end
 
@@ -769,7 +775,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # linearly interpolate
     if aziU!=aziL
-        fraction = (azi - aziL)/(aziU - aziL)
+        fraction = (azi - aziL)/(aziU - aziL) #TODO: only alwaysrecalc upper or lower based on fraction?
     else
         fraction = 0
     end
