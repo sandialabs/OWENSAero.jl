@@ -37,7 +37,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     dtheta = 2*pi/(ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
 
     if length(turbine.r)>1
-        idx = round(Int, (theta+dtheta/2)/dtheta) #If AD problems, check here
+        idx = round(Int, (theta+dtheta/2)/dtheta)
         r = turbine.r[idx]
         twist = turbine.twist[idx]
         delta = turbine.delta[idx]
@@ -51,6 +51,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         # V_sweep = env.V_sweep[idx] # Does not apply since the model calculation is centered around the point of rotation
 
     else
+        idx = 1
         r = turbine.r
         twist = turbine.twist
         delta = turbine.delta
@@ -105,7 +106,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
     mach = Vloc/v_sound
     if env.DSModel == "BV"
-        cl, cd_af = af(alpha,Re,mach,env,V_twist,chord,dt,Vloc;solvestep)
+        cl, cd_af = af(alpha,Re,mach,env,V_twist,chord,dt,Vloc;solvestep,idx)
     elseif env.DSModel == "LB"
         error("LB Dynamic Stall Model Not Implemented Yet")
     else

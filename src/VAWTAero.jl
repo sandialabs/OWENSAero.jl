@@ -1,6 +1,7 @@
 module VAWTAero
 import Statistics:mean
 import Libdl
+import Dierckx
 # Common
 export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
@@ -115,8 +116,8 @@ struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI}
     suction::TB
 end
 
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zero(V_x),zero(V_x),zero(V_x),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zero(V_x),zero(V_x),zero(V_x),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)

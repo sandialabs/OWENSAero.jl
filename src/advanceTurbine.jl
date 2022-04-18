@@ -552,6 +552,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     Mx = zeros(Real,Nslices,ntheta)
     My = zeros(Real,Nslices,ntheta)
     Mz = zeros(Real,Nslices,ntheta)
+    Mz2 = zeros(Real,Nslices)
     integralpower = zeros(Real,Nslices)
     integraltorque = zeros(Real,Nslices)
 
@@ -580,12 +581,13 @@ function steadyTurb(;omega = -1,Vinf = -1)
                     bld_idx = Int(bld_idx-ntheta)
                 end
 
-                Fx[islice,bld_idx] += -Rp_temp[bld_idx].*sin.(thetavec[bld_idx]) + Tp_temp[bld_idx].*cos.(thetavec[bld_idx])
-                Fy[islice,bld_idx] += Rp_temp[bld_idx].*cos.(thetavec[bld_idx]) + Tp_temp[bld_idx].*sin.(thetavec[bld_idx])
-                Fz[islice,bld_idx] += Zp_temp[bld_idx]
-                Mx[islice,bld_idx] += Zp_temp[bld_idx].*r[bld_idx].*cos.(thetavec[bld_idx])
-                My[islice,bld_idx] += Zp_temp[bld_idx].*r[bld_idx].*sin.(thetavec[bld_idx])
-                Mz[islice,bld_idx] += Tp_temp[bld_idx].*r[bld_idx]
+                Fx[islice,step1] += -Rp_temp[bld_idx].*sin.(thetavec[bld_idx]) + Tp_temp[bld_idx].*cos.(thetavec[bld_idx])
+                Fy[islice,step1] += Rp_temp[bld_idx].*cos.(thetavec[bld_idx]) + Tp_temp[bld_idx].*sin.(thetavec[bld_idx])
+                Fz[islice,step1] += Zp_temp[bld_idx]
+                Mx[islice,step1] += Zp_temp[bld_idx].*r[bld_idx].*cos.(thetavec[bld_idx])
+                My[islice,step1] += Zp_temp[bld_idx].*r[bld_idx].*sin.(thetavec[bld_idx])
+                Mz[islice,step1] += Tp_temp[bld_idx].*r[bld_idx]
+                Mz2[islice] += Tp_temp[bld_idx].*r[bld_idx] .* 2*pi/ntheta
 
                 Rp[iblade,islice,step1] = Rp_temp[bld_idx]
                 Tp[iblade,islice,step1] = Tp_temp[bld_idx]
@@ -606,6 +608,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     Mx_base = zeros(Real,ntheta)
     My_base = zeros(Real,ntheta)
     Mz_base = zeros(Real,ntheta)
+    Mz_base2 = VAWTAero.trapz(z3D,Mz2)
 
     for itheta = 1:ntheta
         # Base loads
@@ -616,6 +619,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
         Mx_base[itheta] = VAWTAero.trapz(z3D,(Fy[:,itheta].*z3D)+Mx[:,itheta])
         My_base[itheta] = VAWTAero.trapz(z3D,(Fx[:,itheta].*z3D)+My[:,itheta])
         Mz_base[itheta] = VAWTAero.trapz(z3D,Mz[:,itheta])
+
     end
 
     power = VAWTAero.trapz(z3D,integralpower)
@@ -623,7 +627,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     power2 = mean(Mz_base)*mean(abs.(omega))
 
     global z3Dnorm
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2
 end
 
 function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)

@@ -253,11 +253,15 @@ for AModel in ["AC","DMS"]
         thetavec_old = HDF5.h5read(filename,"thetavec_old")
 
         tol = 1e-2
+
+        atol = maximum(abs.(Rp_us_old))*0.02
         for ii = 1:length(Rp_us)
-            @test isapprox(Rp_us[ii],Rp_us_old[ii],atol = tol)
+            @test isapprox(Rp_us[ii],Rp_us_old[ii];atol)
         end
+
+        atol = maximum(abs.(Tp_us_old))*0.04
         for ii = 1:length(Tp_us)
-            @test isapprox(Tp_us[ii],Tp_us_old[ii],atol = tol)
+            @test isapprox(Tp_us[ii],Tp_us_old[ii];atol)
         end
         for ii = 1:length(CP)
             @test isapprox(CP[ii],CP_old[ii][1],atol = tol)

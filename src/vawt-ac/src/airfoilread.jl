@@ -129,12 +129,14 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     AOA0 = 0.0
     tc = 0.12
 
-    function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false)
-        dalpha=alpha-env.alpha_last[1] + V_twist*dt #TODO: verify sign of motion induced velocity
+    function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
+        dalpha=alpha-env.alpha_last[idx] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
-        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[1], env.BV_DynamicFlagD[1] = VAWTAero.Boeing_Vertol(af,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[1],env.BV_DynamicFlagD[1], family_factor = 0.0)
+        CL_BV, CD_BV, CM_BV, BV_DynamicFlagL, BV_DynamicFlagD = VAWTAero.Boeing_Vertol(af,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idx],env.BV_DynamicFlagD[idx], family_factor = 0.0)
         if !solvestep #don't update this while it is in the DMS independent solve loop
-            env.alpha_last[1] = alpha
+            env.alpha_last[idx] = alpha
+            env.BV_DynamicFlagL[idx] = BV_DynamicFlagL
+            env.BV_DynamicFlagD[idx] = BV_DynamicFlagD
         end
         return CL_BV, CD_BV #TODO: add CM
     end
@@ -222,12 +224,17 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         end
     end
 
+    clspl = Dierckx.Spline2D(alphas, REs, cls)
+    cdspl = Dierckx.Spline2D(alphas, REs, cds)
+    aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
+    aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+
     # Create the base airfoil wrapper function
     function af2(alpha,Re,umach=0.0,family_factor=1.0)
 
         # if length(REs)>1
-            cl = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cls, [alpha], [Re])[1]
-            cd = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cds, [alpha], [Re])[1]
+            cl = Dierckx.evaluate(clspl,alpha, Re)#FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cls, [alpha], [Re])[1]
+            cd = Dierckx.evaluate(cdspl,alpha, Re)#FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cds, [alpha], [Re])[1]
         # else
         #     cl = FLOWMath.akima(alphaOrig*pi/180, clOrig,alpha)
         #     cd = FLOWMath.akima(alphaOrig*pi/180, cdOrig,alpha)
@@ -238,19 +245,21 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
 
     # end
 
-    function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false)
-        dalpha=alpha-env.alpha_last[1] + V_twist*dt #TODO: verify sign of motion induced velocity
+    function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
+        dalpha=alpha-env.alpha_last[idx] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
         # if length(REs)>1
-            aoaStallPos = FLOWMath.akima(REs,aoaStallPosVec,Re)*pi/180
-            aoaStallNeg = FLOWMath.akima(REs,aoaStallNegVec,Re)*pi/180
+            aoaStallPos = aoaStallPosspl(Re)*pi/180#FLOWMath.akima(REs,aoaStallPosVec,Re)*pi/180
+            aoaStallNeg = aoaStallNegspl(Re)*pi/180#FLOWMath.akima(REs,aoaStallNegVec,Re)*pi/180
         # else
         #     aoaStallPos = aoaStallPosVec[1]
         #     aoaStallNeg = aoaStallNegVec[1]
         # end
-        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[1], env.BV_DynamicFlagD[1] = VAWTAero.Boeing_Vertol(af2,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[1],env.BV_DynamicFlagD[1], family_factor = 0.0)
+        CL_BV, CD_BV, CM_BV, BV_DynamicFlagL, BV_DynamicFlagD = VAWTAero.Boeing_Vertol(af2,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idx],env.BV_DynamicFlagD[idx], family_factor = 0.0)
         if !solvestep #don't update this while it is in the DMS independent solve loop #TODO: should we include the flags as well?
-            env.alpha_last[1] = alpha
+            env.alpha_last[idx] = alpha
+            env.BV_DynamicFlagL[idx] = BV_DynamicFlagL
+            env.BV_DynamicFlagD[idx] = BV_DynamicFlagD
         end
         return CL_BV, CD_BV #TODO: add CM
     end
