@@ -54,7 +54,7 @@ global powerU
 global delta = nothing
 global aziL_save = nothing
 global aziU_save = nothing
-
+global startingtwist
 
 """
 setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
@@ -164,7 +164,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     aerocenter_dist = (eta-.25).*chord[1]
 
     twist3D = -atan.(aerocenter_dist./r3D).+twist#ones(Nslices)*-0.4*pi/180
-
+    global startingtwist = twist3D
     omega = ones(Real,ntheta) .* Vinf/Radius*TSR
     RPM = omega[1]/2/pi*60
 
@@ -236,6 +236,7 @@ steady=false) # each of these is size ntheta x nslices
     global turbslices
     global envslices
     global last_step1
+    global startingtwist
     ntheta = turbslices[1].ntheta
     # Get the last step's blade index.
     dtheta = 2*pi/ntheta
@@ -287,7 +288,7 @@ steady=false) # each of these is size ntheta x nslices
                 end
 
                 if bld_twist != -1
-                    turbslices[islice].twist[bld_idx] = bld_twist[ibld,islice] #TODO: include geometric twist if not zero
+                    turbslices[islice].twist[bld_idx] = startingtwist[islice]+bld_twist[ibld,islice]
                 end
 
                 if newOmega != -1
@@ -686,7 +687,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     dtheta = 2*pi/ntheta
 
     # Get lower point
-    aziL = floor(azi/dtheta)*dtheta
+    aziL = floor(azi/dtheta)*dtheta #TODO: time only input
     if aziL_save != aziL || alwaysrecalc # do it on the first round or if it has changed
         if aziL == aziU_save && !alwaysrecalc # if the bottom is now what was the top, swap and don't recalculate
             aziL_save = aziU_save
@@ -771,7 +772,6 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     Yp = zeros(Real,NBlade,Nslices,n_steps)
     Vloc = zeros(Real,NBlade,Nslices,n_steps)
     alpha = zeros(Real,NBlade,Nslices,n_steps)
-    delta = zeros(Real,NBlade,Nslices)
     cl = zeros(Real,Nslices,n_steps)
     cd_af = zeros(Real,Nslices,n_steps)
     Re = zeros(Real,Nslices,n_steps)

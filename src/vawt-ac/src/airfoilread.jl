@@ -169,7 +169,7 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
     end
 
     # Set up arrays
-    alphas = [collect(-180:5:-21);collect(-20:0.5:20);collect(21:5:180)].*pi/180
+    alphas = [collect(-180:1:-21);collect(-20:0.5:20);collect(21:1:180)].*pi/180
     cls = zeros(length(alphas),nRe)
     cds = zeros(length(alphas),nRe)
     #TODO: cms
