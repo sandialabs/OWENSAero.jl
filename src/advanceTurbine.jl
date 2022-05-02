@@ -151,7 +151,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     shapeX = shapeX_spline(shapeY)
 
     global z3D = (shapeY[2:end] + shapeY[1:end-1])/2.0 .+1.0 #TODO: ensure the turbsim can use the correct z value i.e. it is within its window
-    global z3Dnorm = z3D./Height
+    global z3Dnorm = (z3D .- 1.0)./Height
     # RefArea_half, error = QuadGK.quadgk(shapeX_spline, 0, Height, atol=1e-10)
     # RefArea = RefArea_half*2
     RefArea = pi*Height/2*Radius #automatic gradients cant make it through quadgk
@@ -221,16 +221,21 @@ steady=false) # each of these is size ntheta x nslices
 
     global z3D
     # Interpolate to the vertical positions
-    if bld_x!=-1 && bld_z!=-1
+    if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
         bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
+        bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
-            bld_x_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0)
+            bld_x_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0) #TODO: get rid of this -1.0, which is from inflowwind not liking evaluation at the boundary
+            bld_twist_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_twist[ibld,:],z3D.-1.0)
         end
         bld_x = bld_x_temp
+        bld_twist = bld_twist_temp
         bld_z = zero(bld_x) #TODO: a better way to do this.
         for ibld = 1:length(bld_x[:,1])
             bld_z[ibld,:] = z3D.-1.0
         end
+    elseif (bld_x!=-1 && bld_z!=-1) && bld_twist==-1
+        @warn "blade x, z, and twist deformations must be specified together"
     end
 
     global turbslices
@@ -280,14 +285,11 @@ steady=false) # each of these is size ntheta x nslices
                     bld_idx = 1
                 end
 
-                if bld_x != -1 && bld_z != -1
+                if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
                     turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
                     # turbslices[islice].z[islice] = bld_z[ibld,islice]
                     # turbslices[islice].chord = chord[islice]
                     turbslices[islice].delta[bld_idx] = delta3D[ibld,islice]
-                end
-
-                if bld_twist != -1
                     turbslices[islice].twist[bld_idx] = startingtwist[islice]+bld_twist[ibld,islice]
                 end
 
