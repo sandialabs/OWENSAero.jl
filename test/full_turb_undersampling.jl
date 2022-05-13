@@ -215,7 +215,7 @@ Mz_sample_I = FLOWMath.linear(thetavec_I,Mz_base_I,mysamplethetavec)
 # PyPlot.plot(LinRange(0,1,37),Fy_sample)
 
 for itest = [1:10;13:length(Fx_sample)]
-    println(itest)
+    # println(itest)
     @test isapprox(Fx_sample_I[itest],Fx_sample[itest];atol=abs(Fx_sample[1]*0.01))
     @test isapprox(Fy_sample_I[itest],Fy_sample[itest];atol=abs(Fy_sample[1]*0.02))
     @test isapprox(Fz_sample_I[itest],Fz_sample[itest];atol=abs(Fz_sample[1]*0.01))

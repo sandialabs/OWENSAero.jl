@@ -130,13 +130,18 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     tc = 0.12
 
     function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
-        dalpha=alpha-env.alpha_last[idx] + V_twist*dt #TODO: verify sign of motion induced velocity
+        if idx==1
+            idxmin1 = length(env.alpha_last)
+        else
+            idxmin1 = idx-1
+        end
+        dalpha=alpha-env.alpha_last[idxmin1] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
-        CL_BV, CD_BV, CM_BV, BV_DynamicFlagL, BV_DynamicFlagD = VAWTAero.Boeing_Vertol(af,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idx],env.BV_DynamicFlagD[idx], family_factor = 0.0)
+        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[idxmin1], env.BV_DynamicFlagD[idxmin1] = VAWTAero.Boeing_Vertol(af,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idxmin1],env.BV_DynamicFlagD[idxmin1], family_factor = 0.0)
         if !solvestep #don't update this while it is in the DMS independent solve loop
             env.alpha_last[idx] = alpha
-            env.BV_DynamicFlagL[idx] = BV_DynamicFlagL
-            env.BV_DynamicFlagD[idx] = BV_DynamicFlagD
+            env.BV_DynamicFlagL[idx] = env.BV_DynamicFlagL[idxmin1]
+            env.BV_DynamicFlagD[idx] = env.BV_DynamicFlagD[idxmin1]
         end
         return CL_BV, CD_BV #TODO: add CM
     end
@@ -246,7 +251,12 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
     # end
 
     function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
-        dalpha=alpha-env.alpha_last[idx] + V_twist*dt #TODO: verify sign of motion induced velocity
+        if idx==1
+            idxmin1 = length(env.alpha_last)
+        else
+            idxmin1 = idx-1
+        end
+        dalpha=alpha-env.alpha_last[idxmin1] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
         # if length(REs)>1
             aoaStallPos = aoaStallPosspl(Re)*pi/180#FLOWMath.akima(REs,aoaStallPosVec,Re)*pi/180
@@ -255,11 +265,11 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         #     aoaStallPos = aoaStallPosVec[1]
         #     aoaStallNeg = aoaStallNegVec[1]
         # end
-        CL_BV, CD_BV, CM_BV, BV_DynamicFlagL, BV_DynamicFlagD = VAWTAero.Boeing_Vertol(af2,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idx],env.BV_DynamicFlagD[idx], family_factor = 0.0)
+        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[idxmin1], env.BV_DynamicFlagD[idxmin1] = VAWTAero.Boeing_Vertol(af2,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idxmin1],env.BV_DynamicFlagD[idxmin1], family_factor = 0.0)
         if !solvestep #don't update this while it is in the DMS independent solve loop #TODO: should we include the flags as well?
             env.alpha_last[idx] = alpha
-            env.BV_DynamicFlagL[idx] = BV_DynamicFlagL
-            env.BV_DynamicFlagD[idx] = BV_DynamicFlagD
+            env.BV_DynamicFlagL[idx] = env.BV_DynamicFlagL[idxmin1]
+            env.BV_DynamicFlagD[idx] = env.BV_DynamicFlagD[idxmin1]
         end
         return CL_BV, CD_BV #TODO: add CM
     end

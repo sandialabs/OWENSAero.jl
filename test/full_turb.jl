@@ -1,5 +1,5 @@
-# import PyPlot
-# PyPlot.close("all")
+import PyPlot
+PyPlot.close("all")
 import VAWTAero
 using Test
 import HDF5
@@ -27,7 +27,7 @@ function aerowrapper(chord;TSR=6.0,ifw=false,bladelength=110.0)
     global Radius = maximum(shapeX_raw)
     omega = Vinf/Radius*TSR
     RPM = omega/2/pi*60
-    N_Rev = 4
+    N_Rev = 15
     mytime = N_Rev/RPM*60
     n_steps = ntheta*N_Rev#120
     CP = zeros(Nslices,n_steps)
@@ -146,11 +146,8 @@ timetemp = thetavec[:]/ntheta/RPS #1:round(Int,ntheta*N_Rev)
 idx_start = 1#round(Int,length(Fx_base)/5)
 
 mytime = timetemp[idx_start:end] .- timetemp[idx_start]
-# if ifw
-#     filename = "$path/$(AModel)_$(bladelength)_$(chord)_turbulent_unsteadyTSR$(round(Int,TSR)).h5"
-# else
-#     filename = "$path/$(AModel)_$(bladelength)_$(chord)_constWind_unsteadyTSR$(round(Int,TSR)).h5"
-# end
+
+# filename = "$path/data/unsteadyFullTurb_ORIGINAL.h5"
 #
 # HDF5.h5open(filename, "w") do file
 #     HDF5.write(file,"CP",Float64.(CP[:,idx_start:end]))
@@ -197,60 +194,60 @@ mytime2 = HDF5.h5read(file2,"time")
 
 # # Blade Loads
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Rp2[1,1,:]),Rp2[1,1,:],label="old")
-# PyPlot.plot(1:length(Rp[1,1,:]),Rp[1,1,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Rp")
+PyPlot.figure()
+PyPlot.plot(1:length(Rp2[1,1,:]),Rp2[1,1,:],label="old")
+PyPlot.plot(1:length(Rp[1,1,:]),Rp[1,1,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Rp")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Tp2[1,1,:]),Tp2[1,1,:],label="old")
-# PyPlot.plot(1:length(Tp[1,1,:]),Tp[1,1,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Tp")
+PyPlot.figure()
+PyPlot.plot(1:length(Tp2[1,1,:]),Tp2[1,1,:],label="old")
+PyPlot.plot(1:length(Tp[1,1,:]),Tp[1,1,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Tp")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Zp2[1,1,:]),Zp2[1,1,:],label="old")
-# PyPlot.plot(1:length(Zp[1,1,:]),Zp[1,1,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Zp")
+PyPlot.figure()
+PyPlot.plot(1:length(Zp2[1,1,:]),Zp2[1,1,:],label="old")
+PyPlot.plot(1:length(Zp[1,1,:]),Zp[1,1,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Zp")
 #
 # # Base Loads
-# PyPlot.figure()
-# PyPlot.plot(1:length(Fx_base2),Fx_base2,label="old")
-# PyPlot.plot(1:length(Fx_base),-Fx_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Fx_base")
+PyPlot.figure()
+PyPlot.plot(1:length(Fx_base2),Fx_base2,label="old")
+PyPlot.plot(1:length(Fx_base),-Fx_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Fx_base")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Fy_base2),Fy_base2,label="old")
-# PyPlot.plot(1:length(Fy_base),-Fy_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Fy_base")
+PyPlot.figure()
+PyPlot.plot(1:length(Fy_base2),Fy_base2,label="old")
+PyPlot.plot(1:length(Fy_base),-Fy_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Fy_base")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Fz_base2),Fz_base2,label="old")
-# PyPlot.plot(1:length(Fz_base),-Fz_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Fz_base")
+PyPlot.figure()
+PyPlot.plot(1:length(Fz_base2),Fz_base2,label="old")
+PyPlot.plot(1:length(Fz_base),-Fz_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Fz_base")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Mx_base2),Mx_base2,label="old")
-# PyPlot.plot(1:length(Mx_base),-Mx_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Mx_base")
+PyPlot.figure()
+PyPlot.plot(1:length(Mx_base2),Mx_base2,label="old")
+PyPlot.plot(1:length(Mx_base),-Mx_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Mx_base")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(My_base2),My_base2,label="old")
-# PyPlot.plot(1:length(My_base),-My_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("My_base")
+PyPlot.figure()
+PyPlot.plot(1:length(My_base2),My_base2,label="old")
+PyPlot.plot(1:length(My_base),-My_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("My_base")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(Mz_base2),Mz_base2,label="old")
-# PyPlot.plot(1:length(Mz_base),-Mz_base,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Mz_base")
+PyPlot.figure()
+PyPlot.plot(1:length(Mz_base2),Mz_base2,label="old")
+PyPlot.plot(1:length(Mz_base),-Mz_base,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Mz_base")
 
 atol = 1e-6
 for ii = 1:length(CP2)
@@ -377,29 +374,29 @@ Mz_baseSteadyOld = HDF5.h5read(fileSteadyOld,"Mz_base")
 powerSteadyOld = HDF5.h5read(fileSteadyOld,"power")
 power2SteadyOld = HDF5.h5read(fileSteadyOld,"power2")
 
-# PyPlot.figure()
-# PyPlot.plot(1:length(RpSteadyOld[1,15,:]),RpSteadyOld[1,15,:],label="old")
-# PyPlot.plot(1:length(RpSteady[1,15,:]),RpSteady[1,15,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Rp")
+PyPlot.figure()
+PyPlot.plot(1:length(RpSteadyOld[1,15,:]),RpSteadyOld[1,15,:],label="old")
+PyPlot.plot(1:length(RpSteady[1,15,:]),RpSteady[1,15,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Rp")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(TpSteadyOld[1,15,:]),TpSteadyOld[1,15,:],label="old")
-# PyPlot.plot(1:length(TpSteady[1,15,:]),TpSteady[1,15,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Tp")
+PyPlot.figure()
+PyPlot.plot(1:length(TpSteadyOld[1,15,:]),TpSteadyOld[1,15,:],label="old")
+PyPlot.plot(1:length(TpSteady[1,15,:]),TpSteady[1,15,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Tp")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(ZpSteadyOld[1,15,:]),ZpSteadyOld[1,15,:],label="old")
-# PyPlot.plot(1:length(ZpSteady[1,15,:]),ZpSteady[1,15,:],".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("Zp")
+PyPlot.figure()
+PyPlot.plot(1:length(ZpSteadyOld[1,15,:]),ZpSteadyOld[1,15,:],label="old")
+PyPlot.plot(1:length(ZpSteady[1,15,:]),ZpSteady[1,15,:],".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("Zp")
 #
-# PyPlot.figure()
-# PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,label="old")
-# PyPlot.plot(1:length(alphaSteady[1,15,:]),alphaSteady[1,15,:].*180/pi,".-",label="new")
-# PyPlot.legend()
-# PyPlot.ylabel("alpha")
+PyPlot.figure()
+PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,label="old")
+PyPlot.plot(1:length(alphaSteady[1,15,:]),alphaSteady[1,15,:].*180/pi,".-",label="new")
+PyPlot.legend()
+PyPlot.ylabel("alpha")
 
 atol = 1e-4
 for ii = 1:length(CPSteadyOld)
@@ -454,9 +451,9 @@ for ii = 1:length(powerSteadyOld)
     @test isapprox(float.(powerSteady[ii]),powerSteadyOld[ii];atol=atol*abs(powerSteadyOld[ii]))
 end
 
-# PyPlot.figure()
-# PyPlot.plot(1:length(Rp[1,15,:]),Rp[1,15,:])
-# PyPlot.plot(length(Rp[1,15,:])-length(RpSteady[1,15,:])+1:length(Rp[1,15,:]),RpSteady[1,15,:])
+PyPlot.figure()
+PyPlot.plot(1:length(Rp[1,15,:]),Rp[1,15,:])
+PyPlot.plot(length(Rp[1,15,:])-length(RpSteady[1,15,:])+1:length(Rp[1,15,:]),RpSteady[1,15,:])
 
 # end
 # end
