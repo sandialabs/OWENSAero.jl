@@ -177,7 +177,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     end
 
     if ifw
-        VAWTAero.ifwinit(ifw_libfile;turbsim_filename)
+        OpenFASTWrappers.ifwinit(;turbsim_filename)
     end
 
     # TODO: clean this up

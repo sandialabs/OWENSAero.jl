@@ -3,6 +3,7 @@ import HDF5
 import ForwardDiff
 import FiniteDiff
 import Statistics:mean
+import OpenFASTWrappers
 # import RollingFunctions
 #
 # ENV["MPLBACKEND"]="qt5agg"
@@ -19,7 +20,7 @@ import Statistics:mean
 # # rc("axes", color_cycle=["348ABD", "A60628", "009E73", "7A68A6", "D55E00", "CC79A7"])
 plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
 
-const path,_ = splitdir(@__FILE__)
+path,_ = splitdir(@__FILE__)
 import VAWTAero
 # include("$(path)/../src/VAWTAero.jl")
 
@@ -91,8 +92,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
 
         if ifw
             turbsim_filename = "$path/data/ifw/test.bts"
-            ifw_libfile = joinpath(dirname(@__FILE__), "$path/../bin/libifw_c_binding")
-            VAWTAero.ifwinit(ifw_libfile;turbsim_filename)
+            OpenFASTWrappers.ifwinit(;turbsim_filename)
         end
 
         for step1 = 1:ntheta*N_Rev
@@ -119,7 +119,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
 
         end
         if ifw
-            VAWTAero.ifwend()
+            OpenFASTWrappers.ifwend()
         end
     end
 
@@ -191,7 +191,7 @@ for AModel in ["AC","DMS"]
 
             for i1 = 1:length(J[:,1])
                 for i2 = 1:length(J[1,:])
-                    @test isapprox(J[i1,i2],J2[i1,i2],atol=1e-5)
+                    @test isapprox(J[i1,i2],J2[i1,i2];atol=1e-5)
                 end
             end
         else
@@ -264,43 +264,53 @@ for AModel in ["AC","DMS"]
             @test isapprox(Tp_us[ii],Tp_us_old[ii];atol)
         end
         for ii = 1:length(CP)
-            @test isapprox(CP[ii],CP_old[ii][1],atol = tol)
+            @test isapprox(CP[ii],CP_old[ii][1];atol = tol)
         end
         # PyPlot.figure()
         # PyPlot.plot(LinRange(0,1,length(Rp)),Rp,"r-")
         # PyPlot.plot(LinRange(0,1,length(Rp)),Rp_old,"k-")
+        atol = maximum(abs.(Rp_old))*0.02
         for ii = 1:length(Rp)
-            @test isapprox(Rp[ii],Rp_old[ii],atol = tol)
+            @test isapprox(Rp[ii],Rp_old[ii];atol)
         end
         # PyPlot.figure()
         # PyPlot.plot(LinRange(0,1,length(Tp)),Tp,"r-")
         # PyPlot.plot(LinRange(0,1,length(Tp)),Tp_old,"k-")
+        atol = maximum(abs.(Tp_old))*0.02
         for ii = 1:length(Tp)
-            @test isapprox(Tp[ii],Tp_old[ii],atol = tol)
+            @test isapprox(Tp[ii],Tp_old[ii];atol)
         end
+        atol = maximum(abs.(Zp_old))*0.02
         for ii = 1:length(Zp)
-            @test isapprox(Zp[ii],Zp_old[ii],atol = tol)
+            @test isapprox(Zp[ii],Zp_old[ii];atol)
         end
+        atol = maximum(abs.(CT_old))*0.02
         for ii = 1:length(CT)
-            @test isapprox(CT[ii],CT_old[ii],atol = tol)
+            @test isapprox(CT[ii],CT_old[ii];atol)
         end
+        atol = maximum(abs.(Vloc_old))*0.02
         for ii = 1:length(Vloc)
-            @test isapprox(Vloc[ii],Vloc_old[ii],atol = tol)
+            @test isapprox(Vloc[ii],Vloc_old[ii];atol)
         end
+        atol = maximum(abs.(a_old))*0.02
         for ii = 1:length(a)
-            @test isapprox(a[ii],a_old[ii],atol = tol)
+            @test isapprox(a[ii],a_old[ii];atol)
         end
+        atol = maximum(abs.(alpha_old))*0.02
         for ii = 1:length(alpha)
-            @test isapprox(alpha[ii],alpha_old[ii],atol = tol)
+            @test isapprox(alpha[ii],alpha_old[ii];atol)
         end
+        atol = maximum(abs.(cl_af_old))*0.02
         for ii = 1:length(cl_af)
-            @test isapprox(cl_af[ii],cl_af_old[ii],atol = tol)
+            @test isapprox(cl_af[ii],cl_af_old[ii];atol)
         end
+        atol = maximum(abs.(cd_af_old))*0.02
         for ii = 1:length(cd_af)
-            @test isapprox(cd_af[ii],cd_af_old[ii],atol = tol)
+            @test isapprox(cd_af[ii],cd_af_old[ii];atol)
         end
+        atol = maximum(abs.(thetavec_old))*0.02
         for ii = 1:length(thetavec)
-            @test isapprox(thetavec[ii],thetavec_old[ii],atol = tol)
+            @test isapprox(thetavec[ii],thetavec_old[ii];atol)
         end
     end
 end

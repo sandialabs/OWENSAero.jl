@@ -51,7 +51,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     aw_warm = zeros(Real,ntheta*2)
     aw_warm[:] = env.aw_warm[:] #Mutate, do not link
     V_wake_old = zeros(Real,1,1)
-    V_wake_old[1] = env.V_wake_old[1]
+    V_wake_old[1] = max(0,env.V_wake_old[1]) # TODO: smooth max? Prevent numerical issues associated with negative wake
 
     # setup
     awnew = zero(aw_warm)
@@ -89,7 +89,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
 
             if ifw
                 time = mystep*dt[i_theta] #TODO: make the input time instead of step and solve up to a given time considering a specified timestep
-                velocity = ifwcalcoutput([ele_x[i_theta],ele_y[i_theta],turbine.z],time)
+                velocity = OpenFASTWrappers.ifwcalcoutput([ele_x[i_theta],ele_y[i_theta],turbine.z],time)
                 env.V_x[i_theta] = velocity[1]
                 env.V_y[i_theta] = velocity[2]
                 env.V_z[i_theta] = velocity[3]

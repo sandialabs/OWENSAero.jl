@@ -1,7 +1,7 @@
 module VAWTAero
 import Statistics:mean
-import Libdl
 import Dierckx
+import OpenFASTWrappers
 # Common
 export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
@@ -18,6 +18,9 @@ export Boeing_Vertol
 
 # Unsteady Method
 export Unsteady_Step
+
+# Module Path
+const path,_ = splitdir(@__FILE__)
 
 # Common Structs
 
@@ -201,7 +204,6 @@ include("DMS.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")
 include("Unsteady_Step.jl")
-include("inflowwind.jl")
 include("Boeing_Vertol.jl")
 include("advanceTurbine.jl")
 
