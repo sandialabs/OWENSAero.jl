@@ -26,8 +26,8 @@ const path,_ = splitdir(@__FILE__)
 
 """
     Turbine(R::TF,r::TAF,z::TF,chord::TAF3,twist::TAF5,delta::TAF,omega::TAF4,B::TI,af::TFN,ntheta::TI,r_delta_influence::TB,centerX::TAF2,centerY::TAF2)
-    Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zero(R),zero(R))
-    Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zero(R),zero(R))
+    Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)))
+    Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)))
 
 Contains specications for turbine slice (geometry, location, airfoil)
 
@@ -66,13 +66,13 @@ struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TFN,TB}
     centerY::TAF2
 end
 
-Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zero(R),zero(R))
-Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zero(R),zero(R))
+Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)))
+Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)))
 
 """
 Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DSModel::TS,AModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
 Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zero(V_x),zero(V_x),zero(V_x),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
+Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
 
 Contains specications for turbine slice environment/operating conditions as well as some backend memory for dynamic stall and unsteady calculations
 
@@ -99,13 +99,13 @@ Contains specications for turbine slice environment/operating conditions as well
 * `none`:
 
 """
-struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI}
+struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI,TAF3}
     rho::TF
     mu::TF
     V_x::TAF #Vinf is Vx
     V_y::TAF
-    V_z::TAF
-    V_twist::TAF
+    V_z::TAF3
+    V_twist::TAF3
     windangle::TF #radians
     DSModel::TS
     AModel::TS
@@ -120,7 +120,7 @@ struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI}
 end
 
 Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zero(V_x),zero(V_x),zero(V_x),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)

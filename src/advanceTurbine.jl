@@ -182,9 +182,9 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
 
     # TODO: clean this up
     V_xtemp = Vinf*ones(Real,ntheta)
-    V_ytemp = zero(V_xtemp)
-    V_z = zero(V_xtemp)
-    V_twist = zero(V_xtemp)
+    V_ytemp = zeros(Real,size(V_xtemp))
+    V_z = zeros(Real,size(V_xtemp))
+    V_twist = zeros(Real,size(V_xtemp))
     windangle = windangle_D * pi/180
     V_x = V_xtemp*cos(windangle)-V_ytemp*sin(windangle)
     V_y = V_xtemp*sin(windangle)+V_ytemp*cos(windangle)
@@ -230,7 +230,7 @@ steady=false) # each of these is size ntheta x nslices
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp
-        bld_z = zero(bld_x) #TODO: a better way to do this.
+        bld_z = zeros(Real,size(bld_x)) #TODO: a better way to do this.
         for ibld = 1:length(bld_x[:,1])
             bld_z[ibld,:] = z3D.-1.0
         end

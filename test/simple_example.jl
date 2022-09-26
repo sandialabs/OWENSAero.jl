@@ -54,9 +54,9 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
     mu = 1.7894e-5
     tsrvec = [2.1,3.1,4.2,x[2],6.0,7.0]
     V_xtemp = omega/tsrvec[4]*R
-    V_ytemp = zero(V_xtemp)
-    V_z = zero(V_xtemp)
-    V_twist = zero(V_xtemp)
+    V_ytemp = zeros(Real,size(V_xtemp))
+    V_z = zeros(Real,size(V_xtemp))
+    V_twist = zeros(Real,size(V_xtemp))
     windangle = windangle_D * pi/180
     V_x = V_xtemp*cos(windangle)-V_ytemp*sin(windangle)
     V_y = V_xtemp*sin(windangle)+V_ytemp*cos(windangle)

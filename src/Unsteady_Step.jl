@@ -54,7 +54,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     V_wake_old[1] = max(0,env.V_wake_old[1]) # TODO: smooth max? Prevent numerical issues associated with negative wake
 
     # setup
-    awnew = zero(aw_warm)
+    awnew = zeros(Real,size(aw_warm))
 
     # Calculate the RPI indices
     circular_mystep = mystep-floor((mystep-1)/ntheta*turbine.B)*ntheta/turbine.B

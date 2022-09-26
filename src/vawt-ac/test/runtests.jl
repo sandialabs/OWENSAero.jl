@@ -31,7 +31,7 @@ turbines = Array{VAWTAero.Turbine}(undef,1)
 turbines[1] = VAWTAero.Turbine(r,r, chord, twist, delta, omega, B, af, ntheta,false)
 # (rho,mu,V_x,V_y,V_z,V_twist,DSModel,AModel,aw_warm)
 windangle = 0.0 * pi/180.0
-env = VAWTAero.Environment(rho, mu,Vinf,zero(Vinf),zero(Vinf),zero(Vinf),windangle,"none","AC",zeros(ntheta*2))
+env = VAWTAero.Environment(rho, mu,Vinf,zeros(Real,size(Vinf)),zeros(Real,size(Vinf)),zeros(Real,size(Vinf)),windangle,"none","AC",zeros(ntheta*2))
 
 
 @testset "VAWTAero.jl one turbine" begin
