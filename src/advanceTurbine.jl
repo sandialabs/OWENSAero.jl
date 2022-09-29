@@ -177,7 +177,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     end
 
     if ifw
-        OpenFASTWrappers.ifwinit(;turbsim_filename)
+        OpenFASTWrappers.ifwinit(;inflowlib_filename=ifw_libfile,turbsim_filename)
     end
 
     # TODO: clean this up
