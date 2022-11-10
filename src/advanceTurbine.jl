@@ -408,6 +408,9 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
 
         step_idx = max(1,step1-last_step1) #Single time step handling
+        if step_idx>n_steps
+            step_idx = n_steps
+        end
 
         Fx = zeros(Nslices)
         Fy = zeros(Nslices)
