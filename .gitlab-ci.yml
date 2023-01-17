@@ -26,7 +26,38 @@
     - export HTTPS_PROXY="http://user:nopass@proxy.sandia.gov:80/"
     - export no_proxy=*.local,169.254/16,*.sandia.gov,*.srn.sandia.gov,localhost,127.0.0.1,::1
     - export NO_PROXY=*.local,169.254/16,*.sandia.gov,*.srn.sandia.gov,localhost,127.0.0.1,::1
-    - julia -e 'using Pkg; Pkg.add(PackageSpec(url=pwd())); Pkg.build("VAWTAero"); Pkg.test("VAWTAero";coverage=true)'
+        - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    # Generate the private/public key pair using:
+    #
+    #     ssh-keygen -t rsa -m PEM -C username@sandia.gov
+    #
+    # then set the $GIT_SSH_PRIV_KEY environment variable in the CI (Travis-CI,
+    # GitLab-CI, ...) to the base64 encoded private key (i.e. use the string that
+    # comes out of this command for the VALUE in Project Settings -> CI/CD -> Variables
+    # the KEY is the word GIT_SSH_PRIV_KEY):
+    #
+    #     cat generatedkey | base64
+    #
+    # and add the public key `deploy_key.pub` into the target git repository (with
+    # write permissions). Project Settings -> Repository -> Deploy Keys (or your profile public key)
+    # The code below decodes it into the correct format
+    - ssh-add <(echo "$GIT_SSH_PRIV_KEY" | base64 --decode)
+    - mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
+    - echo cee-gitlab.sandia.gov,205.137.80.113 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBPGMKnnt5MDq2swdsmJqIGjQF6JfqXM/Ju1e0lGZiaL6rdOY0dTZFBDHuSrwrp954J0WYXuMKRJB54uMi7B+VZc= >> ~/.ssh/known_hosts
+    - export SSH_KEY_PATH=~/.ssh
+    - export JULIA_PKG_USE_CLI_GIT=true
+    - (echo "$GIT_SSH_PRIV_KEY" | base64 --decode) > ~/.ssh/id_rsa
+    - chmod 400 ~/.ssh/id_rsa
+    - 'which git || ( apt-get update -y && apt-get install git -y )'
+    - git config --global user.name "${GITLAB_USER_NAME}"
+    - git config --global user.email "${GITLAB_USER_EMAIL}"
+    - git config --global http.sslVerify false
+    - git config --global https.sslVerify false
+    - git config --global http.proxy http://user:nopass@proxy.sandia.gov:80
+    - git config --global https.proxy http://user:nopass@proxy.sandia.gov:80
+    - git clone git@cee-gitlab.sandia.gov:8921-VAWT-TOOLS/OpenFASTWrappers.jl.git
+    - julia -e 'using Pkg; Pkg.add(PackageSpec(url="./OpenFASTWrappers.jl")); Pkg.add(PackageSpec(url=pwd())); Pkg.build("VAWTAero"); Pkg.test("VAWTAero";coverage=true)'
     # Comment out below if you do not want coverage results.
     - julia -e 'using Pkg; Pkg.add("Coverage");
       import VAWTAero; cd(joinpath(dirname(pathof(VAWTAero)), ".."));
