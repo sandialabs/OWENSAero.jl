@@ -92,7 +92,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
 
         if ifw
             turbsim_filename = "$path/data/ifw/test.bts"
-            OpenFASTWrappers.ifwinit(;turbsim_filename)
+            OpenFASTWrappers.ifwinit(;inflowlib_filename="/builds/8921-VAWT-TOOLS/OpenFASTWrappers.jl/openfast/build/modules/inflowwind/libifw_c_binding",turbsim_filename)
         end
 
         for step1 = 1:ntheta*N_Rev
