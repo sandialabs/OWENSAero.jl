@@ -62,6 +62,6 @@
   coverage: '/\d+\.\d+ covered/'
 
 test:latest:
-  image: julia:1.8
+  image: julia:latest
   <<: *test_definition
 
