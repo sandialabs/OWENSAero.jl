@@ -1,7 +1,7 @@
 name = "VAWTAero"
 uuid = "513c2d6f-fecb-4566-aa46-de6170e5ba6d"
 authors = ["Kevin R. Moore <kevmoor@sandia.gov> and contributors"]
-version = "1.0.1"
+version = "1.0.2"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
