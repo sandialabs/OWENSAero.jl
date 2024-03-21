@@ -1,0 +1,17 @@
+*.png
+*.DS_Store
+Manifest.toml
+theta*
+*.aux
+*.bbl
+*.blg
+*.log
+*.nlo
+*.nls
+*.out
+*.gz
+*.synctex*
+*.pptx
+*.docx
+*.csv
+*Manual*
