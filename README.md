@@ -1,5 +1,8 @@
 # OWENSAero.jl
 
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](github.com/sandialabs/OWENSAero.jl.git)
+![](https://github.com/sandialabs/OWENSAero.jl/workflows/CI/badge.svg)
+
 This repository contains a set of aerodynamic tools for VAWTs both steady and unsteady operation, 2D and
 3D (stacked 2D) convenience functions along with coupling to NREL's InflowWind for turbulent inflow. If using InflowWind (ifw flag) You
 will need to provide your own .bts files from turbsim (compile or download OpenFAST and use the turbsim

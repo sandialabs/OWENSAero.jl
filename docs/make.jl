@@ -10,3 +10,7 @@ makedocs(;
     sitename = "OWENSAero.jl",
     authors = "Kevin R. Moore <kevmoor@sandia.gov>",
 )
+
+deploydocs(
+    repo = "github.com/sandialabs/OWENSAero.jl.git",
+)
