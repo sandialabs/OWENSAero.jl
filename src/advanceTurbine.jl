@@ -216,6 +216,9 @@ end
 function deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
 bld_z=-1,
 bld_twist=-1,
+bld_x_accel=0,
+bld_y_accel=0,
+bld_z_accel=0,
 steady=false) # each of these is size ntheta x nslices
 
 
@@ -224,13 +227,22 @@ steady=false) # each of these is size ntheta x nslices
     if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
         bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
         bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
+        bld_x_accel_temp = zeros(length(bld_x[:,1]),length(z3D))
+        bld_y_accel_temp = zeros(length(bld_x[:,1]),length(z3D))
+        bld_z_accel_temp = zeros(length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
             bld_x_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0) #TODO: get rid of this -1.0, which is from inflowwind not liking evaluation at the boundary
             bld_twist_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_twist[ibld,:],z3D.-1.0)
+            bld_x_accel_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x_accel[ibld,:],z3D.-1.0)
+            bld_y_accel_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_y_accel[ibld,:],z3D.-1.0)
+            bld_z_accel_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_z_accel[ibld,:],z3D.-1.0)
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp
         bld_z = zeros(Real,size(bld_x)) #TODO: a better way to do this.
+        bld_x_accel = bld_x_accel_temp
+        bld_y_accel = bld_y_accel_temp
+        bld_z_accel = bld_z_accel_temp
         for ibld = 1:length(bld_x[:,1])
             bld_z[ibld,:] = z3D.-1.0
         end
@@ -291,6 +303,9 @@ steady=false) # each of these is size ntheta x nslices
                     # turbslices[islice].chord = chord[islice]
                     turbslices[islice].delta[bld_idx] = delta3D[ibld,islice]
                     turbslices[islice].twist[bld_idx] = startingtwist[islice]+bld_twist[ibld,islice]
+                    turbslices[islice].bld_x_accel[bld_idx] = bld_x_accel[ibld,islice]
+                    turbslices[islice].bld_y_accel[bld_idx] = bld_y_accel[ibld,islice]
+                    turbslices[islice].bld_z_accel[bld_idx] = bld_z_accel[ibld,islice]
                 end
 
                 if newOmega != -1
@@ -347,6 +362,7 @@ Runs a previously initialized aero model (see ?setupTurb) in the unsteady mode (
 
 """
 function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),azi=-1.0,verbosity=0,alwaysrecalc=nothing,last_step=nothing)
+    
     global timelast
     global us_param
     global turbslices
@@ -530,7 +546,7 @@ Runs a previously initialized aero model (see ?setupTurb) in the steady state mo
 
 """
 function steadyTurb(;omega = -1,Vinf = -1)
-
+println("AERO FORCES BEING CALCULATED STEADY")
     # global us_param #TODO: add turbulence lookup option for steady?
     global turbslices
     global envslices

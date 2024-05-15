@@ -22,6 +22,7 @@ end
 
 """
 function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, solvestep=false, add_mass=false, buoy=false)
+    
     # Unpack Vars
     B = turbine.B
     k = 1.0
@@ -31,6 +32,8 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     suction = false
     rho = env.rho
     mu = env.mu
+    # uddot = xx.x[1]
+
     # winddir = env.winddir
 
     dtheta = 2 * pi / (ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
@@ -117,11 +120,7 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     end
 
     # CK, hard coded parameter for added mass, temporary
-    v_old = copy(Vn) * 0.25
-    v_new = copy(Vn)
-    r_old = copy(r) + 0.1
-    r_new = copy(r)
-    #r_ddot = (v_new - v_old) / dt
+    # r_ddot = uddot-omega^2*r
     r_ddot = omega^2*r
     Ca = 1
 
