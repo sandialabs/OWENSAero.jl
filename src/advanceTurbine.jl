@@ -111,6 +111,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     Height = maximum(bld_z),
     Radius = maximum(bld_x),
+    bld_y = zeros(length(bld_x)),
     eta = 0.25,
     twist = 0.0,
     rho = 1.225,
@@ -145,18 +146,19 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
         afname = fill(afname,Nslices)
     end
 
-    shapeX_spline = FLOWMath.Akima(bld_z, bld_x)
+    shapeZ = collect(LinRange(0,Height,Nslices+1))
+    shapeX = FLOWMath.akima(bld_z, bld_x, shapeZ)
+    shapeY = FLOWMath.akima(bld_z, bld_y, shapeZ)
 
-    shapeY = collect(LinRange(0,Height,Nslices+1))
-    shapeX = shapeX_spline(shapeY)
+    blade_helical = round.(Int,atan.(shapeX,shapeY)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
 
-    global z3D = (shapeY[2:end] + shapeY[1:end-1])/2.0 .+1.0 #TODO: ensure the turbsim can use the correct z value i.e. it is within its window
+    global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0 .+1.0 #TODO: ensure the turbsim can use the correct z value i.e. it is within its window
     global z3Dnorm = (z3D .- 1.0)./Height
     # RefArea_half, error = QuadGK.quadgk(shapeX_spline, 0, Height, atol=1e-10)
     # RefArea = RefArea_half*2
     RefArea = pi*Height/2*Radius #automatic gradients cant make it through quadgk
     delta_xs = shapeX[2:end] - shapeX[1:end-1]
-    delta_zs = shapeY[2:end] - shapeY[1:end-1]
+    delta_zs = shapeZ[2:end] - shapeZ[1:end-1]
 
     delta3D = atan.(delta_xs./delta_zs)
 
@@ -207,7 +209,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],twist,delta,omega,B,af,ntheta,false)
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
         envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,zeros(Real,ntheta*2))
     end
 end
@@ -405,13 +407,6 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             println("istep $istep of $(n_steps)")
         end
 
-        step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
-
-        step_idx = max(1,step1-last_step1) #Single time step handling
-        if step_idx>n_steps
-            step_idx = n_steps
-        end
-
         Fx = zeros(Nslices)
         Fy = zeros(Nslices)
         Fz = zeros(Nslices)
@@ -420,22 +415,31 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         Mz = zeros(Nslices)
         integralpower = zeros(Nslices)
 
+        step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+
         bnum = 1
         rev_step = Int(step1-floor(Int,(step1-1)/ntheta)*ntheta + (bnum-1)*ntheta/B)
         if rev_step>ntheta
             rev_step -= ntheta
         end
 
+        step_idx = max(1,step1-last_step1) #Single time step handling
+        if step_idx>n_steps
+            step_idx = n_steps
+        end
+
         for islice = 1:Nslices
+            
+            helical_offset = turbslices[islice].helical_offset
 
             CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc_temp,
             CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl_temp, cd_temp,
-            thetavec_temp, Re_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1)
+            thetavec_temp, Re_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1+helical_offset)
 
             # Intermediate base loads
             r = turbslices[islice].r
             for iblade = 1:B
-                bld_idx = Int(step1-floor(Int,(step1-1)/ntheta)*ntheta + (iblade-1)*ntheta/B)
+                bld_idx = Int(step1+helical_offset-floor(Int,(step1+helical_offset-1)/ntheta)*ntheta + (iblade-1)*ntheta/B)
                 if bld_idx>ntheta
                     bld_idx = Int(bld_idx-ntheta)
                 end
