@@ -150,7 +150,8 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     shapeX = FLOWMath.akima(bld_z, bld_x, shapeZ)
     shapeY = FLOWMath.akima(bld_z, bld_y, shapeZ)
 
-    blade_helical = round.(Int,atan.(shapeX,shapeY)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
+    blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
+    blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
 
     global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0 .+1.0 #TODO: ensure the turbsim can use the correct z value i.e. it is within its window
     global z3Dnorm = (z3D .- 1.0)./Height
