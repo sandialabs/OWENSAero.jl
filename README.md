@@ -1,6 +1,6 @@
 # OWENSAero.jl
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](github.com/sandialabs/OWENSAero.jl.git)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://sandialabs.github.io/OWENSAero.jl)
 ![](https://github.com/sandialabs/OWENSAero.jl/workflows/CI/badge.svg)
 
 This repository contains a set of aerodynamic tools for VAWTs both steady and unsteady operation, 2D and
