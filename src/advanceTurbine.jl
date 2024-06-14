@@ -125,7 +125,7 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     windangle_D = 0.0,
     afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
-    ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"))
+    ifw_libfile = nothing)
 
     global dt = 0.0 #might not be used
     global last_step1 = 0
