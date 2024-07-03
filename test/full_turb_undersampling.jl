@@ -44,13 +44,12 @@ function runfullturb(interpolate)
     shapeX_raw = xrotor./150*bladelength
     shapeY_raw = zrotor./150*bladelength
     B = 3
-
-    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,TSR,Vinf;Nslices,ntheta,afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV",tau = [1e-5,1e-5])
-
     Radius = maximum(shapeX_raw)
     omega = Vinf/Radius*TSR
     RPM = omega/2/pi*60
     N_Rev = 0.5
+
+    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;Nslices,ntheta,afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV",tau = [1e-5,1e-5])
 
     if interpolate
         mydt = 2*pi/(ntheta*omega)/3

@@ -21,13 +21,13 @@ function aerowrapper(chord;TSR=6.0,ifw=false,bladelength=110.0)
     shapeX_raw = xrotor./150*bladelength
     shapeY_raw = zrotor./150*bladelength
     B = 3
-
-    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,TSR,Vinf;afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV")
-
     global Radius = maximum(shapeX_raw)
     omega = Vinf/Radius*TSR
     RPM = omega/2/pi*60
     N_Rev = 15
+
+    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV")
+
     mytime = N_Rev/RPM*60
     n_steps = ntheta*N_Rev#120
     CP = zeros(Nslices,n_steps)

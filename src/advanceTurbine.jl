@@ -57,7 +57,7 @@ global aziU_save = nothing
 global startingtwist
 
 """
-setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
+setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
     Radius = maximum(bld_x),
     eta = 0.25,
@@ -83,7 +83,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `bld_z`: Blade z shape
 * `B`: Number of blades
 * `chord`: chord length (m)
-* `TSR`: Tip speed ratio
+* `omega`: rotation rate in rad/s.  size(1) or size(ntheta), pass in an array(Real,ntheta) when propogating automatic gradients
 * `Vinf`: Inflow velocity
 * `Height`:  turbine total height (m) typically maximum(bld_z) unless only the shape and not size of bld_z is being used
 * `Radius`:  turbine nominal radius (m) typically maximum(bld_x) unless only shape and not size of bld_x is used
@@ -108,7 +108,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `none`:
 
 """
-function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
+function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
     Radius = maximum(bld_x),
     bld_y = zeros(length(bld_x)),
@@ -170,8 +170,9 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
 
     twist3D = -atan.(aerocenter_dist./r3D).+twist#ones(Nslices)*-0.4*pi/180
     global startingtwist = twist3D
-    omega = ones(Real,ntheta) .* Vinf/Radius*TSR
-    RPM = omega[1]/2/pi*60
+    if length(omega)==1
+        omega = ones(Real,ntheta) .* omega
+    end
 
     function affun(alpha, Re, M;V_twist=nothing,chord=nothing,dt=nothing,Vloc=nothing)
 
