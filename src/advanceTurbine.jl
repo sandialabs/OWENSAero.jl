@@ -90,7 +90,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `eta`: blade mount point ratio, i.e. 0.25 would be at the quarter chord
 * `twist`: 0.0, #or array{Float,Nslices}
 * `rho`: working fluid density (kg/m^3)
-* `mu`:  working fluid density (standard SI units)
+* `mu`:  working fluid dynamic viscosity (Pa*s)
 * `RPI`: RPI method flag
 * `tau`: Unsteady wake propogation time constants [0.3,3.0],
 * `ntheta`: Number of azimuthal discretizations
@@ -141,6 +141,8 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
     if length(chord) == 1
         chord = chord.*ones(Real,Nslices)
     end
+
+    thick = chord .* 0.18 #TODO: decide how to propogate automatically or optionally
 
     if isa(afname, String) #This allows for either a single airfoil for all, or if it is an array of strings it won't enter here and they will be used
         afname = fill(afname,Nslices)
@@ -210,12 +212,30 @@ function setupTurb(bld_x,bld_z,B,chord,TSR,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thick[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
         envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,zeros(Real,ntheta*2))
     end
 end
 
+"""
+deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
+    bld_z=-1,
+    bld_twist=-1,
+    steady=false)
 
+Equivalent to an update states call, mutating the internal aerodynamic inputs within the unsteady model.
+
+# Inputs
+* `azi`: Current azimuth position of the turbine in radians (continuously growing with numbers of revolutions)
+* `bld_x`: Blade structural x shape, size(NBlade,any), any as it is splined against bld_z and the aero discretization
+* `bld_z`: Blade structural z shape, size(NBlade,any), any as it is splined against bld_x and the aero discretization
+* `bld_twist`: Blade structural twist, size(NBlade,any), any as it is splined against bld_z and the aero discretization.  Note that in the calcs, this will be in addition to the aero twist offset already applied in initialization.
+* `steady::bool`: if steady is true, it just updates a single step.  TODO: verify this is correct
+
+# Outputs:
+* `none`:
+
+"""
 function deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
 bld_z=-1,
 bld_twist=-1,
