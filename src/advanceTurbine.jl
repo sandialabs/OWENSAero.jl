@@ -74,7 +74,11 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     windangle_D = 0.0,
     afname = "(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
-    ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"))
+    ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"),
+    AM_flag = false,
+    buoy_flag = false,
+    rotAccel_flag = false,
+    AM_Coeff_Ca = 1.0)
 
 Initializes aerodynamic models and sets up backend persistent memory to simplify intermittent calling within coupled solver loops
 
@@ -102,7 +106,10 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
 * `ifw_libfile`:  inflow wind dynamic library location e.g. joinpath(dirname(@__FILE__), "../../../openfast/build/modules/inflowwind/libifw_c_binding"))
-
+* `AM_flag::bool`: flag to turn on added mass effects
+* `buoy_flag::bool`: flag to turn on buoyancy forces
+* `rotAccel_flag::bool`: flag to turn on the rotational acceleration portion of added mass for a crossflow turbine
+* `AM_Coeff_Ca::float`: added mass coefficient, typically 1.0
 
 # Outputs:
 * `none`:
@@ -126,7 +133,12 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     windangle_D = 0.0,
     afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
-    ifw_libfile = nothing)
+    ifw_libfile = nothing,
+    AM_flag = false,
+    rotAccel_flag = false,
+    buoy_flag = false,
+    AM_Coeff_Ca = 1.0,
+    af_thick = 0.18)
 
     global dt = 0.0 #might not be used
     global last_step1 = 0
@@ -142,7 +154,9 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         chord = chord.*ones(Real,Nslices)
     end
 
-    thick = chord .* 0.18 #TODO: decide how to propogate automatically or optionally
+    if length(af_thick) ==1
+        thickness = chord .* af_thick #TODO: decide how to propogate automatically or optionally
+    end
 
     if isa(afname, String) #This allows for either a single airfoil for all, or if it is an array of strings it won't enter here and they will be used
         afname = fill(afname,Nslices)
@@ -213,8 +227,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thick[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,zeros(Real,ntheta*2))
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,zeros(Real,ntheta*2))
     end
 end
 
@@ -584,6 +598,10 @@ function steadyTurb(;omega = -1,Vinf = -1)
     Mx = zeros(Real,Nslices,ntheta)
     My = zeros(Real,Nslices,ntheta)
     Mz = zeros(Real,Nslices,ntheta)
+    M_addedmass_Np = zeros(Real,Nslices,ntheta)
+    M_addedmass_Tp = zeros(Real,Nslices,ntheta)
+    F_addedmass_Np = zeros(Real,Nslices,ntheta)
+    F_addedmass_Tp = zeros(Real,Nslices,ntheta)
     Mz2 = zeros(Real,Nslices)
     integralpower = zeros(Real,Nslices)
     integraltorque = zeros(Real,Nslices)
@@ -602,7 +620,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
 
         CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc[islice,:],
         CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl[islice,:], cd_af[islice,:],
-        thetavec, Re[islice,:] = OWENSAero.steady(turbslices[islice],envslices[islice])
+        thetavec, Re[islice,:], M_addedmass_Np[islice,:], M_addedmass_Tp[islice,:], F_addedmass_Np[islice,:], F_addedmass_Tp[islice,:] = OWENSAero.steady(turbslices[islice],envslices[islice])
 
         # Intermediate base loads
         r = turbslices[islice].r
@@ -659,7 +677,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     power2 = mean(Mz_base)*mean(abs.(omega))
 
     global z3Dnorm
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp
 end
 
 function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)

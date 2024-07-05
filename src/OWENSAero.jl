@@ -126,6 +126,7 @@ struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI,TAF3}
 end
 
 Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,false,false,false,1.0,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
 Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,false,false,false,1.0,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
 
 """
