@@ -238,8 +238,10 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
     function af2(alpha,Re,umach=0.0,family_factor=1.0)
 
         # if length(REs)>1
-            cl = Dierckx.evaluate(clspl,alpha, Re)#FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cls, [alpha], [Re])[1]
-            cd = Dierckx.evaluate(cdspl,alpha, Re)#FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cds, [alpha], [Re])[1]
+            cl = Dierckx.evaluate(clspl,alpha, Re)
+            cd = Dierckx.evaluate(cdspl,alpha, Re)
+            # cl = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cls, [alpha], [Re])[1]
+            # cd = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cds, [alpha], [Re])[1]
         # else
         #     cl = FLOWMath.akima(alphaOrig*pi/180, clOrig,alpha)
         #     cd = FLOWMath.akima(alphaOrig*pi/180, cdOrig,alpha)

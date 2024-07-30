@@ -121,7 +121,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
 
     if AM_flag
         Vol_flap = pi * (chord/2)^2 * 1.0
-        Vol_edge = pi * (thickness/2)^2 * 1.0
+        Vol_edge = pi * ((thickness/10)/2)^2 * 1.0
     
         accel_flap = 0.0 #TODO: put in structs
         accel_edge = 0.0 #TODO: put in structs 
