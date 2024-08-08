@@ -698,8 +698,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta #TODO: time only input
-    if aziL_save != aziL || alwaysrecalc # do it on the first round or if it has changed
-        if aziL == aziU_save && !alwaysrecalc # if the bottom is now what was the top, swap and don't recalculate
+    if aziL_save != aziL 
+        if aziL == aziU_save 
             aziL_save = aziU_save
              CPL[:,end] = CPU[:,end]
              RpL[:,:,end] = RpU[:,:,end]
