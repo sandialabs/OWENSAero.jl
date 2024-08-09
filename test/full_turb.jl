@@ -1,5 +1,6 @@
-# import PyPlot
-# PyPlot.close("all")
+import PyPlot
+PyPlot.close("all")
+PyPlot.pygui(true)
 import OWENSAero
 using Test
 import HDF5
@@ -148,7 +149,7 @@ idx_start = 1#round(Int,length(Fx_base)/5)
 mytime = timetemp[idx_start:end] .- timetemp[idx_start]
 
 # filename = "$path/data/unsteadyFullTurb_ORIGINAL.h5"
-#
+
 # HDF5.h5open(filename, "w") do file
 #     HDF5.write(file,"CP",Float64.(CP[:,idx_start:end]))
 #     HDF5.write(file,"Rp",Float64.(Rp[:,:,idx_start:end]))
@@ -193,56 +194,56 @@ power22 = HDF5.h5read(file2,"power2")
 mytime2 = HDF5.h5read(file2,"time")
 
 # # Blade Loads
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Rp2[1,1,:]),Rp2[1,1,:],label="old")
 # PyPlot.plot(1:length(Rp[1,1,:]),Rp[1,1,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Rp")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Tp2[1,1,:]),Tp2[1,1,:],label="old")
 # PyPlot.plot(1:length(Tp[1,1,:]),Tp[1,1,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Tp")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Zp2[1,1,:]),Zp2[1,1,:],label="old")
 # PyPlot.plot(1:length(Zp[1,1,:]),Zp[1,1,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Zp")
-#
+
 # # Base Loads
 # PyPlot.figure()
 # PyPlot.plot(1:length(Fx_base2),Fx_base2,label="old")
 # PyPlot.plot(1:length(Fx_base),-Fx_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Fx_base")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Fy_base2),Fy_base2,label="old")
 # PyPlot.plot(1:length(Fy_base),-Fy_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Fy_base")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Fz_base2),Fz_base2,label="old")
 # PyPlot.plot(1:length(Fz_base),-Fz_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Fz_base")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Mx_base2),Mx_base2,label="old")
 # PyPlot.plot(1:length(Mx_base),-Mx_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Mx_base")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(My_base2),My_base2,label="old")
 # PyPlot.plot(1:length(My_base),-My_base,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("My_base")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(Mz_base2),Mz_base2,label="old")
 # PyPlot.plot(1:length(Mz_base),-Mz_base,".-",label="new")
@@ -379,24 +380,63 @@ power2SteadyOld = HDF5.h5read(fileSteadyOld,"power2")
 # PyPlot.plot(1:length(RpSteady[1,15,:]),RpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Rp")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(TpSteadyOld[1,15,:]),TpSteadyOld[1,15,:],label="old")
 # PyPlot.plot(1:length(TpSteady[1,15,:]),TpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Tp")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(ZpSteadyOld[1,15,:]),ZpSteadyOld[1,15,:],label="old")
 # PyPlot.plot(1:length(ZpSteady[1,15,:]),ZpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Zp")
-#
+
 # PyPlot.figure()
 # PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,label="old")
 # PyPlot.plot(1:length(alphaSteady[1,15,:]),alphaSteady[1,15,:].*180/pi,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("alpha")
+
+
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(Fx_baseSteadyOld),Fx_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(Fx_baseSteady),Fx_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("Fx_baseSteady")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(Fy_baseSteadyOld),Fy_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(Fy_baseSteady),Fy_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("Fy_baseSteady")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(Fz_baseSteadyOld),Fz_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(Fz_baseSteady),Fz_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("Fz_baseSteady")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(Mx_baseSteadyOld),Mx_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(Mx_baseSteady),Mx_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("Mx_baseSteady")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(My_baseSteadyOld),My_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(My_baseSteady),My_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("My_baseSteady")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(Mz_baseSteadyOld),Mz_baseSteadyOld,label="old")
+# PyPlot.plot(1:length(Mz_baseSteady),Mz_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("Mz_baseSteady")
+
 
 atol = 1e-4
 for ii = 1:length(CPSteadyOld)
