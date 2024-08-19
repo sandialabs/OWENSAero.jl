@@ -55,10 +55,12 @@ function readaerodyn(filename)
     afcl = FLOWMath.Akima(alpha*pi/180, cl)
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
 
-    function af(alpha,re,mach)
-
-        cl = afcl(alpha)
-        cd = afcd(alpha)
+    function af(alphain,re,mach)
+        if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
+            @error "aoa is greater or less than what is defined"
+        end
+            cl = afcl(alphain)
+            cd = afcd(alphain)
 
         return cl, cd
     end
@@ -116,6 +118,9 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
     cl=0.0
     function af(alpha,Re,umach,family_factor)
+        if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
+            @error "aoa is greater or less than what is defined"
+        end
 
         cl = afcl(alpha)
         cd = afcd(alpha)
@@ -223,8 +228,8 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
                 end
 
                 # Interpolate to a uniform aoa array and store
-                cls[:,iRe] = FLOWMath.akima(alphaOrig*pi/180,clOrig,alphas)
-                cds[:,iRe] = FLOWMath.akima(alphaOrig*pi/180,cdOrig,alphas)
+                cls[:,iRe] = safeakima(alphaOrig*pi/180,clOrig,alphas)
+                cds[:,iRe] = safeakima(alphaOrig*pi/180,cdOrig,alphas)
             end
         end
     end
@@ -240,11 +245,11 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         # if length(REs)>1
             cl = Dierckx.evaluate(clspl,alpha, Re)
             cd = Dierckx.evaluate(cdspl,alpha, Re)
-            # cl = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cls, [alpha], [Re])[1]
-            # cd = FLOWMath.interp2d(FLOWMath.akima, alphas, REs, cds, [alpha], [Re])[1]
+            # cl = FLOWMath.interp2d(safeakima, alphas, REs, cls, [alpha], [Re])[1]
+            # cd = FLOWMath.interp2d(safeakima, alphas, REs, cds, [alpha], [Re])[1]
         # else
-        #     cl = FLOWMath.akima(alphaOrig*pi/180, clOrig,alpha)
-        #     cd = FLOWMath.akima(alphaOrig*pi/180, cdOrig,alpha)
+        #     cl = safeakima(alphaOrig*pi/180, clOrig,alpha)
+        #     cd = safeakima(alphaOrig*pi/180, cdOrig,alpha)
         # end
 
         return cl, cd, 0.0
@@ -261,8 +266,8 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         dalpha=alpha-env.alpha_last[idxmin1] + V_twist*dt #TODO: verify sign of motion induced velocity
         adotnorm=dalpha/dt*c/(2.0*FLOWMath.ksmax([U,0.001]))
         # if length(REs)>1
-            aoaStallPos = aoaStallPosspl(Re)*pi/180#FLOWMath.akima(REs,aoaStallPosVec,Re)*pi/180
-            aoaStallNeg = aoaStallNegspl(Re)*pi/180#FLOWMath.akima(REs,aoaStallNegVec,Re)*pi/180
+            aoaStallPos = aoaStallPosspl(Re)*pi/180#safeakima(REs,aoaStallPosVec,Re)*pi/180
+            aoaStallNeg = aoaStallNegspl(Re)*pi/180#safeakima(REs,aoaStallNegVec,Re)*pi/180
         # else
         #     aoaStallPos = aoaStallPosVec[1]
         #     aoaStallNeg = aoaStallNegVec[1]

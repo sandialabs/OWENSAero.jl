@@ -163,8 +163,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     end
 
     shapeZ = collect(LinRange(0,Height,Nslices+1))
-    shapeX = FLOWMath.akima(bld_z, bld_x, shapeZ)
-    shapeY = FLOWMath.akima(bld_z, bld_y, shapeZ)
+    shapeX = safeakima(bld_z, bld_x, shapeZ)
+    shapeY = safeakima(bld_z, bld_y, shapeZ)
 
     blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
     blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
@@ -263,8 +263,8 @@ steady=false) # each of these is size ntheta x nslices
         bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
         bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
-            bld_x_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0) #TODO: get rid of this -1.0, which is from inflowwind not liking evaluation at the boundary
-            bld_twist_temp[ibld,:] = FLOWMath.akima(bld_z[ibld,:],bld_twist[ibld,:],z3D.-1.0)
+            bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0) #TODO: get rid of this -1.0, which is from inflowwind not liking evaluation at the boundary
+            bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.-1.0)
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp

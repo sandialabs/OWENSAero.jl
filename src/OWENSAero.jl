@@ -206,6 +206,14 @@ function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbin
     end
 end
 
+@inline function safeakima(x,y,xpt)
+    if minimum(xpt)<minimum(x) || maximum(xpt)>maximum(x)
+        msg="Extrapolating on akima spline results in undefined solutions minimum(xpt)<minimum(x) $(minimum(xpt))<$(minimum(x)) or maximum(xpt)<maximum(x) $(maximum(xpt))>$(maximum(x))"
+        throw(OverflowError(msg))
+    end
+    return FLOWMath.akima(x,y,xpt)
+end
+
 include("DMS.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")
