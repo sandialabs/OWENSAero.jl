@@ -1,5 +1,6 @@
 # import PyPlot
 # PyPlot.close("all")
+# PyPlot.pygui(true)
 import OWENSAero
 using Test
 import HDF5
@@ -148,7 +149,7 @@ idx_start = 1#round(Int,length(Fx_base)/5)
 mytime = timetemp[idx_start:end] .- timetemp[idx_start]
 
 # filename = "$path/data/unsteadyFullTurb_ORIGINAL.h5"
-#
+
 # HDF5.h5open(filename, "w") do file
 #     HDF5.write(file,"CP",Float64.(CP[:,idx_start:end]))
 #     HDF5.write(file,"Rp",Float64.(Rp[:,:,idx_start:end]))
@@ -375,28 +376,34 @@ powerSteadyOld = HDF5.h5read(fileSteadyOld,"power")
 power2SteadyOld = HDF5.h5read(fileSteadyOld,"power2")
 
 # PyPlot.figure()
-# PyPlot.plot(1:length(RpSteadyOld[1,15,:]),RpSteadyOld[1,15,:],label="old")
+# PyPlot.plot(1:length(RpSteadyOld[1,15,:]),RpSteadyOld[1,15,:],"+-",label="old")
 # PyPlot.plot(1:length(RpSteady[1,15,:]),RpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Rp")
-#
+
 # PyPlot.figure()
-# PyPlot.plot(1:length(TpSteadyOld[1,15,:]),TpSteadyOld[1,15,:],label="old")
+# PyPlot.plot(1:length(TpSteadyOld[1,15,:]),TpSteadyOld[1,15,:],"+-",label="old")
 # PyPlot.plot(1:length(TpSteady[1,15,:]),TpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Tp")
-#
+
 # PyPlot.figure()
-# PyPlot.plot(1:length(ZpSteadyOld[1,15,:]),ZpSteadyOld[1,15,:],label="old")
+# PyPlot.plot(1:length(ZpSteadyOld[1,15,:]),ZpSteadyOld[1,15,:],"+-",label="old")
 # PyPlot.plot(1:length(ZpSteady[1,15,:]),ZpSteady[1,15,:],".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("Zp")
-#
+
 # PyPlot.figure()
-# PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,label="old")
+# PyPlot.plot(1:length(alphaSteadyOld[1,15,:]),alphaSteadyOld[1,15,:].*180/pi,"+-",label="old")
 # PyPlot.plot(1:length(alphaSteady[1,15,:]),alphaSteady[1,15,:].*180/pi,".-",label="new")
 # PyPlot.legend()
 # PyPlot.ylabel("alpha")
+
+# PyPlot.figure()
+# PyPlot.plot(1:length(My_baseSteadyOld),My_baseSteadyOld,"+-",label="old")
+# PyPlot.plot(1:length(My_baseSteady),My_baseSteady,".-",label="new")
+# PyPlot.legend()
+# PyPlot.ylabel("My")
 
 atol = 1e-4
 for ii = 1:length(CPSteadyOld)
