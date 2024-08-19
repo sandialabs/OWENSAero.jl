@@ -169,8 +169,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
     blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
 
-    global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0 .+1.0 #TODO: ensure the turbsim can use the correct z value i.e. it is within its window
-    global z3Dnorm = (z3D .- 1.0)./Height
+    global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0
+    global z3Dnorm = (z3D)./Height
     # RefArea_half, error = QuadGK.quadgk(shapeX_spline, 0, Height, atol=1e-10)
     # RefArea = RefArea_half*2
     RefArea = pi*Height/2*Radius #automatic gradients cant make it through quadgk
@@ -256,15 +256,14 @@ bld_z=-1,
 bld_twist=-1,
 steady=false) # each of these is size ntheta x nslices
 
-
     global z3D
     # Interpolate to the vertical positions
     if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
         bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
         bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
-            bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.-1.0) #TODO: get rid of this -1.0, which is from inflowwind not liking evaluation at the boundary
-            bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.-1.0)
+            bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.+minimum(bld_z[ibld,:]))
+            bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.+minimum(bld_z[ibld,:]))
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp
@@ -325,7 +324,7 @@ steady=false) # each of these is size ntheta x nslices
 
                 if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
                     turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
-                    # turbslices[islice].z[islice] = bld_z[ibld,islice]
+                    # turbslices[islice].z[islice] = z3D.+minimum(bld_z[ibld,:])
                     # turbslices[islice].chord = chord[islice]
                     turbslices[islice].delta[bld_idx] = delta3D[ibld,islice]
                     turbslices[islice].twist[bld_idx] = startingtwist[islice]+bld_twist[ibld,islice]
@@ -737,8 +736,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta #TODO: time only input
-    if aziL_save != aziL || alwaysrecalc # do it on the first round or if it has changed
-        if aziL == aziU_save && !alwaysrecalc # if the bottom is now what was the top, swap and don't recalculate
+    if aziL_save != aziL 
+        if aziL == aziU_save 
             aziL_save = aziU_save
              CPL[:,end] = CPU[:,end]
              RpL[:,:,end] = RpU[:,:,end]
