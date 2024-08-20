@@ -162,7 +162,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         afname = fill(afname,Nslices)
     end
 
-    shapeZ = collect(LinRange(0,Height,Nslices+1))
+    shapeZ = collect(LinRange(0.0,Height,Nslices+1))
     shapeX = safeakima(bld_z, bld_x, shapeZ)
     shapeY = safeakima(bld_z, bld_y, shapeZ)
 
@@ -269,7 +269,7 @@ steady=false) # each of these is size ntheta x nslices
         bld_twist = bld_twist_temp
         bld_z = zeros(Real,size(bld_x)) #TODO: a better way to do this.
         for ibld = 1:length(bld_x[:,1])
-            bld_z[ibld,:] = z3D.-1.0
+            bld_z[ibld,:] = z3D
         end
     elseif (bld_x!=-1 && bld_z!=-1) && bld_twist==-1
         @warn "blade x, z, and twist deformations must be specified together"

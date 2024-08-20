@@ -117,13 +117,13 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     afcl = FLOWMath.Akima(alpha*pi/180, cl)
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
     cl=0.0
-    function af(alpha,Re,umach,family_factor)
+    function af(alphain,Re,umach,family_factor)
         if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
             @error "aoa is greater or less than what is defined"
         end
 
-        cl = afcl(alpha)
-        cd = afcd(alpha)
+        cl = afcl(alphain)
+        cd = afcd(alphain)
 
         return cl, cd, 0.0
     end

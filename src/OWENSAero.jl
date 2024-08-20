@@ -207,7 +207,7 @@ function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbin
 end
 
 @inline function safeakima(x,y,xpt)
-    if minimum(xpt)<minimum(x) || maximum(xpt)>maximum(x)
+    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) || maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
         msg="Extrapolating on akima spline results in undefined solutions minimum(xpt)<minimum(x) $(minimum(xpt))<$(minimum(x)) or maximum(xpt)<maximum(x) $(maximum(xpt))>$(maximum(x))"
         throw(OverflowError(msg))
     end
