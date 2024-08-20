@@ -55,6 +55,7 @@ struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TFN,TB,TAI}
     r::TAF1
     z::TF2
     chord::TAF3
+    thick::TAF3
     twist::TAF5
     delta::TAF0
     omega::TAF4
@@ -67,8 +68,8 @@ struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TFN,TB,TAI}
     helical_offset::TAI
 end
 
-Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1))
-Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1))
+Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1))
+Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1))
 
 """
 Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DSModel::TS,AModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
@@ -100,16 +101,20 @@ Contains specications for turbine slice environment/operating conditions as well
 * `none`:
 
 """
-struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI,TAF3}
+struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3}
     rho::TF
     mu::TF
-    V_x::TAF #Vinf is Vx
-    V_y::TAF
+    V_x::TAFx #Vinf is Vx
+    V_y::TAFy
     V_z::TAF3
     V_twist::TAF3
     windangle::TF #radians
     DSModel::TS
     AModel::TS
+    AM_flag::TB
+    buoy_flag::TB
+    rotAccel_flag::TB
+    AM_Coeff_Ca::TF
     aw_warm::TVF
     steplast::TAI
     idx_RPI::TAI
@@ -119,9 +124,9 @@ struct Environment{TF,TB,TAF,TAF2,TS,TVF,TVF2,TAI,TAF3}
     alpha_last::TAF2
     suction::TB
 end
-
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,false,false,false,1.0,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
+Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,false,false,false,1.0,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false)
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)
@@ -199,6 +204,14 @@ function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbin
     else
         error("AModel not recognized, choose DMS or AC")
     end
+end
+
+@inline function safeakima(x,y,xpt)
+    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) || maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
+        msg="Extrapolating on akima spline results in undefined solutions minimum(xpt)<minimum(x) $(minimum(xpt))<$(minimum(x)) or maximum(xpt)<maximum(x) $(maximum(xpt))>$(maximum(x))"
+        throw(OverflowError(msg))
+    end
+    return FLOWMath.akima(x,y,xpt)
 end
 
 include("DMS.jl")
