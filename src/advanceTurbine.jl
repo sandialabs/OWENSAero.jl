@@ -245,6 +245,8 @@ Equivalent to an update states call, mutating the internal aerodynamic inputs wi
 * `bld_x`: Blade structural x shape, size(NBlade,any), any as it is splined against bld_z and the aero discretization
 * `bld_z`: Blade structural z shape, size(NBlade,any), any as it is splined against bld_x and the aero discretization
 * `bld_twist`: Blade structural twist, size(NBlade,any), any as it is splined against bld_z and the aero discretization.  Note that in the calcs, this will be in addition to the aero twist offset already applied in initialization.
+* `accel_flap_in`: Blade structural acceleration in the flap direction, size(NBlade,any), any as it is splined against bld_z and the aero discretization
+* `accel_edge_in`: Blade structural acceleration in the edge direction, size(NBlade,any), any as it is splined against bld_z and the aero discretization
 * `steady::bool`: if steady is true, it just updates a single step.  TODO: verify this is correct
 
 # Outputs:
@@ -254,6 +256,8 @@ Equivalent to an update states call, mutating the internal aerodynamic inputs wi
 function deformTurb(azi;newOmega=-1,newVinf=-1,bld_x=-1,
 bld_z=-1,
 bld_twist=-1,
+accel_flap_in=-1,
+accel_edge_in=-1,
 steady=false) # each of these is size ntheta x nslices
 
     global z3D
@@ -261,9 +265,15 @@ steady=false) # each of these is size ntheta x nslices
     if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
         bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
         bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
+        accel_flap = zeros(length(bld_x[:,1]),length(z3D))
+        accel_edge = zeros(length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
             bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.+minimum(bld_z[ibld,:]))
             bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.+minimum(bld_z[ibld,:]))
+            if accel_flap_in !=-1
+                accel_flap[ibld,:] = safeakima(bld_z[ibld,:],accel_flap_in[ibld,:],z3D)
+                accel_edge[ibld,:] = safeakima(bld_z[ibld,:],accel_edge_in[ibld,:],z3D)
+            end
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp
@@ -337,6 +347,10 @@ steady=false) # each of these is size ntheta x nslices
                     envslices[islice].V_x[bld_idx] = newVinf #TODO: map to turbulent inflow?
                 end
 
+                if accel_flap_in !==-1
+                    envslices[islice].accel_flap[bld_idx] = accel_flap[ibld,islice]
+                    envslices[islice].accel_edge[bld_idx] = accel_edge[ibld,islice]
+                end
                 # #TODO: add motion related velocity without compounding erroneously, might use global variables to store last state
                 # # envslices[ii].V_x = V_x
                 # if Vinf!=0

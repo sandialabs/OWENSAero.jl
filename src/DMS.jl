@@ -51,6 +51,8 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         V_yt = env.V_y[idx]
         V_zt = env.V_z[idx]
         V_twist = env.V_twist[idx]
+        accel_flap = env.accel_flap[idx]
+        accel_edge = env.accel_edge[idx]
         # V_delta = env.V_delta[idx] # Does not apply since the model calculation is centered around the point of rotation
         # V_sweep = env.V_sweep[idx] # Does not apply since the model calculation is centered around the point of rotation
 
@@ -65,6 +67,8 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         V_y = env.V_y[1]
         V_z = env.V_z[1]
         V_twist = env.V_twist[1]
+        accel_flap = env.accel_flap[1]
+        accel_edge = env.accel_edge[1]
         # V_delta = env.V_delta[1] # Does not apply since the model calculation is centered around the point of rotation
         # V_sweep = env.V_sweep[1] # Does not apply since the model calculation is centered around the point of rotation
     end
@@ -122,9 +126,6 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     if AM_flag
         Vol_flap = pi * (chord/2)^2 * 1.0
         Vol_edge = pi * ((thickness/10)/2)^2 * 1.0
-    
-        accel_flap = 0.0 #TODO: put in structs
-        accel_edge = 0.0 #TODO: put in structs 
 
         if rotAccel_flag
             accel_rot = omega^2 * r
@@ -132,11 +133,17 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
             accel_rot = 0.0
         end
 
-        M_addedmass_Np = rho * env.AM_Coeff_Ca * Vol_flap 
-        M_addedmass_Tp = rho * env.AM_Coeff_Ca * Vol_edge 
+        M_addedmass_flap = rho * env.AM_Coeff_Ca * Vol_flap 
+        M_addedmass_edge = rho * env.AM_Coeff_Ca * Vol_edge 
 
-        F_addedmass_Np = M_addedmass_Np * (accel_flap+accel_rot)
-        F_addedmass_Tp = M_addedmass_Tp * (accel_edge+accel_rot)
+        F_addedmass_flap = M_addedmass_flap * (accel_flap+accel_rot)
+        F_addedmass_edge = M_addedmass_edge * (accel_edge+accel_rot)
+
+        M_addedmass_Np = M_addedmass_flap*sin(twist) - M_addedmass_edge*cos(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        M_addedmass_Tp = M_addedmass_edge*sin(twist) + M_addedmass_flap*cos(twist)
+
+        F_addedmass_Np = F_addedmass_flap*sin(twist) - F_addedmass_edge*cos(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        F_addedmass_Tp = F_addedmass_edge*sin(twist) + F_addedmass_flap*cos(twist)
     else
         M_addedmass_Np = 0.0
         M_addedmass_Tp = 0.0
