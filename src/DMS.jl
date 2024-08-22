@@ -33,6 +33,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     suction = false
     rho = env.rho
     mu = env.mu
+    gravity = env.gravity
     AM_flag = env.AM_flag
     buoy_flag = env.buoy_flag
     rotAccel_flag = env.rotAccel_flag
@@ -151,14 +152,24 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         F_addedmass_Tp = 0.0
     end
 
+    if buoy_flag
+        section_volume = chord*thickness/2*1.0 # per unit length TODO: input volume
+        dcm = [cos(theta) -sin(theta) 0
+        sin(theta) cos(theta) 0
+        0 0 1]
+        F_buoy = dcm * gravity .* (rho*section_volume) #TODO: verify direction
+    else
+        F_buoy = [0.0, 0.0, 0.0]
+    end
+
     # Instantaneous Forces (Unit Height) #Based on this, radial is inward positive and tangential is in direction of rotation positive
     Ab = chord * 1.0 # planform area Assuming unit section height
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
 
     Np = cn.*q_loc + -F_addedmass_Np
-    Rp = Np # Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
-    Zp = Np*tan(delta) # Ning Eq. 27 # Negate to match cactus frame of reference
-    Tp = -rotation*(ct.*q_loc + -F_addedmass_Tp)/cos(delta) # Ning Eq. 27 # Negate to match cactus frame of reference
+    Rp = Np + F_buoy[2]# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
+    Zp = Np*tan(delta) + F_buoy[3] # Ning Eq. 27 # Negate to match cactus frame of reference
+    Tp = -rotation*(ct.*q_loc + -F_addedmass_Tp)/cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
     
     Th = q_loc * (ct*cos(theta) + cn*sin(theta)/cos(delta)) # Eq. 11 but with delta correction
 

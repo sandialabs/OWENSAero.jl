@@ -258,6 +258,7 @@ bld_z=-1,
 bld_twist=-1,
 accel_flap_in=-1,
 accel_edge_in=-1,
+gravity = [0.0,0.0,-9.81],
 steady=false) # each of these is size ntheta x nslices
 
     global z3D
@@ -325,6 +326,7 @@ steady=false) # each of these is size ntheta x nslices
 
         # Apply the new values to the structs at each slice
         for islice = 1:length(turbslices)
+            envslices[islice].gravity[:] = gravity[:]
             for ibld = 1:turbslices[1].B
 
                 bld_idx = (bld1_idx+dstep_bld*(ibld-1))%(ntheta-1)
