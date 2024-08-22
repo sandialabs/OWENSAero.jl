@@ -471,7 +471,12 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
     v = w[ntheta .+ idx]
     q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q = radialforce(u, v, theta, turbines[i], env)
 
-    return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re
+    M_addedmass_Np = zero(alpha)
+    M_addedmass_Tp = zero(alpha)
+    F_addedmass_Np = zero(alpha)
+    F_addedmass_Tp = zero(alpha)
+
+    return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
 
 end
 # TODO: keep this as it shows how to handle multiple turbines, might also look at original code
