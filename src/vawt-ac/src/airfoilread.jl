@@ -56,9 +56,9 @@ function readaerodyn(filename)
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
 
     function af(alphain,re,mach)
-        if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
-            @error "aoa is greater or less than what is defined"
-        end
+        # if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
+        #     @error "aoa is greater or less than what is defined"
+        # end
             cl = afcl(alphain)
             cd = afcd(alphain)
 

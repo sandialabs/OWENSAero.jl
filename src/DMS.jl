@@ -140,11 +140,11 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         F_addedmass_flap = M_addedmass_flap * (accel_flap+accel_rot)
         F_addedmass_edge = M_addedmass_edge * (accel_edge+accel_rot)
 
-        M_addedmass_Np = M_addedmass_flap*sin(twist) - M_addedmass_edge*cos(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
-        M_addedmass_Tp = M_addedmass_edge*sin(twist) + M_addedmass_flap*cos(twist)
+        M_addedmass_Np = M_addedmass_flap*cos(twist) + M_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        M_addedmass_Tp = M_addedmass_edge*cos(twist) - M_addedmass_flap*sin(twist)
 
-        F_addedmass_Np = F_addedmass_flap*sin(twist) - F_addedmass_edge*cos(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
-        F_addedmass_Tp = F_addedmass_edge*sin(twist) + F_addedmass_flap*cos(twist)
+        F_addedmass_Np = F_addedmass_flap*cos(twist) + F_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        F_addedmass_Tp = F_addedmass_edge*cos(twist) - F_addedmass_flap*sin(twist)
     else
         M_addedmass_Np = 0.0
         M_addedmass_Tp = 0.0
