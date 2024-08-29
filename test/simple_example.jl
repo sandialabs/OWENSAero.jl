@@ -92,7 +92,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
 
         if ifw
             turbsim_filename = "$path/data/ifw/test.bts"
-            OWENSOpenFASTWrappers.ifwinit(;inflowlib_filename="/builds/8921-VAWT-TOOLS/OWENSAero.jl/openfast/build/modules/inflowwind/libifw_c_binding",turbsim_filename)
+            OWENSOpenFASTWrappers.ifwinit(;inflowlib_filename=nothing,turbsim_filename)
         end
 
         for step1 = 1:ntheta*N_Rev
@@ -145,7 +145,7 @@ for AModel in ["AC","DMS"]
     @testset "TEST Unsteady Method with ifw $AModel" begin
         ##########################################
 
-        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AModel,steady=false,ifw=false)
+        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AModel,steady=false,ifw=true)
         @test true #check that it runs
         # PyPlot.figure()
         # PyPlot.plot(thetavec./ntheta,Tp,label="Turbulent",color=plot_cycle[1])
