@@ -15,3 +15,6 @@ theta*
 *.docx
 *.csv
 *Manual*
+*.vscode
+*.png
+*.pdf

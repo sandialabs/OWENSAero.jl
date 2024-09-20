@@ -1,0 +1,59 @@
+&ConfigInputs
+
+	GPFlag  = 0
+
+	nr 	= 40
+	nti 	= 30
+	convrg	= .000001
+	iut	= 0
+
+	ifc	= 0
+	ixterm = 1
+	xstop=6
+
+	ntif	= 60
+	iutf	= 0
+	nric 	= 24
+	convrgf	= -1
+	DSFlag = 1
+	PRFlag = 1
+
+/End
+
+
+&CaseInputs
+
+	jbtitle = '5m VAWT'
+
+	rho 	= .0019024
+	vis 	= .3739E-6
+    tempr 	= 70.0
+	hBLRef 	= 10.0
+	slex 	= 0.0
+	hAG 	= 15.0
+
+	igust = 1
+	! 5m/s gust = 11.18 mph
+	gustamp = 11.18
+	! 150RPM -> 2.5 rev/s, we want 2 revolutions, so 0.8 seconds
+	gusttime = 0.8
+	! Guestimate via linear extrapolation; with 3 peaking at about 12 revolutions, should have it peaking at 15 revolutions with about 3.75
+	gustX0 = 26
+
+	RPM 	= 150.0
+	Ut 	= 5.2
+
+	! Turbine geometry
+	GeomFilePath='./SNL5m_0015_troposkein.geom'
+
+	! Airfoil section data
+	nSect 	= 1
+	AFDPath	= '../../airfoils/NACA_0015.dat'
+
+/End
+
+&ConfigOutputs
+	OutputPath = './'
+	DiagOutFlag=1
+	BladeElemOutFlag=1
+/End

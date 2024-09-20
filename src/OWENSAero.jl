@@ -50,11 +50,11 @@ Contains specications for turbine slice (geometry, location, airfoil)
 * `none`:
 
 """
-struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TFN,TB,TAI}
+struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TAF6,TFN,TB,TAI}
     R::TF1
     r::TAF1
     z::TF2
-    chord::TAF3
+    chord::TAF6
     thick::TAF3
     twist::TAF5
     delta::TAF0
