@@ -136,9 +136,11 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     ifw_libfile = nothing,
     AM_flag = false,
     rotAccel_flag = false,
+    centrifugal_force_flag=false,
     buoy_flag = false,
     AM_Coeff_Ca = 1.0,
-    af_thick = 0.18)
+    af_thick = 0.18,
+    rhoA_in=zeros(length(bld_x)))
 
     global dt = 0.0 #might not be used
     global last_step1 = 0
@@ -165,6 +167,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     shapeZ = collect(LinRange(0.0,Height,Nslices+1))
     shapeX = safeakima(bld_z, bld_x, shapeZ)
     shapeY = safeakima(bld_z, bld_y, shapeZ)
+    rhoA = safeakima(bld_z,rhoA_in,shapeZ)
 
     blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
     blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
@@ -227,8 +230,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,zeros(Real,ntheta*2))
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
     end
 end
 
@@ -470,7 +473,10 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         Mz = zeros(Nslices)
         integralpower = zeros(Nslices)
 
-        step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+        step1 = last_step1+istep-1 #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+        if step1<1
+            step1=1
+        end
 
         bnum = 1
         rev_step = Int(step1-floor(Int,(step1-1)/ntheta)*ntheta + (bnum-1)*ntheta/B)
@@ -770,7 +776,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta #TODO: time only input
-    if aziL_save != aziL 
+    if (aziL_save != aziL) || aziL == 0.0
         if aziL == aziU_save 
             aziL_save = aziU_save
              CPL[:,end] = CPU[:,end]
