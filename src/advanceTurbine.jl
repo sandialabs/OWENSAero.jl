@@ -75,10 +75,10 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     afname = "(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"),
-    AM_flag = false,
-    buoy_flag = false,
-    rotAccel_flag = false,
-    AM_Coeff_Ca = 1.0)
+    Aero_AddedMass_Active = false,
+    Aero_Buoyancy_Active = false,
+    Aero_RotAccel_Active = false,
+    AddedMass_Coeff_Ca = 1.0)
 
 Initializes aerodynamic models and sets up backend persistent memory to simplify intermittent calling within coupled solver loops
 
@@ -106,10 +106,10 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
 * `ifw_libfile`:  inflow wind dynamic library location e.g. joinpath(dirname(@__FILE__), "../../../openfast/build/modules/inflowwind/libifw_c_binding"))
-* `AM_flag::bool`: flag to turn on added mass effects
-* `buoy_flag::bool`: flag to turn on buoyancy forces
-* `rotAccel_flag::bool`: flag to turn on the rotational acceleration portion of added mass for a crossflow turbine
-* `AM_Coeff_Ca::float`: added mass coefficient, typically 1.0
+* `Aero_AddedMass_Active::bool`: flag to turn on added mass effects
+* `Aero_Buoyancy_Active::bool`: flag to turn on buoyancy forces
+* `Aero_RotAccel_Active::bool`: flag to turn on the rotational acceleration portion of added mass for a crossflow turbine
+* `AddedMass_Coeff_Ca::float`: added mass coefficient, typically 1.0
 
 # Outputs:
 * `none`:
@@ -134,11 +134,11 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = nothing,
-    AM_flag = false,
-    rotAccel_flag = false,
+    Aero_AddedMass_Active = false,
+    Aero_RotAccel_Active = false,
     centrifugal_force_flag=false,
-    buoy_flag = false,
-    AM_Coeff_Ca = 1.0,
+    Aero_Buoyancy_Active = false,
+    AddedMass_Coeff_Ca = 1.0,
     af_thick = 0.18,
     rhoA_in=zeros(length(bld_x)))
 
@@ -231,7 +231,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
         turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
     end
 end
 

@@ -35,10 +35,10 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     mu = env.mu
     rhoA = turbine.rhoA
     gravity = env.gravity
-    AM_flag = env.AM_flag
+    Aero_AddedMass_Active = env.Aero_AddedMass_Active
     centrifugal_force_flag = env.centrifugal_force_flag
-    buoy_flag = env.buoy_flag
-    rotAccel_flag = env.rotAccel_flag
+    Aero_Buoyancy_Active = env.Aero_Buoyancy_Active
+    Aero_RotAccel_Active = env.Aero_RotAccel_Active
     # winddir = env.winddir
 
     dtheta = 2*pi/(ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
@@ -126,18 +126,18 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     ct = cd_af*cos(phi) - cl*sin(phi) # Eq. 9
     cn = cd_af*sin(phi) + cl*cos(phi) # Eq. 10
 
-    if AM_flag
+    if Aero_AddedMass_Active
         Vol_flap = pi * (chord/2)^2 * 1.0
         Vol_edge = pi * ((thickness/10)/2)^2 * 1.0
 
-        if rotAccel_flag
+        if Aero_RotAccel_Active
             accel_rot = omega^2 * r
         else
             accel_rot = 0.0
         end
 
-        M_addedmass_flap = rho * env.AM_Coeff_Ca * Vol_flap 
-        M_addedmass_edge = rho * env.AM_Coeff_Ca * Vol_edge 
+        M_addedmass_flap = rho * env.AddedMass_Coeff_Ca * Vol_flap 
+        M_addedmass_edge = rho * env.AddedMass_Coeff_Ca * Vol_edge 
 
         F_addedmass_flap = M_addedmass_flap * (accel_flap + accel_rot)
         F_addedmass_edge = M_addedmass_edge * (accel_edge + accel_rot)
@@ -155,7 +155,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         F_addedmass_Tp = 0.0
     end
 
-    if buoy_flag
+    if Aero_Buoyancy_Active
         section_area = chord*thickness/2*1.0 # per unit length TODO: input volume
         dcm = [cos(theta) -sin(theta) 0
         sin(theta) cos(theta) 0
