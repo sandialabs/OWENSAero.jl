@@ -473,10 +473,10 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         Mz = zeros(Nslices)
         integralpower = zeros(Nslices)
 
-        step1 = last_step1+istep-1 #if this is an iterated solve, last_step1 won't get updated until a new time is specified
-        if step1<1
-            step1=1
-        end
+        step1 = last_step1+istep#-1 TODO: there is a question about the iterative updating and the advanced step aligning with the structural model #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+        # if step1<1
+        #     step1=1
+        # end
 
         bnum = 1
         rev_step = Int(step1-floor(Int,(step1-1)/ntheta)*ntheta + (bnum-1)*ntheta/B)
@@ -776,7 +776,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta #TODO: time only input
-    if (aziL_save != aziL) || aziL == 0.0
+    if (aziL_save != aziL) #|| isnothing(aziL_save)
         if aziL == aziU_save 
             aziL_save = aziU_save
              CPL[:,end] = CPU[:,end]
