@@ -1,5 +1,3 @@
-# import PyPlot
-# PyPlot.close("all")
 import OWENSAero
 import FLOWMath
 using Test
@@ -33,7 +31,14 @@ function runfullturb(interpolate)
     ######## Unsteady Method with ifw ########
     ##########################################
     ifw=false
+    
+    
+    # d633a3bbf6f7330ff0dc1135a4c35ef8c18dacb7 good
 
+
+
+    # e691cffc8f02b8860e5040aaf50540fd8c595eca good
+    # e55cf31fc656899358d2cae9d6dee37460789858 good
     Nslices = 30
     Vinf = 13.0
     println("Running")
@@ -138,7 +143,10 @@ CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,Fx_base,Fy_base,Fz_base,Mx_base,My_b
 CP_I,Rp_I,Tp_I,Zp_I,alpha_I,cl_I,cd_af_I,Vloc_I,Re_I,thetavec_I,Fx_base_I,Fy_base_I,Fz_base_I,Mx_base_I,My_base_I,Mz_base_I,power_I,power2_I = runfullturb(true)
 
 # # Blade Loads
-#
+# import PyPlot
+# PyPlot.pygui(true)
+# PyPlot.close("all")
+
 # PyPlot.figure()
 # PyPlot.plot(thetavec_I,Rp_I[1,1,:],label="Interp")
 # PyPlot.plot(thetavec,Rp[1,1,:],".-",label="orig")
@@ -157,7 +165,7 @@ CP_I,Rp_I,Tp_I,Zp_I,alpha_I,cl_I,cd_af_I,Vloc_I,Re_I,thetavec_I,Fx_base_I,Fy_bas
 # PyPlot.legend()
 # PyPlot.ylabel("Zp")
 
-# Base Loads
+# # Base Loads
 # PyPlot.figure()
 # PyPlot.plot(thetavec_I,Fx_base_I,".-",label="interp")
 # PyPlot.plot(thetavec,Fx_base,label="orig")

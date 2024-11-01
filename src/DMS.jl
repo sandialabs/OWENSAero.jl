@@ -33,10 +33,12 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     suction = false
     rho = env.rho
     mu = env.mu
+    rhoA = turbine.rhoA
     gravity = env.gravity
-    AM_flag = env.AM_flag
-    buoy_flag = env.buoy_flag
-    rotAccel_flag = env.rotAccel_flag
+    Aero_AddedMass_Active = env.Aero_AddedMass_Active
+    centrifugal_force_flag = env.centrifugal_force_flag
+    Aero_Buoyancy_Active = env.Aero_Buoyancy_Active
+    Aero_RotAccel_Active = env.Aero_RotAccel_Active
     # winddir = env.winddir
 
     dtheta = 2*pi/(ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
@@ -124,27 +126,28 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     ct = cd_af*cos(phi) - cl*sin(phi) # Eq. 9
     cn = cd_af*sin(phi) + cl*cos(phi) # Eq. 10
 
-    if AM_flag
+    if Aero_AddedMass_Active
         Vol_flap = pi * (chord/2)^2 * 1.0
         Vol_edge = pi * ((thickness/10)/2)^2 * 1.0
 
-        if rotAccel_flag
+        if Aero_RotAccel_Active
             accel_rot = omega^2 * r
         else
             accel_rot = 0.0
         end
 
-        M_addedmass_flap = rho * env.AM_Coeff_Ca * Vol_flap 
-        M_addedmass_edge = rho * env.AM_Coeff_Ca * Vol_edge 
+        M_addedmass_flap = rho * env.AddedMass_Coeff_Ca * Vol_flap 
+        M_addedmass_edge = rho * env.AddedMass_Coeff_Ca * Vol_edge 
 
-        F_addedmass_flap = M_addedmass_flap * (accel_flap+accel_rot)
-        F_addedmass_edge = M_addedmass_edge * (accel_edge+accel_rot)
+        F_addedmass_flap = M_addedmass_flap * (accel_flap + accel_rot)
+        F_addedmass_edge = M_addedmass_edge * (accel_edge + accel_rot)
 
         M_addedmass_Np = M_addedmass_flap*cos(twist) + M_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
         M_addedmass_Tp = M_addedmass_edge*cos(twist) - M_addedmass_flap*sin(twist)
 
         F_addedmass_Np = F_addedmass_flap*cos(twist) + F_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
         F_addedmass_Tp = F_addedmass_edge*cos(twist) - F_addedmass_flap*sin(twist)
+
     else
         M_addedmass_Np = 0.0
         M_addedmass_Tp = 0.0
@@ -152,14 +155,20 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         F_addedmass_Tp = 0.0
     end
 
-    if buoy_flag
-        section_volume = chord*thickness/2*1.0 # per unit length TODO: input volume
+    if Aero_Buoyancy_Active
+        section_area = chord*thickness/2*1.0 # per unit length TODO: input volume
         dcm = [cos(theta) -sin(theta) 0
         sin(theta) cos(theta) 0
         0 0 1]
-        F_buoy = dcm * gravity .* (rho*section_volume) #TODO: verify direction
+        F_buoy = dcm * -gravity .* (rho*section_area-rhoA) #buoyancy mass minus structural mass since added mass requires moving the gravity here
     else
         F_buoy = [0.0, 0.0, 0.0]
+    end
+
+    if centrifugal_force_flag
+        f_centrifugal = rhoA * omega^2 * r
+    else
+        f_centrifugal = 0.0
     end
 
     # Instantaneous Forces (Unit Height) #Based on this, radial is inward positive and tangential is in direction of rotation positive
@@ -167,7 +176,7 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
 
     Np = cn.*q_loc + -F_addedmass_Np
-    Rp = Np + F_buoy[2]# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
+    Rp = Np + F_buoy[2] + f_centrifugal# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
     Zp = Np*tan(delta) + F_buoy[3] # Ning Eq. 27 # Negate to match cactus frame of reference
     Tp = -rotation*(ct.*q_loc + -F_addedmass_Tp)/cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
     

@@ -75,10 +75,10 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     afname = "(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = joinpath(dirname(@__FILE__), "../bin/libifw_c_binding"),
-    AM_flag = false,
-    buoy_flag = false,
-    rotAccel_flag = false,
-    AM_Coeff_Ca = 1.0)
+    Aero_AddedMass_Active = false,
+    Aero_Buoyancy_Active = false,
+    Aero_RotAccel_Active = false,
+    AddedMass_Coeff_Ca = 1.0)
 
 Initializes aerodynamic models and sets up backend persistent memory to simplify intermittent calling within coupled solver loops
 
@@ -106,10 +106,10 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
 * `ifw_libfile`:  inflow wind dynamic library location e.g. joinpath(dirname(@__FILE__), "../../../openfast/build/modules/inflowwind/libifw_c_binding"))
-* `AM_flag::bool`: flag to turn on added mass effects
-* `buoy_flag::bool`: flag to turn on buoyancy forces
-* `rotAccel_flag::bool`: flag to turn on the rotational acceleration portion of added mass for a crossflow turbine
-* `AM_Coeff_Ca::float`: added mass coefficient, typically 1.0
+* `Aero_AddedMass_Active::bool`: flag to turn on added mass effects
+* `Aero_Buoyancy_Active::bool`: flag to turn on buoyancy forces
+* `Aero_RotAccel_Active::bool`: flag to turn on the rotational acceleration portion of added mass for a crossflow turbine
+* `AddedMass_Coeff_Ca::float`: added mass coefficient, typically 1.0
 
 # Outputs:
 * `none`:
@@ -134,11 +134,13 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = nothing,
-    AM_flag = false,
-    rotAccel_flag = false,
-    buoy_flag = false,
-    AM_Coeff_Ca = 1.0,
-    af_thick = 0.18)
+    Aero_AddedMass_Active = false,
+    Aero_RotAccel_Active = false,
+    centrifugal_force_flag=false,
+    Aero_Buoyancy_Active = false,
+    AddedMass_Coeff_Ca = 1.0,
+    af_thick = 0.18,
+    rhoA_in=zeros(length(bld_x)))
 
     global dt = 0.0 #might not be used
     global last_step1 = 0
@@ -165,6 +167,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     shapeZ = collect(LinRange(0.0,Height,Nslices+1))
     shapeX = safeakima(bld_z, bld_x, shapeZ)
     shapeY = safeakima(bld_z, bld_y, shapeZ)
+    rhoA = safeakima(bld_z,rhoA_in,shapeZ)
 
     blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
     blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
@@ -227,8 +230,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,AM_flag,buoy_flag,rotAccel_flag,AM_Coeff_Ca,zeros(Real,ntheta*2))
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
     end
 end
 
@@ -470,7 +473,10 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         Mz = zeros(Nslices)
         integralpower = zeros(Nslices)
 
-        step1 = last_step1+istep #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+        step1 = last_step1+istep#-1 TODO: there is a question about the iterative updating and the advanced step aligning with the structural model #if this is an iterated solve, last_step1 won't get updated until a new time is specified
+        # if step1<1
+        #     step1=1
+        # end
 
         bnum = 1
         rev_step = Int(step1-floor(Int,(step1-1)/ntheta)*ntheta + (bnum-1)*ntheta/B)
@@ -770,7 +776,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
     # Get lower point
     aziL = floor(azi/dtheta)*dtheta #TODO: time only input
-    if aziL_save != aziL 
+    if (aziL_save != aziL) #|| isnothing(aziL_save)
         if aziL == aziU_save 
             aziL_save = aziU_save
              CPL[:,end] = CPU[:,end]
