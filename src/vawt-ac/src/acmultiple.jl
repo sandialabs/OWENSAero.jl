@@ -471,10 +471,56 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
     v = w[ntheta .+ idx]
     q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q = radialforce(u, v, theta, turbines[i], env)
 
-    M_addedmass_Np = zero(alpha)
-    M_addedmass_Tp = zero(alpha)
-    F_addedmass_Np = zero(alpha)
-    F_addedmass_Tp = zero(alpha)
+    if env.AM_flag
+        if length(turbines[1].r)>1
+            dtheta = 2*pi/(ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
+            println("theta: $theta")
+            println("dtheta: $dtheta")
+            println("ntheta: $ntheta")
+            idx = round(Int, (theta+dtheta/2)/dtheta)
+
+            twist = turbines[1].twist[idx]
+            omega = turbines[1].omega[idx]
+            r = turbines[1].r[idx]
+            accel_flap = env.accel_flap[idx]
+            accel_edge = env.accel_edge[idx]
+        else
+            twist = turbines[1].twist
+            omega = turbines[1].omega
+            r = turbines[1].r
+            accel_flap = env.accel_flap[1]
+            accel_edge = env.accel_edge[1]
+        end
+        chord = turbines[1].chord[1]
+        thickness = turbines[1].thickness[idx]
+        rho = env.rho
+
+        Vol_flap = pi * (chord / 2)^2 * 1.0
+        Vol_edge = pi * ((thickness / 10) / 2)^2 * 1.0
+
+        if env.rotAccel_flag
+            accel_rot = omega^2 * r
+        else
+            accel_rot = 0.0
+        end
+
+        M_addedmass_flap = rho * env.AM_Coeff_Ca * Vol_flap
+        M_addedmass_edge = rho * env.AM_Coeff_Ca * Vol_edge
+
+        F_addedmass_flap = M_addedmass_flap * (accel_flap + accel_rot)
+        F_addedmass_edge = M_addedmass_edge * (accel_edge + accel_rot)
+
+        M_addedmass_Np = M_addedmass_flap * cos(twist) + M_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        M_addedmass_Tp = M_addedmass_edge * cos(twist) - M_addedmass_flap * sin(twist)
+
+        F_addedmass_Np = F_addedmass_flap * cos(twist) + F_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        F_addedmass_Tp = F_addedmass_edge * cos(twist) - F_addedmass_flap * sin(twist)
+    else
+        M_addedmass_Np = zero(alpha)
+        M_addedmass_Tp = zero(alpha)
+        F_addedmass_Np = zero(alpha)
+        F_addedmass_Tp = zero(alpha)
+    end
 
     return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
 
