@@ -29,7 +29,7 @@ omega = ones(ntheta)*0.0
 # baseline
 turbines = Array{OWENSAero.Turbine}(undef,1)
 turbines[1] = OWENSAero.Turbine(r,r, chord, twist, delta, omega, B, af, ntheta,false)
-# (rho,mu,V_x,V_y,V_z,V_twist,DSModel,AModel,aw_warm)
+# (rho,mu,V_x,V_y,V_z,V_twist,DynamicStallModel,AeroModel,aw_warm)
 windangle = 0.0 * pi/180.0
 env = OWENSAero.Environment(rho, mu,Vinf,zeros(Real,size(Vinf)),zeros(Real,size(Vinf)),zeros(Real,size(Vinf)),windangle,"none","AC",zeros(ntheta*2))
 

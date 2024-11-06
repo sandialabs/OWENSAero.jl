@@ -69,8 +69,8 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     ntheta = 30,
     Nslices = 30, #TODO: make this different from ntheta
     ifw = false,
-    DSModel = "BV",
-    AModel = "DMS",
+    DynamicStallModel = "BV",
+    AeroModel = "DMS",
     windangle_D = 0.0,
     afname = "(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
@@ -100,8 +100,8 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `ntheta`: Number of azimuthal discretizations
 * `Nslices`: Number of vertical slices of the turbine
 * `ifw`: flag for inflow wind
-* `DSModel`:  Dynamic stall model "BV" or "none" or "LB" when we get it working
-* `AModel`:  Aerodynamic model "DMS" or "AC"
+* `DynamicStallModel`:  Dynamic stall model "BV" or "none" or "LB" when we get it working
+* `AeroModel`:  Aerodynamic model "DMS" or "AC"
 * `windangle_D`:  Inflow wind angle (degrees)
 * `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
@@ -128,8 +128,8 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     ntheta = 30,
     Nslices = 30, #TODO: make this different from ntheta
     ifw = false,
-    DSModel = "BV",
-    AModel = "DMS",
+    DynamicStallModel = "BV",
+    AeroModel = "DMS",
     windangle_D = 0.0,
     afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
@@ -219,10 +219,10 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
 
     for islice = 1:Nslices
 
-        if DSModel=="BV"
+        if DynamicStallModel=="BV"
             af = OWENSAero.readaerodyn_BV_NEW(afname[islice])
-        elseif DSModel=="none" #Dyn stall is not gradient safe
-            af = OWENSAero.readaerodyn_BV_NEW(afname[islice],DSModel="none")
+        elseif DynamicStallModel=="none" #Dyn stall is not gradient safe
+            af = OWENSAero.readaerodyn_BV_NEW(afname[islice],DynamicStallModel="none")
         else
             af = affun
         end
@@ -231,7 +231,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
         turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
     end
 end
 

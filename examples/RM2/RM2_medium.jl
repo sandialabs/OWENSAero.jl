@@ -36,7 +36,7 @@ RE_d = [0.9,1.3]
     ntheta = 30
     Nslices = 30
     ifw=false
-    AModel = "AC"
+    AeroModel = "AC"
 
     Aero_AddedMass_Active = true
     Aero_RotAccel_Active = true
@@ -50,7 +50,7 @@ RE_d = [0.9,1.3]
     shapeZ = LinRange(0,height,Nslices)
 
 
-    OWENSAero.setupTurb(shapeX,shapeZ,B,chord,10.0,Vinf;rho,mu,eta,afname = "$(path)/airfoils/NACA_0021.dat",DSModel="BV",Nslices,Aero_AddedMass_Active,Aero_RotAccel_Active)
+    OWENSAero.setupTurb(shapeX,shapeZ,B,chord,10.0,Vinf;rho,mu,eta,afname = "$(path)/airfoils/NACA_0021.dat",DynamicStallModel="BV",Nslices,Aero_AddedMass_Active,Aero_RotAccel_Active)
 
     TSRrange = LinRange(1.0,5.0,15)
     CP = zeros(length(TSRrange))

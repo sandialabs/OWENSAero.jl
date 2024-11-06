@@ -301,13 +301,13 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     dt = dtheta./abs.(Omega)
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
     mach = W/v_sound
-    if env.DSModel == "BV"
+    if env.DynamicStallModel == "BV"
         cl = zeros(Real,length(alpha))
         cd = zeros(Real,length(alpha))
         for ii = 1:length(alpha)
             cl[ii], cd[ii] = turbine.af(alpha[ii],Re[ii],mach[ii],env,V_twist[ii],chord,dt[ii],W[ii])
         end
-    elseif env.DSModel == "LB"
+    elseif env.DynamicStallModel == "LB"
         error("LB Dynamic Stall Model Not Coupled Yet")
     else
         cl, cd = turbine.af(alpha,Re,mach)

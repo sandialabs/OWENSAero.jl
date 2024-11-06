@@ -37,7 +37,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     ntheta = turbine.ntheta
     dtheta = 2*pi/(ntheta)
     thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
-    AModel = env.AModel
+    AeroModel = env.AeroModel
     rotation = sign(mean(turbine.omega))
 
     # Check that ntheta is divisible by nblades and 2

@@ -116,9 +116,9 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     dt = dtheta/abs.(omega)
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
     mach = Vloc/v_sound
-    if env.DSModel == "BV"
+    if env.DynamicStallModel == "BV"
         cl, cd_af = af(alpha,Re,mach,env,V_twist,chord,dt,Vloc;solvestep,idx)
-    elseif env.DSModel == "LB"
+    elseif env.DynamicStallModel == "LB"
         error("LB Dynamic Stall Model Not Implemented Yet")
     else
         cl, cd_af = af(alpha,Re,mach)

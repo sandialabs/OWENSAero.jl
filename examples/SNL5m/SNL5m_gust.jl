@@ -22,15 +22,15 @@ import OWENSAero
 path,_ = splitdir(@__FILE__)
 # include("$(path)/../../../OWENSAero.jl/src/OWENSAero.jl")
 
-function runme(AModel,slice,bnum)
-    # AModel = "DMS"
+function runme(AeroModel,slice,bnum)
+    # AeroModel = "DMS"
     # slice = 7
     bnum = 1
     ntheta = 30
-    # AModel = "AC"
-    if AModel == "AC"
+    # AeroModel = "AC"
+    if AeroModel == "AC"
         N_aw = ntheta*2 #Number of either "a" (DMS induction factor) or w (u and v induction factors)
-    elseif AModel == "DMS"
+    elseif AeroModel == "DMS"
         N_aw = ntheta
     else
         error("Aeromodel not recognized, choose AC or DMS")
@@ -71,7 +71,7 @@ function runme(AModel,slice,bnum)
     # else
     #     af = OWENSAero.readaerodyn("$(path)/airfoils/NACA_0015_RE3E5.dat")
     # end
-    af = OWENSAero.readaerodyn_BV_NEW("$(path)/airfoils/NACA_0015.dat",DSModel="BV")
+    af = OWENSAero.readaerodyn_BV_NEW("$(path)/airfoils/NACA_0015.dat",DynamicStallModel="BV")
     awwarm = [0.0734080061048192, 0.12251242922733005, 0.1741623096669431, 0.21463048262337026, 0.24095130886069838, 0.2525947743402928, 0.2506267437330584, 0.23777593110718653, 0.2183280835908269, 0.1966037927062711, 0.17431172191618466, 0.14941630864787642, 0.1179208332087899, 0.07703049955652619, 0.025895573316087175, 0.006295173150749581, 0.05855375428983589, 0.11585393975035356, 0.17692022645228292, 0.23679806306693904, 0.29188854267978814, 0.3388985559576654, 0.3716153405175147, 0.38102986264893646, 0.3602220274361156, 0.3094479766496759, 0.23763375800321238, 0.1587359710414027, 0.08511863905660223, 0.031421675399937114, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     awwarm=zero(awwarm)
     shapeX_raw_temp = 1 / cos(12.38*pi/180) .* [ -6.29E-03, 1.33E-01, 2.93E-01, 4.45E-01, 5.71E-01, 6.56E-01, 7.22E-01, 7.81E-01, 8.29E-01, 8.77E-01, 9.16E-01, 9.46E-01, 9.65E-01, 9.77E-01, 9.83E-01, 9.83E-01, 9.83E-01, 9.79E-01, 9.68E-01, 9.54E-01, 9.34E-01, 9.11E-01, 8.93E-01, 8.68E-01, 8.45E-01, 8.13E-01, 7.76E-01, 7.30E-01, 6.73E-01, 6.27E-01, 5.34E-01, 4.13E-01, 2.92E-01, 1.76E-01, 5.88E-02, 1.74E-03]
@@ -121,7 +121,7 @@ function runme(AModel,slice,bnum)
         ###
     ### Solve 1st order filter
     ###
-    env = OWENSAero.Environment(rho,mu,Vinf,DS_model,AModel,awwarm)
+    env = OWENSAero.Environment(rho,mu,Vinf,DS_model,AeroModel,awwarm)
     turbine2D = OWENSAero.Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,false)
     us_param = OWENSAero.UnsteadyParams(RPI,tau,ifw,IECgust,nominalVinf,G_amp,gustX0,gustT)
 
@@ -213,7 +213,7 @@ function runme(AModel,slice,bnum)
     nominalVinf = Vinf[1]
     tau = [0.3,3.0]
     RPI = true
-    env = OWENSAero.Environment(rho,mu,Vinf,DS_model,AModel,awwarm)
+    env = OWENSAero.Environment(rho,mu,Vinf,DS_model,AeroModel,awwarm)
     turbine2D = OWENSAero.Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,false)
     us_param = OWENSAero.UnsteadyParams(RPI,tau,ifw,IECgust,nominalVinf,G_amp,gustX0,gustT)
     start = time()
@@ -304,8 +304,8 @@ function runme(AModel,slice,bnum)
         PyPlot.xlabel("Revolution")
         PyPlot.ylabel("CP")
         # PyPlot.xlim([r_start,r_end])
-        PyPlot.legend(["CACTUS", "$AModel 1st Order Filter","$AModel RPI"])
-        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AModel)Transient_CP_$(slice)_gtime$(gustT).pdf",transparent = true)
+        PyPlot.legend(["CACTUS", "$AeroModel 1st Order Filter","$AeroModel RPI"])
+        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AeroModel)Transient_CP_$(slice)_gtime$(gustT).pdf",transparent = true)
 
         # Angle of Attack
         PyPlot.figure()
@@ -317,8 +317,8 @@ function runme(AModel,slice,bnum)
         PyPlot.xlabel("Theta (deg)")
         PyPlot.xlim([r_start,r_end])
         PyPlot.ylabel("AOA (deg)")
-        PyPlot.legend(["CACTUS 25","CACTUS 50","CACTUS 75", "$AModel 1st Order Filter","$AModel RPI"])
-        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AModel)Transient_alpha$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
+        PyPlot.legend(["CACTUS 25","CACTUS 50","CACTUS 75", "$AeroModel 1st Order Filter","$AeroModel RPI"])
+        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AeroModel)Transient_alpha$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
 
         # Rp
         PyPlot.figure()
@@ -328,8 +328,8 @@ function runme(AModel,slice,bnum)
         PyPlot.xlabel("Revolution")
         PyPlot.ylabel("Radial Force per Span (N/m)")
         PyPlot.xlim([r_start,r_end])
-        # PyPlot.legend(["CACTUS", "$AModel 1st Order Filter","$AModel RPI"])
-        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AModel)Transient_Rp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
+        # PyPlot.legend(["CACTUS", "$AeroModel 1st Order Filter","$AeroModel RPI"])
+        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AeroModel)Transient_Rp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
 
         # Tp
         PyPlot.figure()
@@ -339,8 +339,8 @@ function runme(AModel,slice,bnum)
         PyPlot.xlabel("Revolution")
         PyPlot.ylabel("Tangential Force per Span (N/m)")
         PyPlot.xlim([r_start,r_end])
-        PyPlot.legend(["CACTUS", "$AModel 1st Order Filter","$AModel RPI"])
-        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AModel)Transient_Tp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
+        PyPlot.legend(["CACTUS", "$AeroModel 1st Order Filter","$AeroModel RPI"])
+        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AeroModel)Transient_Tp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
 
         # Zp
         PyPlot.figure()
@@ -350,8 +350,8 @@ function runme(AModel,slice,bnum)
         PyPlot.xlabel("Revolution")
         PyPlot.ylabel("Vertical Force per Span (N/m)")
         PyPlot.xlim([r_start,r_end])
-        # PyPlot.legend(["CACTUS", "$AModel 1st Order Filter","$AModel RPI"])
-        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AModel)Transient_Zp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
+        # PyPlot.legend(["CACTUS", "$AeroModel 1st Order Filter","$AeroModel RPI"])
+        # PyPlot.savefig("$(path)/figs/gust/SNL5m_$(AeroModel)Transient_Zp$(bnum)_$(slice)_gtime$(gustT).pdf",transparent = true)
         # end
         # #
         # function myplots()
@@ -445,7 +445,7 @@ r_end = 25.0;
 # PyPlot.xlabel("Revolution")
 # PyPlot.ylabel("CP")
 # # PyPlot.xlim([r_start,r_end])
-# PyPlot.legend(["CACTUS", "$AModel 1st Order Filter","$AModel RPI"])
+# PyPlot.legend(["CACTUS", "$AeroModel 1st Order Filter","$AeroModel RPI"])
 # PyPlot.savefig("$(path)/figs/gust/SNL5m_ALL_Transient_CP_$(slice)_gtime$(gustT).pdf",transparent = true)
 
 # Angle of Attack

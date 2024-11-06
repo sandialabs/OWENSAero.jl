@@ -22,7 +22,7 @@ path,_ = splitdir(@__FILE__)
 # Main Function
 
 function runme()
-    AModel = "AC"
+    AeroModel = "AC"
     plots = false
     ntheta = 30
     R = 5.0/2#1.73#slice 7#5.0/2 #m
@@ -71,7 +71,7 @@ for shift = 11
         r1=a[ii]*b[ii] ./ ((b[ii]*cos.(theta)).^2+(a[ii]*sin.(theta)).^2).^0.5
         r = zero(r1)
         circshift!(r,r1,shift)
-        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AModel,zeros(ntheta*2))
+        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AeroModel,zeros(ntheta*2))
         turbine = OWENSAero.Turbine(R,r.*R,chord,twist,delta,omega,B,af,ntheta,false)
 
         start = time()
@@ -94,7 +94,7 @@ for shift = 11
         r = zero(r1)
         circshift!(r,r1,shift)
         turbine = OWENSAero.Turbine(R,r.*R,chord,twist,delta,omega,B,af,ntheta,true)
-        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AModel,zeros(ntheta*2))
+        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AeroModel,zeros(ntheta*2))
 
         start = time()
 

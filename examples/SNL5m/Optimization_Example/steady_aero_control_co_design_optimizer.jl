@@ -26,7 +26,7 @@ global iter = 1
 
 function objcon!(con,design_vars;runplot=false)
     global iter += 1
-    AModel = "DMS"
+    AeroModel = "DMS"
     plots = false
     ntheta = 30
     R = 5.0/2#1.73#slice 7#5.0/2 #m
@@ -75,7 +75,7 @@ function objcon!(con,design_vars;runplot=false)
         y = r.*cos.(theta)
         area = (maximum(y) - minimum(y))*height # this is the frontal area the wind sees
 
-        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AModel,zeros(ntheta*2))
+        env = OWENSAero.Environment(rho,mu,Vinf,"NONE",AeroModel,zeros(ntheta*2))
         turbine = OWENSAero.Turbine(R,r.*R,chord,twist,delta,omega,B,af,ntheta,false)
 
         # start = time()
