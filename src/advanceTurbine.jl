@@ -461,7 +461,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     step1 = 0 #initialize scope
     for istep = 1:n_steps#(itime,time) in enumerate(timevec)
 
-        if verbosity>0
+        if verbosity>3
             println("istep $istep of $(n_steps)")
         end
 
