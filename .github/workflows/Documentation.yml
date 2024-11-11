@@ -21,7 +21,8 @@ jobs:
       - name: Install dependencies
         env:
           PYTHON: ""
-        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+        run: julia --project=docs/ -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/sandialabs/OWENSOpenFAST_jll.jl.git")); Pkg.add(PackageSpec(url="https://github.com/sandialabs/OWENSOpenFASTWrappers.jl.git")); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
