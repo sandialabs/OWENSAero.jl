@@ -2,6 +2,7 @@
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://sandialabs.github.io/OWENSAero.jl)
 ![](https://github.com/sandialabs/OWENSAero.jl/workflows/CI/badge.svg)
+[![codecov.io](https://codecov.io/github/sandialabs/OWENSAero.jl/coverage.svg?branch=master)](https://codecov.io/github/sandialabs/OWENSAero.jl?branch=master)
 
 This repository contains a set of aerodynamic tools for VAWTs both steady and unsteady operation, 2D and
 3D (stacked 2D) convenience functions along with coupling to NREL's InflowWind for turbulent inflow. If using InflowWind (ifw flag) You

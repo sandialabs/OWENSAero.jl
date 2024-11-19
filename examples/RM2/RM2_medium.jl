@@ -38,8 +38,8 @@ RE_d = [0.9,1.3]
     ifw=false
     AModel = "AC"
 
-    AM_flag = true
-    rotAccel_flag = true
+    Aero_AddedMass_Active = true
+    Aero_RotAccel_Active = true
 
     chord = FLOWMath.akima([0.0,0.5,1.0],[chordtip,chordmid,chordtip],LinRange(0,1,Nslices))
 
@@ -50,7 +50,7 @@ RE_d = [0.9,1.3]
     shapeZ = LinRange(0,height,Nslices)
 
 
-    OWENSAero.setupTurb(shapeX,shapeZ,B,chord,10.0,Vinf;rho,mu,eta,afname = "$(path)/airfoils/NACA_0021.dat",DSModel="BV",Nslices,AM_flag,rotAccel_flag)
+    OWENSAero.setupTurb(shapeX,shapeZ,B,chord,10.0,Vinf;rho,mu,eta,afname = "$(path)/airfoils/NACA_0021.dat",DSModel="BV",Nslices,Aero_AddedMass_Active,Aero_RotAccel_Active)
 
     TSRrange = LinRange(1.0,5.0,15)
     CP = zeros(length(TSRrange))
