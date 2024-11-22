@@ -27,7 +27,7 @@ function aerowrapper(chord;TSR=6.0,ifw=false,bladelength=110.0)
     RPM = omega/2/pi*60
     N_Rev = 15
 
-    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV")
+    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;afname = "$(path)/airfoils/NACA_0015.dat",DynamicStallModel="BV")
 
     mytime = N_Rev/RPM*60
     n_steps = ntheta*N_Rev#120
@@ -116,8 +116,8 @@ end
 
 
 
-# for AModel in ["DMS"]#,"AC"]
-AModel = "DMS"
+# for AeroModel in ["DMS"]#,"AC"]
+AeroModel = "DMS"
 # for bladelength in [330.0]#,220.0,150.0]
 bladelength = 330.0
 TSR = 6.0

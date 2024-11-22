@@ -6,8 +6,8 @@ path,_ = splitdir(@__FILE__)
 # include("$(path)/../src/OWENSAero.jl")
 
 function runfullturb(interpolate)
-    # for AModel in ["DMS"]#,"AC"]
-    AModel = "DMS"
+    # for AeroModel in ["DMS"]#,"AC"]
+    AeroModel = "DMS"
     # for bladelength in [330.0]#,220.0,150.0]
     bladelength = 330.0
     TSR = 6.0
@@ -54,7 +54,7 @@ function runfullturb(interpolate)
     RPM = omega/2/pi*60
     N_Rev = 0.5
 
-    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;Nslices,ntheta,afname = "$(path)/airfoils/NACA_0015.dat",DSModel="BV",tau = [1e-5,1e-5])
+    OWENSAero.setupTurb(shapeX_raw,shapeY_raw,B,chord,omega,Vinf;Nslices,ntheta,afname = "$(path)/airfoils/NACA_0015.dat",DynamicStallModel="BV",tau = [1e-5,1e-5])
 
     if interpolate
         mydt = 2*pi/(ntheta*omega)/3

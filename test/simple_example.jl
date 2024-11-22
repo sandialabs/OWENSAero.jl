@@ -24,7 +24,7 @@ path,_ = splitdir(@__FILE__)
 import OWENSAero
 # include("$(path)/../src/OWENSAero.jl")
 
-function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",steady=true,ifw=false,DSModel="BV")
+function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AeroModel="DMS",steady=true,ifw=false,DynamicStallModel="BV")
 
     ntheta = 30
     RPM = x[1]
@@ -42,9 +42,9 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
         return cl, cd
     end
 
-    if DSModel=="BV" #Both are gradient safe
+    if DynamicStallModel=="BV" #Both are gradient safe
         af = OWENSAero.readaerodyn_BV("$(path)/airfoils/NACA_0015_RE3E5.dat")
-    elseif DSModel=="none"
+    elseif DynamicStallModel=="none"
         af = OWENSAero.readaerodyn("$(path)/airfoils/NACA_0015_RE3E5.dat")
     else
         af = affun
@@ -63,7 +63,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AModel="DMS",ste
 
     z = 1.0
     turbine = OWENSAero.Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,false)
-    env = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,zeros(Real,ntheta*2))
+    env = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,zeros(Real,ntheta*2))
 
     if steady
         CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl, cd_af, thetavec, Re = OWENSAero.steady(turbine, env)
@@ -134,18 +134,18 @@ end
 ntheta = 30
 Rp_us = zeros(ntheta) #initialize scope
 Tp_us = zeros(ntheta) #initialize scope
-for AModel in ["AC","DMS"]
-    # AModel = "AC"
-    println(AModel)
+for AeroModel in ["AC","DMS"]
+    # AeroModel = "AC"
+    println(AeroModel)
     RPM = 150.0
     TSR = 5.2
     xin = [RPM,TSR]
     filterwindow = 1*ntheta
     ##########################################
-    @testset "TEST Unsteady Method with ifw $AModel" begin
+    @testset "TEST Unsteady Method with ifw $AeroModel" begin
         ##########################################
 
-        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AModel,steady=false,ifw=true)
+        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AeroModel,steady=false,ifw=true)
         @test true #check that it runs
         # PyPlot.figure()
         # PyPlot.plot(thetavec./ntheta,Tp,label="Turbulent",color=plot_cycle[1])
@@ -153,7 +153,7 @@ for AModel in ["AC","DMS"]
         # PyPlot.plot(thetavec./ntheta,Tp_rollingave,"--",label="Turbulent Averaged",color=plot_cycle[1])
     end
     ################################
-    @testset "TEST Unsteady Method $AModel" begin
+    @testset "TEST Unsteady Method $AeroModel" begin
         #################################
         # PyPlot.figure()
         i=1
@@ -161,7 +161,7 @@ for AModel in ["AC","DMS"]
             i+=1
             global Rp_us
             global Tp_us
-            CP, Th, Q, Rp_us, Tp_us, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;RPI,returnall=true,AModel,steady=false)
+            CP, Th, Q, Rp_us, Tp_us, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;RPI,returnall=true,AeroModel,steady=false)
             @test true #check that it runs
 
             # PyPlot.plot(thetavec./ntheta,Tp_us,label="Steady Wind RPI: $RPI",color=plot_cycle[i])
@@ -176,11 +176,11 @@ for AModel in ["AC","DMS"]
 
 
     ################################
-    @testset "TEST Steady GRADIENTS $AModel" begin
+    @testset "TEST Steady GRADIENTS $AeroModel" begin
         ################################
 
-        if AModel=="DMS"
-            aerowrapper0(x) = aerowrapper(x;AModel)
+        if AeroModel=="DMS"
+            aerowrapper0(x) = aerowrapper(x;AeroModel)
             J = ForwardDiff.jacobian(aerowrapper0, xin)
 
             function aerowrapper2(x)
@@ -199,14 +199,14 @@ for AModel in ["AC","DMS"]
         end
     end
     ################################
-    @testset "TEST Wind Direction $AModel" begin
+    @testset "TEST Wind Direction $AeroModel" begin
         #################################
-        if AModel=="DMS"
+        if AeroModel=="DMS"
             windangle_D = collect(0.0:30.0:90.0)
             # PyPlot.figure()
             for iwind = 1:length(windangle_D)
 
-                local CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;AModel,returnall=true,windangle_D=windangle_D[iwind])
+                local CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;AeroModel,returnall=true,windangle_D=windangle_D[iwind])
                 rel_ang_off = 0.0#windangle_D[iwind]*pi/180 #turn on to align loads
                 # PyPlot.plot(thetavec[1:ntheta].+rel_ang_off,Tp,label="Angle $(windangle_D[iwind])")
             end
@@ -216,12 +216,12 @@ for AModel in ["AC","DMS"]
         end
     end
     ################################
-    @testset "TEST Accuracy $AModel" begin
+    @testset "TEST Accuracy $AeroModel" begin
         #################################
 
-        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AModel)
+        CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AeroModel)
 
-        filename = "$path/data/$(AModel)_simple_unit_data.h5"
+        filename = "$path/data/$(AeroModel)_simple_unit_data.h5"
         # HDF5.h5open(filename, "w") do file
         #     HDF5.write(file,"Rp_us_old",Float64.(Rp_us))
         #     HDF5.write(file,"Tp_us_old",Float64.(Tp_us))

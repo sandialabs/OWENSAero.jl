@@ -170,7 +170,7 @@ experimental = DelimitedFiles.readdlm("$(path)/data/steady/SNL5m_CP_150RPM_0015.
 # New Interface
 Vinf = 10.0
 omega = 150.0 / 60.0 * 2*pi 
-OWENSAero.setupTurb(shapeX,shapeY,B,chord,omega,Vinf;rho,mu,eta,afname = "$(path)/../airfoils/NACA_0015.dat",DSModel="BV",Nslices)
+OWENSAero.setupTurb(shapeX,shapeY,B,chord,omega,Vinf;rho,mu,eta,afname = "$(path)/../airfoils/NACA_0015.dat",DynamicStallModel="BV",Nslices)
 
 TSRrange = LinRange(1.0,8.0,20)
 CP = zeros(length(TSRrange))

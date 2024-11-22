@@ -73,9 +73,9 @@ Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,
 Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1),zeros(Real,size(R)))
 
 """
-Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DSModel::TS,AModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
+Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DynamicStallModel::TS,AeroModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
+Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
 
 Contains specications for turbine slice environment/operating conditions as well as some backend memory for dynamic stall and unsteady calculations
 
@@ -87,8 +87,8 @@ Contains specications for turbine slice environment/operating conditions as well
 * `V_z::TAF`: z input velocity (m/s), array corresponding to each azimuthal position
 * `V_twist::TAF`: rotational velocity from active twist (rad/s), array corresponding to each azimuthal position
 * `windangle::TF`: angle of mean oncoming wind (rad)
-* `DSModel::TS`: dynamic stall model ("BV" or "none" or "LB" - once it is finished)
-* `AModel::TS`: aero model used ("DMS" or "AC")
+* `DynamicStallModel::TS`: dynamic stall model ("BV" or "none" or "LB" - once it is finished)
+* `AeroModel::TS`: aero model used ("DMS" or "AC")
 * `aw_warm::TVF`: warm start induction factor array, first half corresponding to u, second half to v
 * `steplast::TAI`: prior simulation step index, used for unsteady wake propogation
 * `idx_RPI::TAI`: used to specify the azimuthal indices needed for a partial solve (i.e. not every azimuthal index), such as is used in the RPI method
@@ -110,8 +110,8 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     V_z::TAF3
     V_twist::TAF3
     windangle::TF #radians
-    DSModel::TS
-    AModel::TS
+    DynamicStallModel::TS
+    AeroModel::TS
     Aero_AddedMass_Active::TB
     Aero_Buoyancy_Active::TB
     Aero_RotAccel_Active::TB
@@ -129,9 +129,9 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     accel_edge::TAF4
     gravity::TAF5
 end
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DSModel,AModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,DSModel,AModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DSModel,AModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)
@@ -199,15 +199,15 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `Re`: Reynolds number for each azimuthal position
 """
 function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
-    if env.AModel=="DMS"
+    if env.AeroModel=="DMS"
         return DMS(turbine, env; w, idx_RPI, solve)
-    elseif env.AModel=="AC"
+    elseif env.AeroModel=="AC"
         turbines = Array{OWENSAero.Turbine}(undef,1)
         turbines[1] = turbine
         return AC(turbines, env; w, idx_RPI, solve, ifw)
         # return AC_steady(turbines, env)
     else
-        error("AModel not recognized, choose DMS or AC")
+        error("AeroModel not recognized, choose DMS or AC")
     end
 end
 

@@ -155,19 +155,19 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
 end
 
 """
-    readaerodyn_BV_NEW(filename;DSModel="BV")
+    readaerodyn_BV_NEW(filename;DynamicStallModel="BV")
 
 for a file with multiple reynolds numbers create airfoil lookup function with boeing vertol dynamic stall model and wrap interpolation
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
-* `DSModel::string`: "BV" or "none"
+* `DynamicStallModel::string`: "BV" or "none"
 
 # Outputs:
 * `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop
 * `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad
 """
-function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch to simplify this
+function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple dispatch to simplify this
     # Loop through the file and determine how many Reynolds numbers there are
     nRe = 0
     open(filename) do f
@@ -281,7 +281,7 @@ function readaerodyn_BV_NEW(filename;DSModel="BV") #TODO: use multiple dispatch 
         return CL_BV, CD_BV #TODO: add CM
     end
 
-    if DSModel == "BV"
+    if DynamicStallModel == "BV"
         return af_BV2 #, alpha*pi/180, cl, cd
     else
         return af2
