@@ -266,7 +266,8 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     ntheta = turbine.ntheta
     R = turbine.R #reference radius
     r = turbine.r #deformed (potentially) radius at each azimuthal location
-    chord = turbine.chord[1]
+    chord = turbine.chord#[1]
+    thickness = turbine.thick#[idx]
     twist = turbine.twist
     delta = turbine.delta
     B = turbine.B
@@ -321,11 +322,78 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     sigma = B*chord./r
     q = sigma./(4*pi).*cn./cos.(delta).*(W./V_wind).^2 #divide by slope to get 3D to 2D transformation normal to radial
 
+    # Added Mass
+    if env.Aero_AddedMass_Active
+        if length(turbine.r) > 1  # TODO CM: theta/thetavec
+            # dtheta = 2 * pi / (ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
+            # println("theta: $theta")
+            # println("dtheta: $dtheta")
+            # println("ntheta: $ntheta")
+            # idx = round(Int, (theta + dtheta / 2) / dtheta)
+
+            twist = turbine.twist#[idx]
+            omega = turbine.omega#[idx]
+            r = turbine.r#[idx]
+            accel_flap = env.accel_flap#[idx]
+            accel_edge = env.accel_edge#[idx]
+        else # TODO CM: is this ever used?
+            # twist = turbine.twist
+            # omega = turbine.omega
+            # r = turbine.r
+            # accel_flap = env.accel_flap[1]
+            # accel_edge = env.accel_edge[1]
+        end
+        chord = turbine.chord#[1]
+        thickness = turbine.thick#[idx]
+        rho = env.rho
+
+        Vol_flap = @. pi * (chord / 2)^2 * 1.0
+        Vol_edge = @. pi * ((thickness / 10) / 2)^2 * 1.0
+
+        if env.Aero_RotAccel_Active
+            accel_rot = @. omega^2 * r
+        else
+            accel_rot = 0.0
+        end
+
+        M_addedmass_flap = @. rho * env.AddedMass_Coeff_Ca * Vol_flap
+        M_addedmass_edge = @. rho * env.AddedMass_Coeff_Ca * Vol_edge
+
+        F_addedmass_flap = @. M_addedmass_flap * (accel_flap + accel_rot)
+        F_addedmass_edge = @. M_addedmass_edge * (accel_edge + accel_rot)
+
+        M_addedmass_Np = @. M_addedmass_flap * cos(twist) + M_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        M_addedmass_Tp = @. M_addedmass_edge * cos(twist) - M_addedmass_flap * sin(twist)
+
+        F_addedmass_Np = @. F_addedmass_flap * cos(twist) + F_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        F_addedmass_Tp = @. F_addedmass_edge * cos(twist) - F_addedmass_flap * sin(twist)
+    else
+        M_addedmass_Np = zero(alpha)
+        M_addedmass_Tp = zero(alpha)
+        F_addedmass_Np = zero(alpha)
+        F_addedmass_Tp = zero(alpha)
+    end
+
+    # Buoyancy
+    F_buoy = zeros(3, ntheta)
+    section_area = chord * thickness / 2 * 1.0 # per unit length TODO: input volume
+    mass = -env.gravity .* (rho * section_area - turbine.rhoA) # buoyancy mass minus structural mass since added mass requires moving the gravity here
+    if env.Aero_Buoyancy_Active
+        for (itheta, theta) in enumerate(thetavec)
+            dcm = [
+                cos(theta) -sin(theta) 0
+                sin(theta) cos(theta) 0
+                0 0 1
+            ]
+            F_buoy[:, itheta] = dcm * mass
+        end
+    end
+
     # instantaneous forces #Based on this, radial is inward and tangential is in direction of rotation
     qdyn = 0.5*rho*W.^2
-    Rp = cn.*qdyn*chord
-    Tp = rotation*ct.*qdyn.*chord./cos.(delta)
-    Zp = cn.*qdyn.*chord.*tan.(delta)
+    Rp = cn.*qdyn*chord - F_addedmass_Np .+ F_buoy[2, :] # TODO CM: correct?
+    Tp = (rotation*ct.*qdyn.*chord + F_addedmass_Tp)./cos.(delta)  .+ F_buoy[1, :] # TODO CM: correct?
+    Zp = (cn.*qdyn.*chord - F_addedmass_Np).*tan.(delta)  .+ F_buoy[3, :] # TODO CM: correct?
 
     # nonlinear correction factor
     integrand = (W./V_wind).^2 .* (cn.*sin.(thetavec) - rotation*ct.*cos.(thetavec)./cos.(delta))
@@ -349,7 +417,8 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     Q = r.*Tp*rotation
     P = abs(mean(Omega))*B/(2*pi)*pInt(thetavec, Q)
     CP = P / (0.5*rho*mean(V_wind)^3 * Sref)
-    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q
+
+    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
 end
 
 # -----------------------------------------
@@ -466,15 +535,11 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
 
         w[idx_RPI] = w_RPI
     end #solve
+
     idx = collect(1:ntheta)
     u = w[idx]
     v = w[ntheta .+ idx]
-    q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q = radialforce(u, v, theta, turbines[i], env)
-
-    M_addedmass_Np = zero(alpha)
-    M_addedmass_Tp = zero(alpha)
-    F_addedmass_Np = zero(alpha)
-    F_addedmass_Tp = zero(alpha)
+    q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp = radialforce(u, v, theta, turbines[i], env)
 
     return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
 

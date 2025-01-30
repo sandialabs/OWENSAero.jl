@@ -1,126 +1,127 @@
-import PyPlot
-PyPlot.rc("figure", figsize=(4, 3))
-PyPlot.rc("font", size=10.0)
-PyPlot.rc("lines", linewidth=1.5)
-PyPlot.rc("lines", markersize=3.0)
-PyPlot.rc("legend", frameon=false)
-PyPlot.rc("axes.spines", right=false, top=false)
-PyPlot.rc("figure.subplot", left=.18, bottom=.17, top=0.9, right=.9)
-PyPlot.rc("figure",max_open_warning=500)
-color_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
-PyPlot.pygui(true)
-# PyPlot.close("all")
-import OWENSAero
-using Test
-import HDF5
-import FLOWMath
-using Statistics:mean
-import DelimitedFiles
+using Plots
+using DelimitedFiles: readdlm
+import OWENSAero: setupTurb, steadyTurb
+import FLOWMath: akima
 
-path,_ = splitdir(@__FILE__)
-
+# Turbine
+airfoils_path = abspath("./airfoils")
+airfoil = "NACA_0021.dat"
 radius = 0.538
 height = 0.807
 chordmid = 0.066667
 chordtip = 0.04
+eta = 0.5
 B = 3
+ω = NaN # will vary this parameter later
+ntheta = 30
+Nslices = 30
+afname = joinpath(airfoils_path, airfoil)
+chord = akima([0.0, 0.5, 1.0], [chordtip, chordmid, chordtip], LinRange(0, 1, Nslices))
+shapeX = ones(Nslices) .* radius
+shapeZ = LinRange(0, height, Nslices)
+area = height * 2radius
 
-RE_d = [0.9,1.3]
-# for (ire,Vinf) in enumerate([0.8,1.2])
-    ire = 2
-    Vinf = 1.2
-    rho=1000.0
-    mu=1.792E-3
-    eta=0.5
+# Fluid
+Vinf = 1.2
+rho = 1000.0
+mu = 1.792E-3
 
-    ntheta = 30
-    Nslices = 30
-    ifw=false
-    AeroModel = "AC"
+# Model
+ifw = false
+# AeroModel = "DMS"  # AeroModel ∈ ["DMS", "AC"]
+# Aero_AddedMass_Active = true
+# Aero_Buoyancy_Active = false
+Aero_RotAccel_Active = true
+DynamicStallModel = "BV"
 
-    Aero_AddedMass_Active = true
-    Aero_RotAccel_Active = true
+results = Dict{String,Dict{String,Array}}()
 
-    chord = FLOWMath.akima([0.0,0.5,1.0],[chordtip,chordmid,chordtip],LinRange(0,1,Nslices))
+min_tipspeed, max_tipspeed = 1, 5
+n_tipspeeds = 15
+tsr = range(min_tipspeed, max_tipspeed, n_tipspeeds)
 
-    # PyPlot.figure()
-    # PyPlot.plot(collect(LinRange(0,1,Nslices)),chord)
+for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+    # Setup
+    _ = setupTurb(shapeX, shapeZ, B, chord, ω, Vinf;
+        rho, mu, eta, afname, DynamicStallModel, Nslices, Aero_AddedMass_Active, AeroModel,
+        Aero_RotAccel_Active, Aero_Buoyancy_Active
+    )
 
-    shapeX = ones(Nslices).*radius
-    shapeZ = LinRange(0,height,Nslices)
+    # Solve problem for range of tip speed ratios
+    CP = Vector{Float64}(undef, n_tipspeeds)
+    RpSteady = Array{Float64}(undef, (B, Nslices, ntheta, n_tipspeeds))
+    TpSteady = similar(RpSteady)
+    alphaSteady = similar(RpSteady)
 
+    label = AeroModel * (Aero_AddedMass_Active ? "-AM" : "") * (Aero_Buoyancy_Active ? "-BY" : "")
+    println("$(label)")
+    for (iTSR, TSR) in enumerate(tsr)
+        println("  TSR: $(round(TSR; digits=2))")
+        omega = Vinf / radius * TSR
+        i_results = steadyTurb(; omega, Vinf)
 
-    OWENSAero.setupTurb(shapeX,shapeZ,B,chord,10.0,Vinf;rho,mu,eta,afname = "$(path)/airfoils/NACA_0021.dat",DynamicStallModel="BV",Nslices,Aero_AddedMass_Active,Aero_RotAccel_Active)
-
-    TSRrange = LinRange(1.0,5.0,15)
-    CP = zeros(length(TSRrange))
-    RpSteady = zeros(B,Nslices,ntheta,length(TSRrange))
-    TpSteady = zeros(B,Nslices,ntheta,length(TSRrange))
-    alphaSteady = zeros(B,Nslices,ntheta,length(TSRrange))
-    for (iTSR,TSR) in enumerate(collect(TSRrange))
-        # iTSR = 1
-        # TSR = 2.2
-        #Steady State Test
-        omega = Vinf/radius*TSR
-        
-        RPM = omega * 60 / (2*pi)
-
-        CPSteady,
-        RpSteady[:,:,:,iTSR],
-        TpSteady[:,:,:,iTSR],
-        ZpSteady,
-        alphaSteady[:,:,:,iTSR],
-        cl_afSteady,
-        cd_afSteady,
-        VlocSteady,
-        ReSteady,
-        thetavecSteady,
-        nstepSteady,
-        Fx_baseSteady,
-        Fy_baseSteady,
-        Fz_baseSteady,
-        Mx_baseSteady,
-        My_baseSteady,
-        Mz_baseSteady,
-        powerSteady,
-        power2Steady,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,
-        M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp = OWENSAero.steadyTurb(;omega,Vinf)
-
-        println("RPM: $RPM")
-        # println(mean(ReSteady))
-        area = height * radius*2
-
-        CP[iTSR] = powerSteady/(0.5*rho*Vinf^3*area)
+        RpSteady[:, :, :, iTSR] = i_results[2]
+        TpSteady[:, :, :, iTSR] = i_results[3]
+        alphaSteady[:, :, :, iTSR] = i_results[5]
+        CP[iTSR] = i_results[18] / (0.5rho * Vinf^3 * area)
     end
+    println("")
+    results[label] = Dict(
+        "cₚ" => CP,
+        "rₚ" => RpSteady,
+        "tₚ" => TpSteady,
+        "α" => alphaSteady,
+    )
+end
 
-    PyPlot.figure("CP")
-    PyPlot.plot(TSRrange,CP,"-",color=color_cycle[2],label="OWENS Aero, $(RE_d[ire]) RE_d (No Added Mass)") #,color=color_cycle[2]
-# end
-RM2_0_538D_RE_D_0_9E6 = DelimitedFiles.readdlm("$(path)/RM2_0.538D_RE_D_0.9E6.csv", ',',Float64)
-RM2_0_538D_RE_D_1_3E6 = DelimitedFiles.readdlm("$(path)/RM2_0.538D_RE_D_1.3E6.csv", ',',Float64)
-# PyPlot.plot(RM2_0_538D_RE_D_0_9E6[:,1],RM2_0_538D_RE_D_0_9E6[:,2],"k--",label="Exp. 0.9e6 RE_d")
-PyPlot.plot(RM2_0_538D_RE_D_1_3E6[:,1],RM2_0_538D_RE_D_1_3E6[:,2],"k-",label="Exp. 1.2e6 RE_d")
-# PyPlot.plot(right_TSR,right_CP,"ko",label="Right Only Exp.")
-PyPlot.legend()
-PyPlot.xlabel("TSR")
-PyPlot.ylabel("Cp")
+# load experimental data
+expdata_path = abspath("./exp_data")
+exp_0p9 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_0.9E6.csv"), ',', Float64)
+exp_1p3 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_1.3E6.csv"), ',', Float64)
 
-PyPlot.figure("Rp")
-PyPlot.plot((1:length(RpSteady[1,15,:,7]))./length(RpSteady[1,15,:,7]).*360,RpSteady[1,15,:,7],".-",label="No Added Mass")
-PyPlot.legend()
-PyPlot.ylabel("Rp")
-PyPlot.xlabel("Azimuth")
+# Plot
+fig_path = abspath("./figures")
+mkpath(fig_path)
 
-PyPlot.figure("Tp")
-PyPlot.plot((1:length(TpSteady[1,15,:,7]))./length(TpSteady[1,15,:,7]).*360,TpSteady[1,15,:,7],".-",label="No Added Mass")
-PyPlot.legend()
-PyPlot.ylabel("Tp")
-PyPlot.xlabel("Azimuth")
+p = plot(xlabel="tip speed ratio", ylabel="Cₚ")
+for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+    if !(!Aero_AddedMass_Active && Aero_Buoyancy_Active)
+        label = AeroModel * (Aero_AddedMass_Active ? "-AM" : "") * (Aero_Buoyancy_Active ? "-BY" : "")
+        ls = Aero_Buoyancy_Active ? :dot : (Aero_AddedMass_Active ? :dash : :solid)
+        lc = AeroModel == "DMS" ? :blue : :red
+        plot!(tsr, results[label]["cₚ"]; ls, lc, label)
+    end
+end
+# scatter!(exp_0p9[:, 1], exp_0p9[:, 2]; mc=:black, markershape=:circle, label="Exp. Re=0.9")
+scatter!(exp_1p3[:, 1], exp_1p3[:, 2]; mc=:black, markershape=:diamond, label="Exp. Re=1.3")
+savefig(p, joinpath(fig_path, "Cp.pdf"))
 
-PyPlot.figure("Alpha")
-PyPlot.plot((1:length(alphaSteady[1,15,:,7]))./length(alphaSteady[1,15,:,7]).*360,alphaSteady[1,15,:,7]./2.0./pi.*360,".-",label="Added Mass")
-PyPlot.legend()
-PyPlot.ylabel("Alpha")
-PyPlot.xlabel("Azimuth")
+function plot_slice(islice, itsr, iblade=1, results=results)
+    p_r = plot(xlabel="θ [°]", ylabel="rₚ")
+    p_t = plot(xlabel="θ [°]", ylabel="tₚ")
+    p_α = plot(xlabel="θ [°]", ylabel="α")
 
+    θ = (1:ntheta) ./ ntheta .* 360
 
+    for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+        if !(!Aero_AddedMass_Active && Aero_Buoyancy_Active)
+            label = AeroModel * (Aero_AddedMass_Active ? "-AM" : "") * (Aero_Buoyancy_Active ? "-BY" : "")
+            rₚ = results[label]["rₚ"][iblade, islice, :, itsr]
+            tₚ = results[label]["tₚ"][iblade, islice, :, itsr]
+            α = results[label]["α"][iblade, islice, :, itsr]
+            ls = Aero_Buoyancy_Active ? :dot : (Aero_AddedMass_Active ? :dash : :solid)
+            lc = AeroModel == "DMS" ? :blue : :red
+            plot!(p_r, θ, rₚ; ls, lc, label)
+            plot!(p_t, θ, tₚ; ls, lc, label)
+            plot!(p_α, θ, α; ls, lc, label)
+        end
+    end
+    savefig(p_r, joinpath(fig_path, "rp_$(islice)_$(itsr)_$(iblade).pdf"))
+    savefig(p_t, joinpath(fig_path, "tp_$(islice)_$(itsr)_$(iblade).pdf"))
+    savefig(p_α, joinpath(fig_path, "alpha_$(islice)_$(itsr)_$(iblade).pdf"))
+end
+
+islice = 15
+itsr = 7
+
+plot_slice(islice, itsr)
