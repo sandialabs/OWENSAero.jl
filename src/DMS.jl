@@ -5,7 +5,7 @@
 
 import FLOWMath
 import Statistics
-import Statistics:mean
+import Statistics: mean
 
 """
 INTERNAL streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solvestep=false)
@@ -21,8 +21,8 @@ else
 end
 
 """
-function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solvestep=false)
-    
+function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, solvestep=false)
+
     # Unpack Vars
     B = turbine.B
     k = 1.0
@@ -41,10 +41,10 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     Aero_RotAccel_Active = env.Aero_RotAccel_Active
     # winddir = env.winddir
 
-    dtheta = 2*pi/(ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
+    dtheta = 2 * pi / (ntheta) #Assuming discretization is fixed equidistant (but omega can change between each point)
 
-    if length(turbine.r)>1
-        idx = round(Int, (theta+dtheta/2)/dtheta)
+    if length(turbine.r) > 1
+        idx = round(Int, (theta + dtheta / 2) / dtheta)
         r = turbine.r[idx]
         twist = turbine.twist[idx]
         delta = turbine.delta[idx]
@@ -76,25 +76,25 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
         # V_sweep = env.V_sweep[1] # Does not apply since the model calculation is centered around the point of rotation
     end
 
-    if Vxwake!=nothing
+    if Vxwake != nothing
         V_xt = Vxwake
     end
 
     if suction
         # Drag Coefficient: Eq. 5
-        if a<=0.7
-            CD = 4/3 * a * (3-a)/(1+a)
-        elseif a > 0.7 && a <=1
-            CD = 0.889 - (0.0203-(a-0.143)^2)/0.6427
+        if a <= 0.7
+            CD = 4 / 3 * a * (3 - a) / (1 + a)
+        elseif a > 0.7 && a <= 1
+            CD = 0.889 - (0.0203 - (a - 0.143)^2) / 0.6427
         else
             error("a > 1 is undefined")
         end
     else
         # Drag Coefficient: Eq. 2
-        if a<=0.4
-            CD = 4*a*(1-a)
+        if a <= 0.4
+            CD = 4 * a * (1 - a)
         else
-            CD = 0.889 - (0.0203-(a-0.143)^2)/0.6427
+            CD = 0.889 - (0.0203 - (a - 0.143)^2) / 0.6427
         end
     end
 
@@ -102,8 +102,8 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     # TSR = abs(omega)*r/sqrt(V_x^2+V_y^2) # Tip Speed Ratio, section 2.3, however since this is being used for relative local velocities, we use the local radius r, and not the nominal radius R
     # Vt = V_x*(1-a)*cos(theta)+V_y*sin(theta)+V_y*(a)*cos(theta)+TSR
 
-    Vn = (V_xt*(1-a)*sin(theta)-V_yt*cos(theta)+V_yt*(a)*sin(theta))*cos.(delta) + V_zt*sin(delta)
-    Vt = V_xt*((1-a)*cos(theta))+V_yt*sin(theta)+V_yt*(1-a)*cos(theta)+abs(omega)*r
+    Vn = (V_xt * (1 - a) * sin(theta) - V_yt * cos(theta) + V_yt * (a) * sin(theta)) * cos.(delta) + V_zt * sin(delta)
+    Vt = V_xt * ((1 - a) * cos(theta)) + V_yt * sin(theta) + V_yt * (1 - a) * cos(theta) + abs(omega) * r
     Vloc = sqrt(Vn^2 + Vt^2)
     phi = atan(Vn, Vt)
     alpha = phi - twist
@@ -112,23 +112,23 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     # phi = atan(((1-a)*sin(theta)).*cos.(delta) , ((1-a)*cos(theta)+TSR)) # Eq. 7 but correct for slope from the 3D to 2D frame of reverence, also must use atan2 to determine which quadrant and get the signs correct
     # Vloc = Vinf .* ((1-a)^2 + 2*(1-a)*TSR*cos(theta).*cos.(delta) + TSR^2).^0.5 # Eq. 8
 
-    Re = rho*Vloc*chord/mu
-    dt = dtheta/abs.(omega)
+    Re = rho * Vloc * chord / mu
+    dt = dtheta / abs.(omega)
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
-    mach = Vloc/v_sound
+    mach = Vloc / v_sound
     if env.DynamicStallModel == "BV"
-        cl, cd_af = af(alpha,Re,mach,env,V_twist,chord,dt,Vloc;solvestep,idx)
+        cl, cd_af = af(alpha, Re, mach, env, V_twist, chord, dt, Vloc; solvestep, idx)
     elseif env.DynamicStallModel == "LB"
         error("LB Dynamic Stall Model Not Implemented Yet")
     else
-        cl, cd_af = af(alpha,Re,mach)
+        cl, cd_af = af(alpha, Re, mach)
     end
-    ct = cd_af*cos(phi) - cl*sin(phi) # Eq. 9
-    cn = cd_af*sin(phi) + cl*cos(phi) # Eq. 10
+    ct = cd_af * cos(phi) - cl * sin(phi) # Eq. 9
+    cn = cd_af * sin(phi) + cl * cos(phi) # Eq. 10
 
     if Aero_AddedMass_Active
-        Vol_flap = pi * (chord/2)^2 * 1.0
-        Vol_edge = pi * ((thickness/10)/2)^2 * 1.0
+        Vol_flap = pi * (chord / 2)^2 * 1.0
+        Vol_edge = pi * ((thickness / 10) / 2)^2 * 1.0
 
         if Aero_RotAccel_Active
             accel_rot = omega^2 * r
@@ -136,17 +136,17 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
             accel_rot = 0.0
         end
 
-        M_addedmass_flap = rho * env.AddedMass_Coeff_Ca * Vol_flap 
-        M_addedmass_edge = rho * env.AddedMass_Coeff_Ca * Vol_edge 
+        M_addedmass_flap = rho * env.AddedMass_Coeff_Ca * Vol_flap
+        M_addedmass_edge = rho * env.AddedMass_Coeff_Ca * Vol_edge
 
         F_addedmass_flap = M_addedmass_flap * (accel_flap + accel_rot)
         F_addedmass_edge = M_addedmass_edge * (accel_edge + accel_rot)
 
-        M_addedmass_Np = M_addedmass_flap*cos(twist) + M_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
-        M_addedmass_Tp = M_addedmass_edge*cos(twist) - M_addedmass_flap*sin(twist)
+        M_addedmass_Np = M_addedmass_flap * cos(twist) + M_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        M_addedmass_Tp = M_addedmass_edge * cos(twist) - M_addedmass_flap * sin(twist)
 
-        F_addedmass_Np = F_addedmass_flap*cos(twist) + F_addedmass_edge*sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
-        F_addedmass_Tp = F_addedmass_edge*cos(twist) - F_addedmass_flap*sin(twist)
+        F_addedmass_Np = F_addedmass_flap * cos(twist) + F_addedmass_edge * sin(twist) # Go from the beam frame of reference to the normal and tangential direction #TODO: verify the directions
+        F_addedmass_Tp = F_addedmass_edge * cos(twist) - F_addedmass_flap * sin(twist)
 
     else
         M_addedmass_Np = 0.0
@@ -156,11 +156,11 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     end
 
     if Aero_Buoyancy_Active
-        section_area = chord*thickness/2*1.0 # per unit length TODO: input volume
+        section_area = chord * thickness / 2 * 1.0 # per unit length TODO: input volume
         dcm = [cos(theta) -sin(theta) 0
-        sin(theta) cos(theta) 0
-        0 0 1]
-        F_buoy = dcm * -gravity .* (rho*section_area-rhoA) #buoyancy mass minus structural mass since added mass requires moving the gravity here
+            sin(theta) cos(theta) 0
+            0 0 1]
+        F_buoy = dcm * -gravity .* (rho * section_area - rhoA) #buoyancy mass minus structural mass since added mass requires moving the gravity here
     else
         F_buoy = [0.0, 0.0, 0.0]
     end
@@ -175,25 +175,25 @@ function streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solveste
     Ab = chord * 1.0 # planform area Assuming unit section height
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
 
-    Np = cn.*q_loc + -F_addedmass_Np
+    Np = cn .* q_loc + -F_addedmass_Np
     Rp = Np + F_buoy[2] + f_centrifugal# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
-    Zp = Np*tan(delta) + F_buoy[3] # Ning Eq. 27 # Negate to match cactus frame of reference
-    Tp = -rotation*(ct.*q_loc + -F_addedmass_Tp)/cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
-    
-    Th = q_loc * (ct*cos(theta) + cn*sin(theta)/cos(delta)) # Eq. 11 but with delta correction
+    Zp = Np * tan(delta) + F_buoy[3] # Ning Eq. 27 # Negate to match cactus frame of reference
+    Tp = -rotation * (ct .* q_loc + -F_addedmass_Tp) / cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
+
+    Th = q_loc * (ct * cos(theta) + cn * sin(theta) / cos(delta)) # Eq. 11 but with delta correction
 
     Q = q_loc * r * -ct # Eq. 12 but with Local radius for local torque, Negate the force for reaction torque, in the power frame of reference?
 
-    Ast = 1.0 * r * dtheta *abs(sin(theta)) # Section 2.0, local radius for local area, however do not allow negative area, so use absolute value
+    Ast = 1.0 * r * dtheta * abs(sin(theta)) # Section 2.0, local radius for local area, however do not allow negative area, so use absolute value
 
-    q_inf = 0.5 * rho * Ast * (V_xt^2+V_yt^2) # this is in the radial frame of reference V_x.^2 , also (sqrt(V_x^2+V_y^2)).^2 is reduced
+    q_inf = 0.5 * rho * Ast * (V_xt^2 + V_yt^2) # this is in the radial frame of reference V_x.^2 , also (sqrt(V_x^2+V_y^2)).^2 is reduced
 
-    CT = (k * B/(2*pi) * dtheta*Th) ./ q_inf # Eq. 13
+    CT = (k * B / (2 * pi) * dtheta * Th) ./ q_inf # Eq. 13
 
     if output_all
         return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
     else
-        return CD-CT # Residual, section 2.4
+        return CD - CT # Residual, section 2.4
     end
 end
 
@@ -211,84 +211,84 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
     #Convert global F.O.R. winds to turbine frame
     windangle = env.windangle
 
-    V_xtemp = env.V_x.*cos(windangle)+env.V_y.*sin(windangle) # Vinf is V_x, t is for turbine direction f.o.r.
-    V_ytemp = -env.V_x.*sin(windangle)+env.V_y.*cos(windangle)
+    V_xtemp = env.V_x .* cos(windangle) + env.V_y .* sin(windangle) # Vinf is V_x, t is for turbine direction f.o.r.
+    V_ytemp = -env.V_x .* sin(windangle) + env.V_y .* cos(windangle)
 
     env.V_x[:] = V_xtemp #TODO: ensure this doesn't mess up unsteady methods with persistent backend memory
     env.V_y[:] = V_ytemp
 
     # Unpack the rest
 
-    dtheta = 2*pi/(ntheta)
+    dtheta = 2 * pi / (ntheta)
     # thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
     thetavec = collect(dtheta/2:dtheta:2*pi)
 
-    astar = zeros(Real,ntheta*2)#env.aw_warm[1:ntheta] #zeros(ntheta)
+    astar = zeros(Real, ntheta * 2)#env.aw_warm[1:ntheta] #zeros(ntheta)
 
     if a_in == 0
         idx_RPI = 1:ntheta
     else
         astar[1:ntheta] = a_in[1:ntheta]
     end
-    Th = zeros(Real,ntheta)
-    Q = zeros(Real,ntheta)
-    Rp = zeros(Real,ntheta)
-    Tp = zeros(Real,ntheta)
-    Zp = zeros(Real,ntheta)
-    Vloc = zeros(Real,ntheta)
-    CD = zeros(Real,ntheta)
-    CT = zeros(Real,ntheta)
-    alpha = zeros(Real,ntheta)
-    cl = zeros(Real,ntheta)
-    cd_af = zeros(Real,ntheta)
-    Re = zeros(Real,ntheta)
-    M_addedmass_Np = zeros(Real,ntheta)
-    M_addedmass_Tp = zeros(Real,ntheta)
-    F_addedmass_Np = zeros(Real,ntheta)
-    F_addedmass_Tp = zeros(Real,ntheta)
-    
+    Th = zeros(Real, ntheta)
+    Q = zeros(Real, ntheta)
+    Rp = zeros(Real, ntheta)
+    Tp = zeros(Real, ntheta)
+    Zp = zeros(Real, ntheta)
+    Vloc = zeros(Real, ntheta)
+    CD = zeros(Real, ntheta)
+    CT = zeros(Real, ntheta)
+    alpha = zeros(Real, ntheta)
+    cl = zeros(Real, ntheta)
+    cd_af = zeros(Real, ntheta)
+    Re = zeros(Real, ntheta)
+    M_addedmass_Np = zeros(Real, ntheta)
+    M_addedmass_Tp = zeros(Real, ntheta)
+    F_addedmass_Np = zeros(Real, ntheta)
+    F_addedmass_Tp = zeros(Real, ntheta)
+
     # For All Upper
     iter_RPI = 1
-    for i = 1:Int(ntheta/2)
+    for i = 1:Int(ntheta / 2)
         # Solve Residual
         if idx_RPI[iter_RPI] == i
-            iter_RPI+=1
+            iter_RPI += 1
             if solve
-                resid(a) = streamtube(a,thetavec[i],turbine,env;solvestep=true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
-                astar[i], _ = FLOWMath.brent(resid, 0, .999)
+                resid(a) = streamtube(a, thetavec[i], turbine, env; solvestep=true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
+                astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i]  = streamtube(astar[i],thetavec[i],turbine,env;output_all=true)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i] = streamtube(astar[i], thetavec[i], turbine, env; output_all=true)
         end
     end
 
     Vxsave = mean(env.V_x)
 
     # For All Lower
-    for i = Int(ntheta/2+1):ntheta
+    for i = Int(ntheta / 2 + 1):ntheta
         # Update Downstream Inflow based on upstream solution
         if idx_RPI[iter_RPI] == i
-            iter_RPI+=1
-            a_used = astar[Int(ntheta/2)-(i-Int(ntheta/2))+1] # We index in a circle, but the streamtubes go straight through, swapping at 180 deg
+            iter_RPI += 1
+            a_used = astar[Int(ntheta / 2)-(i-Int(ntheta / 2))+1] # We index in a circle, but the streamtubes go straight through, swapping at 180 deg
             if env.suction
-                Vxwake = (1.0-a_used)/(1.0+a_used)*env.V_x[i] # Eq. 6
+                Vxwake = (1.0 - a_used) / (1.0 + a_used) * env.V_x[i] # Eq. 6
             else
-                Vxwake = (1.0-2.0*a_used)*env.V_x[i] # Eq. 3
+                Vxwake = (1.0 - 2.0 * a_used) * env.V_x[i] # Eq. 3
             end
 
             # Solve Residual
             if solve
-                resid(a) = streamtube(a,thetavec[i],turbine,env;Vxwake,solvestep=true) #Solve wrt negative theta on the back side?
-                astar[i], _ = FLOWMath.brent(resid, 0, .999)
+                resid(a) = streamtube(a, thetavec[i], turbine, env; Vxwake, solvestep=true) #Solve wrt negative theta on the back side?
+                astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i]  = streamtube(astar[i],thetavec[i],turbine,env;output_all=true,Vxwake)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i] = streamtube(astar[i], thetavec[i], turbine, env; output_all=true, Vxwake)
         end
     end
 
     # Aggregate Turbine Performance
     k = 1.0
-    CP = sum((k * turbine.B/(2*pi) * dtheta*abs.(Q)*mean(abs.(turbine.omega))) / (0.5*env.rho*1.0*2*turbine.R*Vxsave^3)) # Eq. 14, normalized by nominal radius R
+    CP = sum((k * turbine.B / (2 * pi) * dtheta * abs.(Q) * mean(abs.(turbine.omega))) / (0.5 * env.rho * 1.0 * 2 * turbine.R * Vxsave^3)) # Eq. 14, normalized by nominal radius R
 
-    return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec.-windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
+    return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec .- windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp
 end
