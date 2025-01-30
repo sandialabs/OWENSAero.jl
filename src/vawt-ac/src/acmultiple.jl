@@ -377,7 +377,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     # Buoyancy
     F_buoy = zeros(3, ntheta)
     section_area = chord * thickness / 2 * 1.0 # per unit length TODO: input volume
-    mass = -env.gravity .* (rho * section_area - turbine.rhoA) # buoyancy mass minus structural mass since added mass requires moving the gravity here
+    mass = -env.gravity .* (rho * section_area .- turbine.rhoA) # buoyancy mass minus structural mass since added mass requires moving the gravity here
     if env.Aero_Buoyancy_Active
         for (itheta, theta) in enumerate(thetavec)
             dcm = [
