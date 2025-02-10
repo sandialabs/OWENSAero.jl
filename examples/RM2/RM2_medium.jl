@@ -93,13 +93,30 @@ RE_d = [0.9,1.3]
         CP[iTSR] = powerSteady/(0.5*rho*Vinf^3*area)
     end
 
-    PyPlot.figure("CP")
-    PyPlot.plot(TSRrange,CP,"-",color=color_cycle[2],label="OWENS Aero, $(RE_d[ire]) RE_d (No Added Mass)") #,color=color_cycle[2]
+PyPlot.figure("CP")
+PyPlot.plot(TSRrange,CP,".-",color=color_cycle[1],label="OWENS Aero Only, (No Added Mass)") #,color=color_cycle[2]
+
+tsr_aeroelastic = [1.0, 2.0, 3.0, 4.0, 5.0]
+cp_aeroelastic = [0.005925193025218385, 0.061526662120420406, 0.3977425517719758, 0.40540280139050694, 0.2658708292801572]
+
+PyPlot.plot(tsr_aeroelastic,cp_aeroelastic,"o",color=color_cycle[2],label="OWENS Aeroelastic, (No Added Mass)") #,color=color_cycle[2]
+
+tsr_aeroelastic_am_b = [1.0, 2.0, 3.0, 4.0, 5.0]
+cp_aeroelastic_am_b = [0.005916272308048002, 0.06147708945467846, 0.3977710928570039, 0.40549960878253666, 0.2658563202321533]
+
+PyPlot.plot(tsr_aeroelastic,cp_aeroelastic,"+",color=color_cycle[3],label="OWENS Aeroelastic, (Added Mass, Buoyancy)") #,color=color_cycle[2]
+
+tsr_aeroelastic_am_b_aerodyn = [3.0]
+cp_aeroelastic_am_b_aerodyn = [0.429]
+
+PyPlot.plot(tsr_aeroelastic_am_b_aerodyn,cp_aeroelastic_am_b_aerodyn,"o",color=color_cycle[4],label="OWENS-OpenFAST Aeroelastic, (Added Mass)") #,color=color_cycle[2]
+
+
 # end
 RM2_0_538D_RE_D_0_9E6 = DelimitedFiles.readdlm("$(path)/RM2_0.538D_RE_D_0.9E6.csv", ',',Float64)
 RM2_0_538D_RE_D_1_3E6 = DelimitedFiles.readdlm("$(path)/RM2_0.538D_RE_D_1.3E6.csv", ',',Float64)
 # PyPlot.plot(RM2_0_538D_RE_D_0_9E6[:,1],RM2_0_538D_RE_D_0_9E6[:,2],"k--",label="Exp. 0.9e6 RE_d")
-PyPlot.plot(RM2_0_538D_RE_D_1_3E6[:,1],RM2_0_538D_RE_D_1_3E6[:,2],"k-",label="Exp. 1.2e6 RE_d")
+PyPlot.plot(RM2_0_538D_RE_D_1_3E6[:,1],RM2_0_538D_RE_D_1_3E6[:,2],"k-",label="Experimental")
 # PyPlot.plot(right_TSR,right_CP,"ko",label="Right Only Exp.")
 PyPlot.legend()
 PyPlot.xlabel("TSR")
@@ -117,10 +134,13 @@ PyPlot.legend()
 PyPlot.ylabel("Tp")
 PyPlot.xlabel("Azimuth")
 
-PyPlot.figure("Alpha")
-PyPlot.plot((1:length(alphaSteady[1,15,:,7]))./length(alphaSteady[1,15,:,7]).*360,alphaSteady[1,15,:,7]./2.0./pi.*360,".-",label="Added Mass")
-PyPlot.legend()
-PyPlot.ylabel("Alpha")
-PyPlot.xlabel("Azimuth")
+
+for itsr = 1:length(TSRrange)
+    PyPlot.figure("Alpha_TSR_$(TSRrange[itsr])")
+    PyPlot.plot((1:length(alphaSteady[1,15,:,itsr]))./length(alphaSteady[1,15,:,itsr]).*360,alphaSteady[1,15,:,itsr]./2.0./pi.*360,".-",label="Added Mass")
+    PyPlot.legend()
+    PyPlot.ylabel("Alpha")
+    PyPlot.xlabel("Azimuth")
+end
 
 

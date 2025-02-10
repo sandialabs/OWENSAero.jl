@@ -230,7 +230,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         r = ones(Real,ntheta).*r3D[islice]
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
-        turbslices[islice] = OWENSAero.Turbine(Radius,r,z3D[islice],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
+        turbslices[islice] = OWENSAero.Turbine(Radius,r,[z3D[islice]],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
         envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
     end
 end
@@ -281,10 +281,10 @@ steady=false) # each of these is size ntheta x nslices
         end
         bld_x = bld_x_temp
         bld_twist = bld_twist_temp
-        bld_z = zeros(Real,size(bld_x)) #TODO: a better way to do this.
-        for ibld = 1:length(bld_x[:,1])
-            bld_z[ibld,:] = z3D
-        end
+        # bld_z = zeros(Real,size(bld_x)) #TODO: a better way to do this.
+        # for ibld = 1:length(bld_x[:,1])
+        #     bld_z[ibld,:] = z3D
+        # end
     elseif (bld_x!=-1 && bld_z!=-1) && bld_twist==-1
         @warn "blade x, z, and twist deformations must be specified together"
     end
@@ -320,7 +320,7 @@ steady=false) # each of these is size ntheta x nslices
             delta3D = zeros(Real,turbslices[1].B,length(bld_x[1,:]))
             for ibld = 1:turbslices[1].B
                 delta_xs = bld_x[ibld,2:end] - bld_x[ibld,1:end-1]
-                delta_zs = bld_z[ibld,2:end] - bld_z[ibld,1:end-1]
+                delta_zs = z3D[2:end] - z3D[1:end-1]
 
                 delta3D[ibld,1:end-1] = atan.(delta_xs./delta_zs)
                 delta3D[ibld,end] = delta3D[ibld,end-1]
@@ -339,7 +339,7 @@ steady=false) # each of these is size ntheta x nslices
 
                 if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
                     turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
-                    # turbslices[islice].z[islice] = z3D.+minimum(bld_z[ibld,:])
+                    turbslices[islice].z[1] = z3D[islice].+minimum(bld_z[ibld,:])
                     # turbslices[islice].chord = chord[islice]
                     turbslices[islice].delta[bld_idx] = delta3D[ibld,islice]
                     turbslices[islice].twist[bld_idx] = startingtwist[islice]+bld_twist[ibld,islice]
