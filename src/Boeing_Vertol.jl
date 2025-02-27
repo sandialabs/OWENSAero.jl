@@ -124,7 +124,7 @@ function Boeing_Vertol(af,alpha,adotnorm,umach,Re,aoaStallPos,aoaStallNeg,AOA0,t
     if BV_DynamicFlagL == 1
         # Dynamic stall characteristics
         # Linear expansion model for linear region coeffs
-        CL, _, CM = af(alrefL,Re,umach,family_factor) #TODO: Verify CM calculation
+        CL, _, CM = af(Main.ForwardDiff.value(alrefL),Main.ForwardDiff.value(Re),Main.ForwardDiff.value(umach),family_factor) #TODO: Verify CM calculation
         CL=CL/(alrefL-AOA0)*(alpha-AOA0)
     end
 

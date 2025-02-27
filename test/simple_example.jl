@@ -20,7 +20,7 @@ import OWENSOpenFASTWrappers
 # # rc("axes", color_cycle=["348ABD", "A60628", "009E73", "7A68A6", "D55E00", "CC79A7"])
 plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
 
-path,_ = splitdir(@__FILE__)
+path = joinpath(@__DIR__, "test")
 import OWENSAero
 # include("$(path)/../src/OWENSAero.jl")
 
@@ -92,6 +92,7 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AeroModel="DMS",
 
         if ifw
             turbsim_filename = "$path/data/ifw/test.bts"
+            @info "calling ifwinit"
             OWENSOpenFASTWrappers.ifwinit(;inflowlib_filename=nothing,turbsim_filename)
         end
 
