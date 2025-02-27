@@ -1,3 +1,4 @@
+# XXX: Bundle in some struct instead of using global variables
 global dt = 0.0 #might not be used
 global last_step1 = 0
 global last_azi = 0.0
@@ -264,13 +265,15 @@ accel_edge_in=-1,
 gravity = [0.0,0.0,-9.81],
 steady=false) # each of these is size ntheta x nslices
 
+TT = eltype(bld_x)
+
     global z3D
     # Interpolate to the vertical positions
     if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
-        bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
-        bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
-        accel_flap = zeros(length(bld_x[:,1]),length(z3D))
-        accel_edge = zeros(length(bld_x[:,1]),length(z3D))
+        bld_x_temp = zeros(TT, length(bld_x[:,1]),length(z3D))
+        bld_twist_temp = zeros(TT, length(bld_x[:,1]),length(z3D))
+        accel_flap = zeros(TT, length(bld_x[:,1]),length(z3D))
+        accel_edge = zeros(TT, length(bld_x[:,1]),length(z3D))
         for ibld = 1:length(bld_x[:,1])
             bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.+minimum(bld_z[ibld,:]))
             bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.+minimum(bld_z[ibld,:]))
@@ -307,6 +310,13 @@ steady=false) # each of these is size ntheta x nslices
     else
         azi_used = LinRange(last_azi,azi,n_steps)
     end
+
+    # Convert this global variable to Duals...
+    # XXX: This is horribly mostly due to the use of a global var
+    global turbslices
+    TT = promote_type(eltype(bld_x), eltype(turbslices[1].r))
+    turbslices2 = Any[Turbine(x.R, convert(Vector{TT}, x.r), x.z, x.chord, x.thick, convert(Vector{TT}, x.twist), convert(Vector{TT}, x.delta), x.omega, x.B, x.af, x.ntheta, x.r_delta_influence, x.centerX, x.centerY, x.helical_offset, x.rhoA) for x in turbslices]
+    turbslices = turbslices2
 
     for istep = 1:n_steps
         bld1_idx = round(Int,azi_used[istep]/dtheta)%ntheta #step1%ntheta
@@ -428,34 +438,37 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         n_steps = max(1,round(Int,azi/dtheta) - last_step1)
     end
 
+    # XXX
+    TT = Main.ForwardDiff.Dual{Nothing, Float64, 1} # TODO: Derive from input
+
     CP = zeros(Nslices,n_steps)
-    Rp = zeros(B,Nslices,n_steps)
-    Tp = zeros(B,Nslices,n_steps)
-    Zp = zeros(B,Nslices,n_steps)
-    Xp = zeros(B,Nslices,n_steps)
-    Yp = zeros(B,Nslices,n_steps)
+    Rp = zeros(TT, B,Nslices,n_steps)
+    Tp = zeros(TT, B,Nslices,n_steps)
+    Zp = zeros(TT, B,Nslices,n_steps)
+    Xp = zeros(TT, B,Nslices,n_steps)
+    Yp = zeros(TT, B,Nslices,n_steps)
     M_addedmass_Np = zeros(B,Nslices,n_steps)
     M_addedmass_Tp = zeros(B,Nslices,n_steps)
     F_addedmass_Np = zeros(B,Nslices,n_steps)
     F_addedmass_Tp = zeros(B,Nslices,n_steps)
-    Vloc = zeros(B,Nslices,n_steps)
-    alpha = zeros(B,Nslices,n_steps)
-    delta = zeros(B,Nslices)
-    cl = zeros(Nslices,n_steps)
+    Vloc = zeros(TT, B,Nslices,n_steps)
+    alpha = zeros(TT, B,Nslices,n_steps)
+    delta = zeros(TT, B,Nslices)
+    cl = zeros(TT, Nslices,n_steps)
     cd_af = zeros(Nslices,n_steps)
-    Re = zeros(Nslices,n_steps)
+    Re = zeros(TT, Nslices,n_steps)
     # thetavec = zeros(Nslices,n_steps)
     thetavec = zeros(B,n_steps)
 
     # Base Loads
-    Fx_base = zeros(n_steps)
-    Fy_base = zeros(n_steps)
-    Fz_base = zeros(n_steps)
-    Mx_base = zeros(n_steps)
-    My_base = zeros(n_steps)
-    Mz_base = zeros(n_steps)
-    power = zeros(n_steps)
-    power2 = zeros(n_steps)
+    Fx_base = zeros(TT, n_steps)
+    Fy_base = zeros(TT, n_steps)
+    Fz_base = zeros(TT, n_steps)
+    Mx_base = zeros(TT, n_steps)
+    My_base = zeros(TT, n_steps)
+    Mz_base = zeros(TT, n_steps)
+    power = zeros(TT, n_steps)
+    power2 = zeros(TT, n_steps)
 
     rev_step = 0
     step1 = 0 #initialize scope
@@ -465,13 +478,13 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             println("istep $istep of $(n_steps)")
         end
 
-        Fx = zeros(Nslices)
-        Fy = zeros(Nslices)
-        Fz = zeros(Nslices)
-        Mx = zeros(Nslices)
-        My = zeros(Nslices)
-        Mz = zeros(Nslices)
-        integralpower = zeros(Nslices)
+        Fx = zeros(TT, Nslices)
+        Fy = zeros(TT, Nslices)
+        Fz = zeros(TT, Nslices)
+        Mx = zeros(TT, Nslices)
+        My = zeros(TT, Nslices)
+        Mz = zeros(TT, Nslices)
+        integralpower = zeros(TT, Nslices)
 
         step1 = last_step1+istep#-1 TODO: there is a question about the iterative updating and the advanced step aligning with the structural model #if this is an iterated solve, last_step1 won't get updated until a new time is specified
         # if step1<1
