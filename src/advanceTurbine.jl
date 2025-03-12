@@ -118,6 +118,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
     Radius = maximum(bld_x),
+    Htwr_base = 0.0,
     bld_y = zeros(length(bld_x)),
     eta = 0.25,
     twist = 0.0,
@@ -200,7 +201,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     end
 
     if ifw
-        OWENSOpenFASTWrappers.ifwinit(;inflowlib_filename=ifw_libfile,turbsim_filename)
+        OWENSOpenFASTWrappers.ifwinit(;inflowlib_filename=ifw_libfile,RefHt=Htwr_base+Height/2,RefLength=Height,turbsim_filename)
     end
 
     # TODO: clean this up
