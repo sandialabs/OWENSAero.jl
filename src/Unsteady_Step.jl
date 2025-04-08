@@ -89,7 +89,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
 
             if ifw
                 time = mystep*dt[i_theta] #TODO: make the input time instead of step and solve up to a given time considering a specified timestep
-                velocity = OWENSOpenFASTWrappers.ifwcalcoutput([ele_x[i_theta],ele_y[i_theta],turbine.z],time)
+                velocity = OWENSOpenFASTWrappers.ifwcalcoutput([ele_x[i_theta],ele_y[i_theta],turbine.z[1]],time)
                 env.V_x[i_theta] = velocity[1]
                 env.V_y[i_theta] = velocity[2]
                 env.V_z[i_theta] = velocity[3]

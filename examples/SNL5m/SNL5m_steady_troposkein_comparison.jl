@@ -16,7 +16,6 @@ plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
 using Test
 import Statistics:mean
 import DelimitedFiles
-import Dierckx
 import QuadGK
 import FLOWMath
 import HDF5

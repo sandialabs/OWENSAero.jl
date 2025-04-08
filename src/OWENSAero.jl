@@ -1,6 +1,6 @@
 module OWENSAero
 import Statistics:mean
-import Dierckx
+import Interpolations
 import OWENSOpenFASTWrappers
 # Common
 export Unsteady_Step

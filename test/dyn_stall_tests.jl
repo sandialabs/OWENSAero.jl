@@ -1,6 +1,5 @@
 using Test
 import DelimitedFiles
-import Dierckx: Spline1D, evaluate
 import HDF5
 # import PyPlot
 # PyPlot.close("all")
