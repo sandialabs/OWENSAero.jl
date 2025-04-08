@@ -3,14 +3,13 @@ import PyPlot
 PyPlot.close("all")
 import Statistics:mean
 import DelimitedFiles
-import Dierckx
 import QuadGK
 import FLOWMath
-import VAWTAero
+import OWENSAero
 
 close("all")
 path,_ = splitdir(@__FILE__)
-# include("$(path)/../../../src/VAWTAero.jl")
+# include("$(path)/../../../src/OWENSAero.jl")
 
 PyPlot.rc("figure", figsize=(4, 3))
 PyPlot.rc("font", size=10.0)
@@ -67,9 +66,9 @@ function runme(A_model,iscurved)
     twist3D = -atan.(aerocenter_dist./r3D)#ones(n_slices)*-0.4*pi/180
 
     if DS_model=="BV"
-        af3D = VAWTAero.readaerodyn_BV("$(path)/airfoils/NACA_0015_RE3E5.dat")
+        af3D = OWENSAero.readaerodyn_BV("$(path)/airfoils/NACA_0015_RE3E5.dat")
     else
-        af3D = VAWTAero.readaerodyn("$(path)/airfoils/NACA_0015_RE3E5.dat")
+        af3D = OWENSAero.readaerodyn("$(path)/airfoils/NACA_0015_RE3E5.dat")
     end
 
     # Unchanging Parameters
@@ -134,7 +133,7 @@ function runme(A_model,iscurved)
             delta = ones(ntheta)*delta3D[slice] #rad
             af = af3D
 
-            turbine = VAWTAero.Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl)
+            turbine = OWENSAero.Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl)
             if slice == 1 && tsr_idx != 1
                 aw_warm = w[:,slice,tsr_idx-1]
             elseif tsr_idx == 1
@@ -142,16 +141,16 @@ function runme(A_model,iscurved)
             else
                 aw_warm = w[:,slice-1,tsr_idx]
             end
-            env = VAWTAero.Environment(rho,mu,Vinf,DS_model,A_model,aw_warm)
+            env = OWENSAero.Environment(rho,mu,Vinf,DS_model,A_model,aw_warm)
 
             # Option to Plot the model
-            # VAWTAero.plot_domain(turbine)
+            # OWENSAero.plot_domain(turbine)
 
             start = time()
 
-            # Juno.@enter VAWTAero.steady(turbine, env)
+            # Juno.@enter OWENSAero.steady(turbine, env)
             CP_in, _, _, Rp_in, Tp_in, Zp_in,W[:,slice,tsr_idx], _, _, _, w_in, alpha_in,
-            cl_in, cd_in, thetavec[:], Re_in = VAWTAero.steady(turbine, env)
+            cl_in, cd_in, thetavec[:], Re_in = OWENSAero.steady(turbine, env)
 
             CP[slice,tsr_idx] = CP_in[1]
             Tp[:,slice,tsr_idx] = Tp_in
@@ -162,9 +161,9 @@ function runme(A_model,iscurved)
             cd[:,slice,tsr_idx] = cd_in
             Re[:,slice,tsr_idx] = Re_in
             w[1:ntheta,slice,tsr_idx] = w_in[1:ntheta]
-            Rp_out[slice,tsr_idx] = B/(2*pi)*VAWTAero.pInt(thetavec, abs.(Rp[:,slice,tsr_idx])) #average absolute force over the revolution
-            Tp_out[slice,tsr_idx] = B/(2*pi)*VAWTAero.pInt(thetavec, Tp_in) #average NON-absolute force over the revolution
-            Zp_out[slice,tsr_idx] = B/(2*pi)*VAWTAero.pInt(thetavec, abs.(Zp[:,slice,tsr_idx])) #average absolute force over the revolution
+            Rp_out[slice,tsr_idx] = B/(2*pi)*OWENSAero.pInt(thetavec, abs.(Rp[:,slice,tsr_idx])) #average absolute force over the revolution
+            Tp_out[slice,tsr_idx] = B/(2*pi)*OWENSAero.pInt(thetavec, Tp_in) #average NON-absolute force over the revolution
+            Zp_out[slice,tsr_idx] = B/(2*pi)*OWENSAero.pInt(thetavec, abs.(Zp[:,slice,tsr_idx])) #average absolute force over the revolution
 
             elapsed[slice] = time() - start
 
@@ -190,7 +189,7 @@ function runme(A_model,iscurved)
             q_loc_b3 = 0.5*rho*element_planf_A[slice].*(data_full_rev_b3[:,15].*Vinf).^2
             Qp_cactus_b3 = q_loc_b3.*data_full_rev_b3[:,25]./element_planf_L[slice].*r3D[slice]
 
-            P_cactus = abs(mean(abs.(omega)))/(2*pi)*VAWTAero.pInt(thetavec, Qp_cactus_b1+Qp_cactus_b2+Qp_cactus_b3)
+            P_cactus = abs(mean(abs.(omega)))/(2*pi)*OWENSAero.pInt(thetavec, Qp_cactus_b1+Qp_cactus_b2+Qp_cactus_b3)
 
             H_cactus = 1.0  # per unit height
             Sref_cactus = 2*R*H_cactus
@@ -333,7 +332,7 @@ function runme(A_model,iscurved)
         println("$(mean_elapsed) seconds")
 
         # CPvec[tsr_idx] = sum(CP[:,tsr_idx].*h_frac)
-        CPvec[tsr_idx] = VAWTAero.trapz(h,CP[:,tsr_idx].*2*R./RefArea) #Undo local normalization and normalize by full turbine
+        CPvec[tsr_idx] = OWENSAero.trapz(h,CP[:,tsr_idx].*2*R./RefArea) #Undo local normalization and normalize by full turbine
 
         dataout[tsr_idx] = data_full_rev
     end
@@ -388,11 +387,11 @@ Vinf = abs.(omega)/tsrvec[tsr_idx]*R
 
 # Calculate the integral torque
 
-Qint_AC_curved = VAWTAero.trapz(h,-Tp_AC_curved[:,tsr_idx].*cos.(delta3D))
-Qint_DMS_curved = VAWTAero.trapz(h,-Tp_DMS_curved[:,tsr_idx].*cos.(delta3D))
-Qint_AC_straight = VAWTAero.trapz(h,-Tp_AC_straight[:,tsr_idx].*cos.(delta3D))
-Qint_DMS_straight = VAWTAero.trapz(h,-Tp_DMS_straight[:,tsr_idx].*cos.(delta3D))
-Qint_cactus = VAWTAero.trapz(h,te_cactus[:,tsr_idx].*(0.5*1.225*0.8*mean(Vinf)^2 * RefArea * R)./r3D./h_elem.*cos.(delta3D))
+Qint_AC_curved = OWENSAero.trapz(h,-Tp_AC_curved[:,tsr_idx].*cos.(delta3D))
+Qint_DMS_curved = OWENSAero.trapz(h,-Tp_DMS_curved[:,tsr_idx].*cos.(delta3D))
+Qint_AC_straight = OWENSAero.trapz(h,-Tp_AC_straight[:,tsr_idx].*cos.(delta3D))
+Qint_DMS_straight = OWENSAero.trapz(h,-Tp_DMS_straight[:,tsr_idx].*cos.(delta3D))
+Qint_cactus = OWENSAero.trapz(h,te_cactus[:,tsr_idx].*(0.5*1.225*0.8*mean(Vinf)^2 * RefArea * R)./r3D./h_elem.*cos.(delta3D))
 
 err_Qint_AC_curved = (Qint_AC_curved-Qint_cactus)/Qint_cactus*100
 err_Qint_DMS_curved = (Qint_DMS_curved-Qint_cactus)/Qint_cactus*100
@@ -444,11 +443,11 @@ println("err_minpeak_DMS_curved $(err_minpeak_DMS_curved) %")
 println("err_minpeak_AC_straight $(err_minpeak_AC_straight) %")
 println("err_minpeak_DMS_straight $(err_minpeak_DMS_straight) %")
 
-Qint_AC_curved = VAWTAero.trapz(h,-Tp_AC_curved[:,tsr_idx].*cos.(delta3D).*r3D)
-Qint_DMS_curved = VAWTAero.trapz(h,-Tp_DMS_curved[:,tsr_idx].*cos.(delta3D).*r3D)
-Qint_AC_straight = VAWTAero.trapz(h,-Tp_AC_straight[:,tsr_idx].*cos.(delta3D).*r3D)
-Qint_DMS_straight = VAWTAero.trapz(h,-Tp_DMS_straight[:,tsr_idx].*cos.(delta3D).*r3D)
-Qint_cactus = VAWTAero.trapz(h,te_cactus[:,tsr_idx].*(0.5*1.225*0.8*mean(Vinf)^2 * RefArea * R)./h_elem.*cos.(delta3D))
+Qint_AC_curved = OWENSAero.trapz(h,-Tp_AC_curved[:,tsr_idx].*cos.(delta3D).*r3D)
+Qint_DMS_curved = OWENSAero.trapz(h,-Tp_DMS_curved[:,tsr_idx].*cos.(delta3D).*r3D)
+Qint_AC_straight = OWENSAero.trapz(h,-Tp_AC_straight[:,tsr_idx].*cos.(delta3D).*r3D)
+Qint_DMS_straight = OWENSAero.trapz(h,-Tp_DMS_straight[:,tsr_idx].*cos.(delta3D).*r3D)
+Qint_cactus = OWENSAero.trapz(h,te_cactus[:,tsr_idx].*(0.5*1.225*0.8*mean(Vinf)^2 * RefArea * R)./h_elem.*cos.(delta3D))
 
 cactmean = te_cactus[islice,tsr_idx].*(0.5*1.225*0.8*mean(Vinf)^2 * RefArea * R)./r3D[islice]./h_elem[islice].*cos.(delta3D[islice])
 

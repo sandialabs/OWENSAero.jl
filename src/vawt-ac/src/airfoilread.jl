@@ -4,7 +4,7 @@
 
 # import Interpolations: interpolate, Gridded, Linear, GriddedInterpolation
 import FLOWMath
-import Dierckx: Spline1D, evaluate
+import Interpolations
 
 """
     readaerodyn(filename)
@@ -234,8 +234,16 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         end
     end
 
-    clspl = Dierckx.Spline2D(alphas, REs, cls)
-    cdspl = Dierckx.Spline2D(alphas, REs, cds)
+    # clspl = Dierckx.Spline2D(alphas, REs, cls)
+    # cdspl = Dierckx.Spline2D(alphas, REs, cds)
+    # Assume cls is filled appropriately: size = (length(alphas), length(REs))
+    
+    itpcl = Interpolations.interpolate((alphas, REs), cls, Interpolations.Gridded(Interpolations.Linear()))
+    clspl = Interpolations.extrapolate(itpcl, Interpolations.Flat())  
+
+    itpcd = Interpolations.interpolate((alphas, REs), cds, Interpolations.Gridded(Interpolations.Linear()))
+    cdspl = Interpolations.extrapolate(itpcd, Interpolations.Flat())  
+
     aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
     aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
 
@@ -243,8 +251,10 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
     function af2(alpha,Re,umach=0.0,family_factor=1.0)
 
         # if length(REs)>1
-            cl = Dierckx.evaluate(clspl,alpha, Re)
-            cd = Dierckx.evaluate(cdspl,alpha, Re)
+            # cl = Dierckx.evaluate(clspl,alpha, Re)
+            # cd = Dierckx.evaluate(cdspl,alpha, Re)
+            cl = clspl(alpha, Re)
+            cd = cdspl(alpha, Re)
             # cl = FLOWMath.interp2d(safeakima, alphas, REs, cls, [alpha], [Re])[1]
             # cd = FLOWMath.interp2d(safeakima, alphas, REs, cds, [alpha], [Re])[1]
         # else
