@@ -25,7 +25,7 @@ OWENSOpenFAST_jll = {url = "https://github.com/sandialabs/OWENSOpenFAST_jll.jl"}
 DelimitedFiles = "1"
 FLOWMath = "0.3, 0.4"
 FiniteDiff = "2"
-ForwardDiff = "0.10"
+ForwardDiff = "0.10, 1"
 HDF5 = "0.17"
 Interpolations = "0.15.1"
 LsqFit = "0.15"
