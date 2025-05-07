@@ -265,14 +265,18 @@ accel_edge_in=-1,
 gravity = [0.0,0.0,-9.81],
 steady=false) # each of these is size ntheta x nslices
 
+    # TODO: This should probably also depend on some of the other input types
+    TT = eltype(bld_x)
+
     global z3D
+    nbld = size(bld_x, 1)
     # Interpolate to the vertical positions
     if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
-        bld_x_temp = zeros(length(bld_x[:,1]),length(z3D))
-        bld_twist_temp = zeros(length(bld_x[:,1]),length(z3D))
-        accel_flap = zeros(length(bld_x[:,1]),length(z3D))
-        accel_edge = zeros(length(bld_x[:,1]),length(z3D))
-        for ibld = 1:length(bld_x[:,1])
+        bld_x_temp = zeros(TT, nbld, length(z3D))
+        bld_twist_temp = zeros(TT, nbld, length(z3D))
+        accel_flap = zeros(TT, nbld, length(z3D))
+        accel_edge = zeros(TT, nbld, length(z3D))
+        for ibld = 1:nbld
             bld_x_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_x[ibld,:],z3D.+minimum(bld_z[ibld,:]))
             bld_twist_temp[ibld,:] = safeakima(bld_z[ibld,:],bld_twist[ibld,:],z3D.+minimum(bld_z[ibld,:]))
             if accel_flap_in !=-1
@@ -429,35 +433,49 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         n_steps = max(1,round(Int,azi/dtheta) - last_step1)
     end
 
+    # XXX: This computation depends on other things too but it is a bit tricky to work with
+    #      the global variables (like `turbslices`) so this will do for now.
+    TT = typeof(ts)
+
     CP = zeros(Nslices,n_steps)
-    Rp = zeros(B,Nslices,n_steps)
-    Tp = zeros(B,Nslices,n_steps)
-    Zp = zeros(B,Nslices,n_steps)
-    Xp = zeros(B,Nslices,n_steps)
-    Yp = zeros(B,Nslices,n_steps)
+    Rp = zeros(TT, B, Nslices, n_steps)
+    Tp = zeros(TT, B, Nslices, n_steps)
+    Zp = zeros(TT, B, Nslices, n_steps)
+    Xp = zeros(TT, B, Nslices, n_steps)
+    Yp = zeros(TT, B, Nslices, n_steps)
     M_addedmass_Np = zeros(B,Nslices,n_steps)
     M_addedmass_Tp = zeros(B,Nslices,n_steps)
     F_addedmass_Np = zeros(B,Nslices,n_steps)
     F_addedmass_Tp = zeros(B,Nslices,n_steps)
-    F_buoy = zeros(B,Nslices,n_steps,3)
-    Vloc = zeros(B,Nslices,n_steps)
-    alpha = zeros(B,Nslices,n_steps)
-    delta = zeros(B,Nslices)
-    cl = zeros(Nslices,n_steps)
+    F_buoy = zeros(TT, B,Nslices,n_steps,3)
+    Vloc = zeros(TT, B, Nslices, n_steps)
+    alpha = zeros(TT, B, Nslices, n_steps)
+    delta = zeros(TT, B, Nslices)
+    cl = zeros(TT, Nslices, n_steps)
     cd_af = zeros(Nslices,n_steps)
-    Re = zeros(Nslices,n_steps)
+    Re = zeros(TT, Nslices, n_steps)
     # thetavec = zeros(Nslices,n_steps)
     thetavec = zeros(B,n_steps)
 
     # Base Loads
-    Fx_base = zeros(n_steps)
-    Fy_base = zeros(n_steps)
-    Fz_base = zeros(n_steps)
-    Mx_base = zeros(n_steps)
-    My_base = zeros(n_steps)
-    Mz_base = zeros(n_steps)
-    power = zeros(n_steps)
-    power2 = zeros(n_steps)
+    Fx_base = zeros(TT, n_steps)
+    Fy_base = zeros(TT, n_steps)
+    Fz_base = zeros(TT, n_steps)
+    Mx_base = zeros(TT, n_steps)
+    My_base = zeros(TT, n_steps)
+    Mz_base = zeros(TT, n_steps)
+    power = zeros(TT, n_steps)
+    power2 = zeros(TT, n_steps)
+
+
+    # Zeroed out for ever time step below
+    Fx = zeros(TT, Nslices)
+    Fy = zeros(TT, Nslices)
+    Fz = zeros(TT, Nslices)
+    Mx = zeros(TT, Nslices)
+    My = zeros(TT, Nslices)
+    Mz = zeros(TT, Nslices)
+    integralpower = zeros(TT, Nslices)
 
     rev_step = 0
     step1 = 0 #initialize scope
@@ -467,13 +485,14 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             println("istep $istep of $(n_steps)")
         end
 
-        Fx = zeros(Nslices)
-        Fy = zeros(Nslices)
-        Fz = zeros(Nslices)
-        Mx = zeros(Nslices)
-        My = zeros(Nslices)
-        Mz = zeros(Nslices)
-        integralpower = zeros(Nslices)
+        # Zero out buffers
+        fill!(Fx, 0)
+        fill!(Fy, 0)
+        fill!(Fz, 0)
+        fill!(Mx, 0)
+        fill!(My, 0)
+        fill!(Mz, 0)
+        fill!(integralpower, 0)
 
         step1 = last_step1+istep#-1 TODO: there is a question about the iterative updating and the advanced step aligning with the structural model #if this is an iterated solve, last_step1 won't get updated until a new time is specified
         # if step1<1
