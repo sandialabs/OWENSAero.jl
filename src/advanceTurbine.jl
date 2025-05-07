@@ -439,6 +439,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     M_addedmass_Tp = zeros(B,Nslices,n_steps)
     F_addedmass_Np = zeros(B,Nslices,n_steps)
     F_addedmass_Tp = zeros(B,Nslices,n_steps)
+    F_buoy = zeros(B,Nslices,n_steps,3)
     Vloc = zeros(B,Nslices,n_steps)
     alpha = zeros(B,Nslices,n_steps)
     delta = zeros(B,Nslices)
@@ -497,7 +498,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc_temp,
             CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl_temp, cd_temp,
             thetavec_temp, Re_temp, M_addedmass_Np_temp, M_addedmass_Tp_temp, F_addedmass_Np_temp,
-            F_addedmass_Tp_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1+helical_offset)
+            F_addedmass_Tp_temp, F_buoy_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1+helical_offset)
 
             # Intermediate base loads
             r = turbslices[islice].r
@@ -529,6 +530,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
                 M_addedmass_Tp[iblade,islice,step_idx] = M_addedmass_Tp_temp[bld_idx]
                 F_addedmass_Np[iblade,islice,step_idx] = F_addedmass_Np_temp[bld_idx]
                 F_addedmass_Tp[iblade,islice,step_idx] = F_addedmass_Tp_temp[bld_idx]
+                F_buoy[iblade,islice,step_idx,:] = F_buoy_temp[bld_idx,:]
             end
             integralpower[islice] = B/(2*pi)*OWENSAero.pInt(thetavec_temp, Tp_temp.*r.*omega)
 
@@ -564,7 +566,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         timelast = tnew
     end
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp,step1,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp,step1,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
 end
 
 
@@ -634,6 +636,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     M_addedmass_Tp = zeros(Real,Nslices,ntheta)
     F_addedmass_Np = zeros(Real,Nslices,ntheta)
     F_addedmass_Tp = zeros(Real,Nslices,ntheta)
+    F_buoy = zeros(Real,Nslices,ntheta,3)
     Mz2 = zeros(Real,Nslices)
     integralpower = zeros(Real,Nslices)
     integraltorque = zeros(Real,Nslices)
@@ -652,7 +655,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
 
         CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc[islice,:],
         CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl[islice,:], cd_af[islice,:],
-        thetavec, Re[islice,:], M_addedmass_Np[islice,:], M_addedmass_Tp[islice,:], F_addedmass_Np[islice,:], F_addedmass_Tp[islice,:] = OWENSAero.steady(turbslices[islice],envslices[islice])
+        thetavec, Re[islice,:], M_addedmass_Np[islice,:], M_addedmass_Tp[islice,:], F_addedmass_Np[islice,:], F_addedmass_Tp[islice,:],F_buoy[islice,:,:] = OWENSAero.steady(turbslices[islice],envslices[islice])
 
         # Intermediate base loads
         r = turbslices[islice].r
@@ -709,7 +712,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     power2 = mean(Mz_base)*mean(abs.(omega))
 
     global z3Dnorm
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
 end
 
 function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
@@ -735,6 +738,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     global F_addedmass_Np_U
     global F_addedmass_Tp_L
     global F_addedmass_Tp_U
+    global F_buoy_L
+    global F_buoy_U
     global alphaL
     global alphaU
     global clL
@@ -790,6 +795,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
              M_addedmass_Tp_L[:,:,end] = M_addedmass_Tp_U[:,:,end]
              F_addedmass_Np_L[:,:,end] = F_addedmass_Np_U[:,:,end]
              F_addedmass_Tp_L[:,:,end] = F_addedmass_Tp_U[:,:,end]
+             F_buoy_L[:,:,end,:] = F_buoy_U[:,:,end,:]
              alphaL[:,:,end] = alphaU[:,:,end]
              clL[:,end] = clU[:,end]
              cd_afL[:,end] = cd_afU[:,end]
@@ -808,7 +814,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPL,RpL,TpL,ZpL,alphaL,clL,cd_afL,VlocL,ReL,thetavecL,ntheta,Fx_baseL,
             Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,_,_,
-            delta,XpL,YpL,last_step,M_addedmass_Np_L,M_addedmass_Tp_L,F_addedmass_Np_L,F_addedmass_Tp_L = advanceTurb(t;azi=aziL,last_step=last_stepL)
+            delta,XpL,YpL,last_step,M_addedmass_Np_L,M_addedmass_Tp_L,F_addedmass_Np_L,F_addedmass_Tp_L,F_buoy_L = advanceTurb(t;azi=aziL,last_step=last_stepL)
             if aziL_save != aziL
                 last_stepL = last_step
             end
@@ -829,6 +835,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
         M_addedmass_Tp_U[:,:,end] = M_addedmass_Tp_L[:,:,end]
         F_addedmass_Np_U[:,:,end] = F_addedmass_Np_L[:,:,end]
         F_addedmass_Tp_U[:,:,end] = F_addedmass_Tp_L[:,:,end]
+        F_buoy_U[:,:,end,:] = F_buoy_L[:,:,end,:]
         alphaU[:,:,end] = alphaL[:,:,end]
         clU[:,end] = clL[:,end]
         cd_afU[:,end] = cd_afL[:,end]
@@ -848,7 +855,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPU,RpU,TpU,ZpU,alphaU,clU,cd_afU,VlocU,ReU,thetavecU,ntheta,Fx_baseU,
             Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,_,_,
-            delta,XpU,YpU,last_step,M_addedmass_Np_U,M_addedmass_Tp_U,F_addedmass_Np_U,F_addedmass_Tp_U = advanceTurb(t;azi=aziU,last_step=last_stepU)
+            delta,XpU,YpU,last_step,M_addedmass_Np_U,M_addedmass_Tp_U,F_addedmass_Np_U,F_addedmass_Tp_U,F_buoy_U = advanceTurb(t;azi=aziU,last_step=last_stepU)
             if aziU_save != aziU
                 last_stepU = last_step
             end
@@ -871,6 +878,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     M_addedmass_Tp = zeros(Real,NBlade,Nslices,n_steps)
     F_addedmass_Np = zeros(Real,NBlade,Nslices,n_steps)
     F_addedmass_Tp = zeros(Real,NBlade,Nslices,n_steps)
+    F_buoy = zeros(Real,NBlade,Nslices,n_steps,3)
     Vloc = zeros(Real,NBlade,Nslices,n_steps)
     alpha = zeros(Real,NBlade,Nslices,n_steps)
     cl = zeros(Real,Nslices,n_steps)
@@ -896,6 +904,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
             M_addedmass_Tp[iblade,islice,:] .= M_addedmass_Tp_L[iblade,islice,end] .+ fraction.*(M_addedmass_Tp_U[iblade,islice,end].-M_addedmass_Tp_L[iblade,islice,end])
             F_addedmass_Np[iblade,islice,:] .= F_addedmass_Np_L[iblade,islice,end] .+ fraction.*(F_addedmass_Np_U[iblade,islice,end].-F_addedmass_Np_L[iblade,islice,end])
             F_addedmass_Tp[iblade,islice,:] .= F_addedmass_Tp_L[iblade,islice,end] .+ fraction.*(F_addedmass_Tp_U[iblade,islice,end].-F_addedmass_Tp_L[iblade,islice,end])
+            F_buoy[iblade,islice,1,:] .= F_buoy_L[iblade,islice,end,:] .+ fraction.*(F_buoy_U[iblade,islice,end,:].-F_buoy_L[iblade,islice,end,:])
             alpha[iblade,islice,:] .= alphaL[iblade,islice,end] .+ fraction.*(alphaU[iblade,islice,end].-alphaL[iblade,islice,end])
             Vloc[iblade,islice,:] .= VlocL[iblade,islice,end] .+ fraction.*(VlocU[iblade,islice,end].-VlocL[iblade,islice,end])
             thetavec[iblade,:] .= thetavecL[iblade,end] .+ fraction.*(thetavecU[iblade,end].-thetavecL[iblade,end])
@@ -915,5 +924,5 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     power = powerL[end] + fraction*(powerU[end]-powerL[end])
     power2 = power2L[end] + fraction*(power2U[end]-power2L[end])
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,nothing,z3Dnorm,delta,Xp,Yp,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,nothing,z3Dnorm,delta,Xp,Yp,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
 end

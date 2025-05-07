@@ -3,8 +3,10 @@ using DelimitedFiles: readdlm
 import OWENSAero: setupTurb, steadyTurb
 import FLOWMath: akima
 
+path,_ = splitdir(@__FILE__)
+
 # Turbine
-airfoils_path = abspath("./airfoils")
+airfoils_path = "$path/airfoils"
 airfoil = "NACA_0021.dat"
 radius = 0.538
 height = 0.807
@@ -23,12 +25,29 @@ area = height * 2radius
 
 # Fluid
 Vinf = 1.2
-rho = 1000.0
-mu = 1.792E-3
+# rho = 1000.0
+# mu = 1.792E-3
+
+rho = 1025.0
+mu = 1.08E-3
+
+# Calculate Reynolds
+TSR = 3.0
+radius = 1.0
+Vinf = 2.0
+chord = 0.3
+omega = Vinf/radius*TSR
+rot_velocity = omega*radius
+Re_check = rho*rot_velocity*chord/mu
+Re_plus = rho*(rot_velocity+Vinf)*chord/mu
+Re_minus = rho*(rot_velocity-Vinf)*chord/mu
 
 # Model
 ifw = false
-# AeroModel = "DMS"  # AeroModel ∈ ["DMS", "AC"]
+aeromodels = ["DMS", "AC"]
+Aero_AddedMass_Actives = [false,true]
+Aero_Buoyancy_Actives = [false,true]
+
 # Aero_AddedMass_Active = true
 # Aero_Buoyancy_Active = false
 Aero_RotAccel_Active = true
@@ -40,10 +59,10 @@ min_tipspeed, max_tipspeed = 1, 5
 n_tipspeeds = 15
 tsr = range(min_tipspeed, max_tipspeed, n_tipspeeds)
 
-for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+for AeroModel ∈ aeromodels, Aero_AddedMass_Active ∈ Aero_AddedMass_Actives, Aero_Buoyancy_Active ∈ Aero_Buoyancy_Actives
     # Setup
     _ = setupTurb(shapeX, shapeZ, B, chord, ω, Vinf;
-        rho, mu, eta, afname, DynamicStallModel, Nslices, Aero_AddedMass_Active, AeroModel,
+        rho, mu, eta, afname, DynamicStallModel, Nslices, ntheta, Aero_AddedMass_Active, AeroModel,
         Aero_RotAccel_Active, Aero_Buoyancy_Active
     )
 
@@ -75,16 +94,16 @@ for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_B
 end
 
 # load experimental data
-expdata_path = abspath("./exp_data")
+expdata_path = "$path/exp_data"
 exp_0p9 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_0.9E6.csv"), ',', Float64)
 exp_1p3 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_1.3E6.csv"), ',', Float64)
 
 # Plot
-fig_path = abspath("./figures")
+fig_path = "$path/figures"
 mkpath(fig_path)
 
 p = plot(xlabel="tip speed ratio", ylabel="Cₚ")
-for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+for AeroModel ∈ aeromodels, Aero_AddedMass_Active ∈ Aero_AddedMass_Actives, Aero_Buoyancy_Active ∈ Aero_Buoyancy_Actives
     if !(!Aero_AddedMass_Active && Aero_Buoyancy_Active)
         label = AeroModel * (Aero_AddedMass_Active ? "-AM" : "") * (Aero_Buoyancy_Active ? "-BY" : "")
         ls = Aero_Buoyancy_Active ? :dot : (Aero_AddedMass_Active ? :dash : :solid)
@@ -103,7 +122,7 @@ function plot_slice(islice, itsr, iblade=1, results=results)
 
     θ = (1:ntheta) ./ ntheta .* 360
 
-    for AeroModel ∈ ["DMS", "AC"], Aero_AddedMass_Active ∈ [false, true], Aero_Buoyancy_Active ∈ [false, true]
+    for AeroModel ∈ aeromodels, Aero_AddedMass_Active ∈ Aero_AddedMass_Actives, Aero_Buoyancy_Active ∈ Aero_Buoyancy_Actives
         if !(!Aero_AddedMass_Active && Aero_Buoyancy_Active)
             label = AeroModel * (Aero_AddedMass_Active ? "-AM" : "") * (Aero_Buoyancy_Active ? "-BY" : "")
             rₚ = results[label]["rₚ"][iblade, islice, :, itsr]
