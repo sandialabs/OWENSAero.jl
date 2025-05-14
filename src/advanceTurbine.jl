@@ -443,16 +443,16 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     Zp = zeros(TT, B, Nslices, n_steps)
     Xp = zeros(TT, B, Nslices, n_steps)
     Yp = zeros(TT, B, Nslices, n_steps)
-    M_addedmass_Np = zeros(B,Nslices,n_steps)
-    M_addedmass_Tp = zeros(B,Nslices,n_steps)
-    F_addedmass_Np = zeros(B,Nslices,n_steps)
-    F_addedmass_Tp = zeros(B,Nslices,n_steps)
-    F_buoy = zeros(TT, B,Nslices,n_steps,3)
+    M_addedmass_Np = zeros(TT, B, Nslices, n_steps)
+    M_addedmass_Tp = zeros(TT, B, Nslices, n_steps)
+    F_addedmass_Np = zeros(TT, B, Nslices, n_steps)
+    F_addedmass_Tp = zeros(TT, B, Nslices, n_steps)
+    F_buoy = zeros(TT, B, Nslices, n_steps, 3)
     Vloc = zeros(TT, B, Nslices, n_steps)
     alpha = zeros(TT, B, Nslices, n_steps)
     delta = zeros(TT, B, Nslices)
     cl = zeros(TT, Nslices, n_steps)
-    cd_af = zeros(Nslices,n_steps)
+    cd_af = zeros(TT, Nslices,n_steps)
     Re = zeros(TT, Nslices, n_steps)
     # thetavec = zeros(Nslices,n_steps)
     thetavec = zeros(B,n_steps)
@@ -508,6 +508,13 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         step_idx = max(1,step1-last_step1) #Single time step handling
         if step_idx>n_steps
             step_idx = n_steps
+        end
+
+        # TODO: Hack to make duals work
+        input_has_duals = eltype(turbslices[1].omega) <: ForwardDiff.Dual
+        envslices_has_duals = false # TODO: Detect
+        if input_has_duals && !envslices_has_duals
+            prepare_for_duals(eltype(turbslices[1].omega))
         end
 
         for islice = 1:Nslices
