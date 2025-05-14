@@ -115,7 +115,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
 
     if env.steplast[1] != mystep
         env.aw_warm[:] = aw_filtered[:] #Mutate, do not link
-        env.V_wake_old[1] = V_wake_filt[1]
+        env.V_wake_old[1] = V_wake_filt
         env.steplast[1] = mystep
     end
     # env.idx_RPI[:] = idx_RPI_half #Mutate, do not link, TODO: fix this, is used for indexing outputs

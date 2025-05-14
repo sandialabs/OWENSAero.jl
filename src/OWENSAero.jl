@@ -1,6 +1,7 @@
 module OWENSAero
 import Statistics:mean
 import Interpolations
+using ForwardDiff: ForwardDiff
 import OWENSOpenFASTWrappers
 # Common
 export Unsteady_Step
@@ -132,6 +133,44 @@ end
 Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
 Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
 Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+
+# TODO: This is a silly hack that should be removed once `envslices` isn't a global variable
+# anymore but instead instantiated with the correct types from the start.
+function prepare_for_duals(::Type{DT}) where DT
+    global envslices
+    function convert_env(env)
+        env′ = Environment(
+            env.rho,
+            env.mu,
+            env.V_x,
+            env.V_y,
+            env.V_z,
+            env.V_twist,
+            env.windangle,
+            env.DynamicStallModel,
+            env.AeroModel,
+            env.Aero_AddedMass_Active,
+            env.Aero_Buoyancy_Active,
+            env.Aero_RotAccel_Active,
+            env.AddedMass_Coeff_Ca,
+            env.centrifugal_force_flag,
+            env.aw_warm,
+            env.steplast,
+            env.idx_RPI,
+            convert(Vector{DT}, env.V_wake_old),
+            env.BV_DynamicFlagL,
+            env.BV_DynamicFlagD,
+            env.alpha_last,
+            env.suction,
+            env.accel_flap,
+            env.accel_edge,
+            env.gravity
+        )
+        return env′
+    end
+    map!(convert_env, envslices, envslices)
+    return
+end
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)

@@ -230,23 +230,26 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
     else
         astar[1:ntheta] = a_in[1:ntheta]
     end
-    Th = zeros(Real, ntheta)
-    Q = zeros(Real, ntheta)
-    Rp = zeros(Real, ntheta)
-    Tp = zeros(Real, ntheta)
-    Zp = zeros(Real, ntheta)
-    Vloc = zeros(Real, ntheta)
-    CD = zeros(Real, ntheta)
-    CT = zeros(Real, ntheta)
-    alpha = zeros(Real, ntheta)
-    cl = zeros(Real, ntheta)
-    cd_af = zeros(Real, ntheta)
-    Re = zeros(Real, ntheta)
-    M_addedmass_Np = zeros(Real, ntheta)
-    M_addedmass_Tp = zeros(Real, ntheta)
-    F_addedmass_Np = zeros(Real, ntheta)
-    F_addedmass_Tp = zeros(Real, ntheta)
-    F_buoy = zeros(Real, ntheta,3)
+
+    # TODO: Better input type detection -- other fields probably also matters.
+    T = typeof(turbine.R)
+    Th = zeros(T, ntheta)
+    Q = zeros(T, ntheta)
+    Rp = zeros(T, ntheta)
+    Tp = zeros(T, ntheta)
+    Zp = zeros(T, ntheta)
+    Vloc = zeros(T, ntheta)
+    CD = zeros(T, ntheta)
+    CT = zeros(T, ntheta)
+    alpha = zeros(T, ntheta)
+    cl = zeros(T, ntheta)
+    cd_af = zeros(T, ntheta)
+    Re = zeros(T, ntheta)
+    M_addedmass_Np = zeros(T, ntheta)
+    M_addedmass_Tp = zeros(T, ntheta)
+    F_addedmass_Np = zeros(T, ntheta)
+    F_addedmass_Tp = zeros(T, ntheta)
+    F_buoy = zeros(T, ntheta, 3)
 
     # For All Upper
     iter_RPI = 1
