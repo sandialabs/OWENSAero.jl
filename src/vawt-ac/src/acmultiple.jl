@@ -418,7 +418,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     P = abs(mean(Omega))*B/(2*pi)*pInt(thetavec, Q)
     CP = P / (0.5*rho*mean(V_wind)^3 * Sref)
 
-    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy'
 end
 
 # -----------------------------------------
