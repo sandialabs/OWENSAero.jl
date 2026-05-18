@@ -18,6 +18,8 @@ Both paths share the `Turbine`, `Environment`, and `UnsteadyParams` data structu
 - [Quickstart](quickstart.md) shows the smallest direct slice and full-turbine calls.
 - [Model Selection](model_selection.md) explains when to use DMS, AC, dynamic stall, RPI, and InflowWind.
 - [Full Turbine Workflow](full_turbine_workflow.md) documents the stateful `setupTurb`/`steadyTurb`/`advanceTurb` path used by coupled OWENS runs.
+- [Dynamic Stall](dynamic_stall.md) documents the Boeing-Vertol test/example path.
+- [RM2 Example](rm2_example.md) points to the standalone RM2 aerodynamic example.
 - [Frames, Units, and Outputs](theory/frames_units.md) records load directions and expected SI units.
 - [Validation and Testing](validation.md) identifies the tests that currently pin model behavior and the remaining validation gaps.
 - [API Reference](reference/reference.md) is the generated function and type index.

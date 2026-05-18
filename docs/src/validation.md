@@ -7,6 +7,7 @@ OWENSAero validation has two layers: pinned regression tests for code behavior a
 | Area | Evidence |
 | --- | --- |
 | Slice DMS and AC | `test/simple_example.jl` pins output tuples, wind-direction cases, and HDF5 fixture comparisons. |
+| Boeing-Vertol dynamic stall | `test/dyn_stall_tests.jl` pins the full NACA 0012 pitching histories and representative extrema without GUI plotting. |
 | Unsteady method | `test/simple_example.jl` covers RPI and non-RPI cases, including InflowWind-driven branches. |
 | Gradients | steady DMS gradient checks compare AD behavior for representative calls; AC gradient coverage remains open. |
 | Full turbine | `test/full_turb.jl` and `test/full_turb_undersampling.jl` exercise the stateful turbine workflow. |

@@ -44,7 +44,8 @@ Re_minus = rho*(rot_velocity-Vinf)*chord/mu
 
 # Model
 ifw = false
-aeromodels = ["DMS", "AC"]
+model_setting = get(ENV, "OWENSAERO_RM2_MODELS", "DMS")
+aeromodels = lowercase(model_setting) == "all" ? ["DMS", "AC"] : strip.(split(model_setting, ","))
 Aero_AddedMass_Actives = [false,true]
 Aero_Buoyancy_Actives = [false,true]
 

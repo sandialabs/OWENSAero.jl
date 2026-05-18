@@ -19,7 +19,7 @@ using OWENSAero
 
     out = OWENSAero.streamtube(0.2, pi / 3, turbine, env; output_all=true)
 
-    @test out isa NTuple{17, Any}
+    @test out isa NTuple{19, Any}
     @test out[1] ≈ 3.120186136285371 atol=1e-12
     @test out[2] ≈ 2.100708299227373 atol=1e-12
     @test out[6] ≈ 6.53305459604201 atol=1e-12
@@ -28,6 +28,8 @@ using OWENSAero
     @test out[10] ≈ 0.86227050009385 atol=1e-12
     @test out[12] ≈ 89448.88655584514 atol=1e-8
     @test out[17] == [0.0, 0.0, 0.0]
+    @test out[18] == 0.0
+    @test out[19] == 0.0
 end
 
 @testset "DMS preserves caller wind frame" begin

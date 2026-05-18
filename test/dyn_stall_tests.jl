@@ -1,13 +1,33 @@
 using Test
 import DelimitedFiles
 import HDF5
-# import PyPlot
-# PyPlot.close("all")
+import FLOWMath
 
 import OWENSAero
 # include("../src/OWENSAero.jl")
 path,_ = splitdir(@__FILE__)
 tol = 1e-4
+
+function akima_without_duplicate_abscissae(x, y)
+    xvec = Float64.(collect(x))
+    yvec = Float64.(collect(y))
+    order = sortperm(xvec)
+    xsorted = xvec[order]
+    ysorted = yvec[order]
+    unique_x = Float64[]
+    unique_y = Float64[]
+    i = firstindex(xsorted)
+    while i <= lastindex(xsorted)
+        j = i
+        while j < lastindex(xsorted) && xsorted[j+1] == xsorted[i]
+            j += 1
+        end
+        push!(unique_x, xsorted[i])
+        push!(unique_y, sum(ysorted[i:j]) / (j - i + 1))
+        i = j + 1
+    end
+    return FLOWMath.Akima(unique_x, unique_y)
+end
 
 @testset "NACA 0012 Boeing-Vertol" begin
 
@@ -55,15 +75,15 @@ tol = 1e-4
         # PyPlot.plot(full_alpha_cl,full_cl)
         # PyPlot.plot(full_alpha_cm,full_cm)
 
-        afcl = Spline1D(full_alpha_cl*pi/180, full_cl, s=0.1)
-        afcm = Spline1D(full_alpha_cm*pi/180, full_cm, s=0.1)
-        afcd = Spline1D(af_re3_6e6[:,1]*pi/180, af_re3_6e6[:,3], s=0.01)
+        afcl = akima_without_duplicate_abscissae(full_alpha_cl*pi/180, full_cl)
+        afcm = akima_without_duplicate_abscissae(full_alpha_cm*pi/180, full_cm)
+        afcd = akima_without_duplicate_abscissae(af_re3_6e6[:,1]*pi/180, af_re3_6e6[:,3])
 
         function af(alpha,Re,mach,family_factor)
 
-            cl = evaluate(afcl, alpha)
-            cm = evaluate(afcm, alpha)
-            cd = evaluate(afcd, alpha)
+            cl = afcl(alpha)
+            cm = afcm(alpha)
+            cd = afcd(alpha)
 
             return cl, cd, cm
         end
@@ -83,13 +103,6 @@ tol = 1e-4
     # Juno.@enter runme()
     af_re3_6e6,full_alpha_cl,full_cl,full_alpha_cm,full_cm, alpha_BV, CL_BV, CD_BV, CM_BV = runme()
 
-    # Load the Experimental and Comparative BV Results
-    CL_exp = DelimitedFiles.readdlm("$(path)/data/dynstall/Fig10_Exp_CL.txt", ',',skipstart = 1)
-    CL_BV_paper = DelimitedFiles.readdlm("$(path)/data/dynstall/Fig10_BV_CL.txt", ',',skipstart = 1)
-
-    CM_exp = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_Fig10_EXP_Sadr.txt", ',',skipstart = 0)
-    CM_BV_paper = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_Fig10_BV_Sadr.txt", ',',skipstart = 0)
-
     #Unit Data
     filename = "$path/data/dynstall/BV_unit_data.h5"
     # HDF5.h5open(filename, "w") do file
@@ -104,83 +117,33 @@ tol = 1e-4
     CD_BV_old = HDF5.h5read(filename,"CD_BV")
     CM_BV_old = HDF5.h5read(filename,"CM_BV")
 
-    # Perform Testing Comparisons
-    # PyPlot.figure()
-    # PyPlot.plot(LinRange(0,1,length(alpha_BV)),alpha_BV,"r-")
-    # PyPlot.plot(LinRange(0,1,length(alpha_BV_old)),alpha_BV_old,"b-")
+    # Perform pinned regression comparisons against the checked-in dynamic-stall
+    # fixture. These are intentionally direct array checks rather than loose
+    # "is real" assertions, because small changes in the dynamic flags or prior
+    # alpha state can otherwise pass unnoticed.
+    @test alpha_BV isa Vector{Float64}
+    @test CL_BV isa Vector{Float64}
+    @test CD_BV isa Vector{Float64}
+    @test CM_BV isa Vector{Float64}
+    @test length(alpha_BV) == 1501
+    @test length(CL_BV) == 1501
+    @test length(CD_BV) == 1501
+    @test length(CM_BV) == 1501
+    @test all(isfinite, CL_BV)
+    @test all(isfinite, CD_BV)
+    @test all(isfinite, CM_BV)
+    @test isapprox(alpha_BV_old, alpha_BV; atol=tol, rtol=0)
+    @test isapprox(CL_BV_old, CL_BV; atol=tol, rtol=0)
+    @test isapprox(CD_BV_old, CD_BV; atol=tol, rtol=0)
+    @test isapprox(CM_BV_old, CM_BV; atol=tol, rtol=0)
+    @test maximum(CL_BV) ≈ 1.6453597607493362 atol=tol
+    @test minimum(CL_BV) ≈ 0.003243925119865854 atol=tol
+    @test maximum(CD_BV) ≈ 0.3136503672765179 atol=tol
+    @test minimum(CM_BV) ≈ -0.10459421783230137 atol=tol
+    @test CL_BV[1] ≈ 1.1116093542418823 atol=tol
+    @test CD_BV[1] ≈ 0.0184 atol=tol
+    @test CM_BV[end] ≈ -0.001917210444783475 atol=tol
 
-    # PyPlot.figure()
-    # PyPlot.plot(LinRange(0,1,length(CL_BV)),CL_BV,"r-")
-    # PyPlot.plot(LinRange(0,1,length(CL_BV_old)),CL_BV_old,"b-")
-
-    # PyPlot.figure()
-    # PyPlot.plot(LinRange(0,1,length(CD_BV)),CD_BV,"r-")
-    # PyPlot.plot(LinRange(0,1,length(CD_BV_old)),CD_BV_old,"b-")
-
-    # PyPlot.figure()
-    # PyPlot.plot(LinRange(0,1,length(CM_BV)),CM_BV,"r-")
-    # PyPlot.plot(LinRange(0,1,length(CM_BV_old)),CM_BV_old,"b-")
-
-    for ii = 1:length(alpha_BV_old)
-        @test isapprox(alpha_BV_old[ii],alpha_BV[ii],atol=tol)
-        @test isapprox(CL_BV_old[ii],CL_BV[ii],atol=tol)
-        @test isapprox(CD_BV_old[ii],CD_BV[ii],atol=tol)
-        @test isapprox(CM_BV_old[ii],CM_BV[ii],atol=tol)
-    end
-
-#     # Plot
-#     plots = true
-#     if plots
-#         # import PyPlot
-#         PyPlot.rc("figure", figsize=(4, 3))
-#         PyPlot.rc("font", size=10.0)
-#         PyPlot.rc("lines", linewidth=1.5)
-#         PyPlot.rc("lines", markersize=3.0)
-#         PyPlot.rc("legend", frameon=false)
-#         PyPlot.rc("axes.spines", right=false, top=false)
-#         PyPlot.rc("figure.subplot", left=.18, bottom=.17, top=0.9, right=.9)
-#         # rc("axes", color_cycle=["348ABD", "A60628", "009E73", "7A68A6", "D55E00", "CC79A7"])
-#         plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
-#
-#         PyPlot.figure()
-#         PyPlot.plot(full_alpha_cl,full_cl,"k.-")
-#         PyPlot.plot(CL_exp[:,1],CL_exp[:,2],".-",color = plot_cycle[1])
-#         PyPlot.plot(CL_BV_paper[:,1],CL_BV_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_BV*180/pi, CL_BV,".-",color = plot_cycle[3])
-#         PyPlot.arrow(7.0,1.1,3.5,0.4,head_width=0.05,width=0.015,head_length=0.7,overhang=0.5,head_starts_at_zero="true",facecolor="k")
-#         PyPlot.arrow(18.0,0.4,-5.0,0.0,head_width=0.05,width=0.015,head_length=0.7,overhang=0.5,head_starts_at_zero="true",facecolor="k")
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Lift Coefficient")
-#         PyPlot.xlim([-22,22])
-#         PyPlot.legend(["Static Sadr","Exp Dynamic","Sadr BV","CACTUS BV"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CL_Fig10_BV.pdf",transparent = true)
-#
-#         PyPlot.figure()
-#         PyPlot.plot(full_alpha_cm,full_cm,"k.-")
-#         PyPlot.plot(CM_exp[:,1],CM_exp[:,2],".-",color = plot_cycle[1])
-#         PyPlot.plot(CM_BV_paper[:,1],CM_BV_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_BV*180/pi, CM_BV,".-",color = plot_cycle[3])
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Moment Coefficient")
-#         PyPlot.xlim([0,22])
-#         PyPlot.legend(["Static Sadr","Exp Dynamic","Sadr BV","CACTUS BV"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CM_Fig10_BV.pdf",transparent = true)
-#
-#         PyPlot.figure()
-#         PyPlot.plot(af_re3_6e6[:,1],af_re3_6e6[:,3],"k.-")
-#         # PyPlot.plot(CD_exp[:,1],CD_exp[:,2],".-",color = plot_cycle[1])
-#         # PyPlot.plot(CD_BV_paper[:,1],CD_BV_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_BV*180/pi, CD_BV,".-",color = plot_cycle[3])
-#         PyPlot.arrow(17.0,0.1,2.0,0.1,head_width=0.02,width=0.005,head_length=0.3,overhang=0.3,head_starts_at_zero="true",facecolor="k")
-#         PyPlot.arrow(14.0,0.28,-2.0,-0.1,head_width=0.02,width=0.005,head_length=0.3,overhang=0.3,head_starts_at_zero="true",facecolor="k")
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Drag Coefficient")
-#         PyPlot.xlim([0,22])
-#         PyPlot.ylim([0,0.4])
-#         PyPlot.legend(["Static Xfoil","CACTUS BV"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CD_Fig10_BV.pdf",transparent = true)
-#     end
-#
 end
 
 # @testset "NACA 0012 Leishman-Beddoes" begin
