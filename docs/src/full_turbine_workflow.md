@@ -1,0 +1,33 @@
+# Full Turbine Workflow
+
+The high-level turbine workflow is the interface used by coupled OWENS simulations. It builds stacked aerodynamic slices once, stores solver state, and advances or re-solves the aero model as the structural state changes.
+
+## Lifecycle
+
+1. `setupTurb(...)` constructs slice geometry, reads airfoil data, initializes environments, and creates unsteady state containers.
+2. `steadyTurb(; omega, Vinf)` evaluates the initialized turbine at a steady operating point.
+3. `advanceTurb(tnew; ts, azi, verbosity, alwaysrecalc, last_step)` advances the unsteady solution to a new time and returns load histories and state.
+4. `AdvanceTurbineInterpolate(...)` interpolates between adjacent azimuthal evaluations for coupled time integration.
+
+These functions are intentionally stateful. A new call to `setupTurb` is required when rotor geometry, airfoils, model options, inflow source, or discretization change.
+
+## Geometry Inputs
+
+`setupTurb` expects blade centerline coordinates by slice, blade count, chord, rotation rate, and inflow. The examples use `shapeX` for radius-like positions and `shapeZ` for vertical station positions. Chord can be scalar or station-dependent depending on the call path.
+
+Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled.
+
+## Output Shape
+
+The high-level functions return power, torque, per-slice distributed loads, azimuthal angles, local velocities, angles of attack, airfoil coefficients, Reynolds numbers, and model-specific auxiliary loads. The exact tuple differs between steady and unsteady workflows, so tests should destructure by the current function contract instead of assuming a shared tuple layout.
+
+## Coupling Notes
+
+When coupled to OWENS structural dynamics:
+
+- update `setupTurb` only for topology or discretization changes;
+- use `deformTurb` or the coupled wrapper to update blade deflection state;
+- keep aero and structural sign conventions visible in the test name and fixture;
+- pin force components separately instead of testing only aggregate power.
+
+The examples in `test/full_turb.jl`, `test/full_turb_undersampling.jl`, and `examples/RM2/RM2_medium.jl` are the most useful starting points for complete turbine cases.

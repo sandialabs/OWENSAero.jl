@@ -1,14 +1,23 @@
 # OWENSAero.jl
 
-This repository contains a set of aerodynamic tools for VAWTs both steady and unsteady operation, 2D and
-3D (stacked 2D) convenience functions along with coupling to NREL's InflowWind for turbulent inflow. You
-will need to provide your own .bts files from turbsim (compile or download OpenFAST and use the turbsim
-binary with an .inp file.  There is an example in the test/data/ifw folder)
+OWENSAero provides the aerodynamic models used by OWENS for vertical-axis wind and water turbines. It can also be used directly for single-slice studies, full stacked-slice turbine calculations, and OpenFAST InflowWind-driven turbulent inflow cases.
 
-Double Multiple Streamtube implementation per https://doi.org/10.5194/wes-2019-44
+![OWENSAero workflow](assets/aero_workflow.svg)
 
-Actuator Cylinder Implementation from https://github.com/byuflowlab/vawt-ac (updated and modified)
+The package contains two primary VAWT aerodynamic paths:
 
-CACTUS Dynamic Stall models https://github.com/sandialabs/CACTUS
+| Path | Main use | Notes |
+| --- | --- | --- |
+| Double-multiple-streamtube (DMS) | Fast design sweeps, optimization, and regression testing | Implemented in `DMS` and selected by `Environment(..., AeroModel = "DMS", ...)`. |
+| Actuator cylinder (AC) | Higher-fidelity steady slice loading and multi-turbine influence work | Implemented in `AC` and selected by `AeroModel = "AC"`. |
 
-3D VAWT error resolution and unsteady method numerical acceleration (RPI) per https://arc.aiaa.org/doi/abs/10.2514/1.J060476
+Both paths share the `Turbine`, `Environment`, and `UnsteadyParams` data structures. The high-level turbine workflow in `setupTurb`, `steadyTurb`, and `advanceTurb` builds one or more vertical slices, stores model state, and returns distributed aerodynamic loads for coupling to OWENS structural dynamics.
+
+## Documentation Map
+
+- [Quickstart](quickstart.md) shows the smallest direct slice and full-turbine calls.
+- [Model Selection](model_selection.md) explains when to use DMS, AC, dynamic stall, RPI, and InflowWind.
+- [Full Turbine Workflow](full_turbine_workflow.md) documents the stateful `setupTurb`/`steadyTurb`/`advanceTurb` path used by coupled OWENS runs.
+- [Frames, Units, and Outputs](theory/frames_units.md) records load directions and expected SI units.
+- [Validation and Testing](validation.md) identifies the tests that currently pin model behavior and the remaining validation gaps.
+- [API Reference](reference/reference.md) is the generated function and type index.
