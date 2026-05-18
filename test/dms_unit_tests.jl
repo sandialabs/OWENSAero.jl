@@ -1,3 +1,4 @@
+using Test
 using OWENSAero
 
 @testset "DMS scalar streamtube" begin

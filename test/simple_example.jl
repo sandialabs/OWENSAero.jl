@@ -20,6 +20,44 @@ import OWENSOpenFASTWrappers
 # # rc("axes", color_cycle=["348ABD", "A60628", "009E73", "7A68A6", "D55E00", "CC79A7"])
 plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
 
+const UNSTEADY_BASELINES = Dict(
+    ("AC", true) => (Rp1=14.585768584726665, Tp1=-1.3587949100837058, Rpmean=4.498402095922495, Tpmean=6.076899967037278, Vloc1=42.65710717629131, Re1=445046.12377008086),
+    ("AC", false) => (Rp1=12.56554592200133, Tp1=-1.4074827540058672, Rpmean=3.2414528905956614, Tpmean=4.1713403556593756, Vloc1=42.65823030277452, Re1=445057.84146780916),
+    ("DMS", true) => (Rp1=17.8724152206306, Tp1=-1.2526644527903148, Rpmean=6.088556414031047, Tpmean=7.844120412980309, Vloc1=42.5286710408061, Re1=443706.1359454618),
+    ("DMS", false) => (Rp1=17.8724152206306, Tp1=-1.2526644527903148, Rpmean=18.02741463669498, Tpmean=4.181179869956496, Vloc1=42.5286710408061, Re1=443706.1359454618),
+)
+
+const IFW_UNSTEADY_BASELINES = Dict(
+    "AC" => (Rp1=-2.6331031705280084, Tp1=-1.2559507588560983, Rpmean=2.3980398649584904, Tpmean=0.30031142795009114, Vloc1=38.56407465412821, Re1=402343.0813221861),
+    "DMS" => (Rp1=-3.958783356071784, Tp1=-1.272566646170957, Rpmean=4.65480460237821, Tpmean=-0.017477189310114483, Vloc1=38.95222326170589, Re1=406392.6769156071),
+)
+
+function test_unsteady_outputs(AeroModel, RPI, Rp, Tp, Zp, Vloc, Re, baseline)
+    expected_steps = 2 * ntheta
+
+    @test length(Rp) == expected_steps
+    @test length(Tp) == expected_steps
+    @test length(Zp) == expected_steps
+    @test length(Vloc) == expected_steps
+    @test length(Re) == expected_steps
+    @test all(isfinite, Float64.(Rp))
+    @test all(isfinite, Float64.(Tp))
+    @test all(isfinite, Float64.(Zp))
+    @test all(isfinite, Float64.(Vloc))
+    @test all(isfinite, Float64.(Re))
+    @test minimum(Float64.(Vloc)) > 0
+    @test minimum(Float64.(Re)) > 0
+    @test maximum(abs.(Float64.(Rp))) > 1
+    @test maximum(abs.(Float64.(Tp))) > 1
+
+    @test Rp[1] ≈ baseline.Rp1 rtol=1e-7 atol=1e-7
+    @test Tp[1] ≈ baseline.Tp1 rtol=1e-7 atol=1e-7
+    @test mean(Rp) ≈ baseline.Rpmean rtol=1e-7 atol=1e-7
+    @test mean(Tp) ≈ baseline.Tpmean rtol=1e-7 atol=1e-7
+    @test Vloc[1] ≈ baseline.Vloc1 rtol=1e-7 atol=1e-7
+    @test Re[1] ≈ baseline.Re1 rtol=1e-7 atol=1e-4
+end
+
 path,_ = splitdir(@__FILE__)
 import OWENSAero
 # include("$(path)/../src/OWENSAero.jl")
@@ -146,7 +184,7 @@ for AeroModel in ["AC","DMS"]
         ##########################################
 
         CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;returnall=true,AeroModel,steady=false,ifw=true)
-        @test true #check that it runs
+        test_unsteady_outputs(AeroModel, true, Rp, Tp, Zp, Vloc, Re, IFW_UNSTEADY_BASELINES[AeroModel])
         # PyPlot.figure()
         # PyPlot.plot(thetavec./ntheta,Tp,label="Turbulent",color=plot_cycle[1])
         # Tp_rollingave = RollingFunctions.runmean(Tp,filterwindow)
@@ -162,7 +200,7 @@ for AeroModel in ["AC","DMS"]
             global Rp_us
             global Tp_us
             CP, Th, Q, Rp_us, Tp_us, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;RPI,returnall=true,AeroModel,steady=false)
-            @test true #check that it runs
+            test_unsteady_outputs(AeroModel, RPI, Rp_us, Tp_us, Zp, Vloc, Re, UNSTEADY_BASELINES[(AeroModel, RPI)])
 
             # PyPlot.plot(thetavec./ntheta,Tp_us,label="Steady Wind RPI: $RPI",color=plot_cycle[i])
             # Tp_us_rollingave = RollingFunctions.runmean(Tp_us,filterwindow)
@@ -195,7 +233,7 @@ for AeroModel in ["AC","DMS"]
                 end
             end
         else
-            @warn "AC analytic gradients need to make it past NLsolve to work, still to do"
+            @test_skip "AC analytic gradients need to make it past NLsolve to work"
         end
     end
     ################################
@@ -203,16 +241,48 @@ for AeroModel in ["AC","DMS"]
         #################################
         if AeroModel=="DMS"
             windangle_D = collect(0.0:30.0:90.0)
+            CP_ref, Rp_ref, Tp_ref, Vloc_ref, alpha_ref, thetavec_ref = nothing, nothing, nothing, nothing, nothing, nothing
             # PyPlot.figure()
             for iwind = 1:length(windangle_D)
 
                 local CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;AeroModel,returnall=true,windangle_D=windangle_D[iwind])
+                @test isfinite(CP)
+                @test all(isfinite, Float64.(Rp))
+                @test all(isfinite, Float64.(Tp))
+                @test all(isfinite, Float64.(Vloc))
+                @test all(isfinite, Float64.(alpha))
+                if iwind == 1
+                    CP_ref = CP
+                    Rp_ref = copy(Rp)
+                    Tp_ref = copy(Tp)
+                    Vloc_ref = copy(Vloc)
+                    alpha_ref = copy(alpha)
+                    thetavec_ref = copy(thetavec)
+                else
+                    @test CP ≈ CP_ref atol=1e-14
+                    @test Rp ≈ Rp_ref atol=1e-12
+                    @test Tp ≈ Tp_ref atol=1e-12
+                    @test Vloc ≈ Vloc_ref atol=1e-12
+                    @test alpha ≈ alpha_ref atol=1e-14
+                    @test thetavec ≈ thetavec_ref .- windangle_D[iwind] * pi / 180 atol=1e-14
+                end
                 rel_ang_off = 0.0#windangle_D[iwind]*pi/180 #turn on to align loads
                 # PyPlot.plot(thetavec[1:ntheta].+rel_ang_off,Tp,label="Angle $(windangle_D[iwind])")
             end
             # PyPlot.legend()
         else
-            @warn "AC nonzero wind angle still in work"
+            for windangle_D in (0.0, 30.0, 60.0)
+                local CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;AeroModel,returnall=true,windangle_D)
+                @test isfinite(CP)
+                @test CP > 0
+                @test all(isfinite, Float64.(Rp))
+                @test all(isfinite, Float64.(Tp))
+                @test all(isfinite, Float64.(Vloc))
+                @test minimum(Float64.(Vloc)) > 0
+                @test thetavec[1] ≈ pi / ntheta atol=1e-14
+                @test thetavec[end] ≈ 2 * pi - pi / ntheta atol=1e-14
+            end
+            @test_skip "AC wind-angle frame invariance is not implemented yet"
         end
     end
     ################################
@@ -251,6 +321,30 @@ for AeroModel in ["AC","DMS"]
         cl_af_old = HDF5.h5read(filename,"cl_af_old")
         cd_af_old = HDF5.h5read(filename,"cd_af_old")
         thetavec_old = HDF5.h5read(filename,"thetavec_old")
+
+        fixture_rtol = AeroModel == "AC" ? 1e-3 : 1e-10
+        @test size(Rp) == size(Rp_old)
+        @test size(Tp) == size(Tp_old)
+        @test size(Zp) == size(Zp_old)
+        @test size(Vloc) == size(Vloc_old)
+        @test size(alpha) == size(alpha_old)
+        @test size(cl_af) == size(cl_af_old)
+        @test size(cd_af) == size(cd_af_old)
+        @test size(thetavec) == size(thetavec_old)
+        @test isfinite(CP)
+        @test CP ≈ CP_old rtol=fixture_rtol atol=1e-12
+        @test Rp[1] ≈ Rp_old[1] rtol=fixture_rtol atol=1e-12
+        @test Tp[1] ≈ Tp_old[1] rtol=fixture_rtol atol=1e-12
+        @test Vloc[1] ≈ Vloc_old[1] rtol=fixture_rtol atol=1e-12
+        @test thetavec[1] ≈ thetavec_old[1] atol=1e-14
+        @test thetavec[end] ≈ thetavec_old[end] atol=1e-14
+        @test all(isfinite, Float64.(Rp))
+        @test all(isfinite, Float64.(Tp))
+        @test all(isfinite, Float64.(Vloc))
+        @test all(isfinite, Float64.(alpha))
+        @test all(isfinite, Float64.(Re))
+        @test minimum(Float64.(Vloc)) > 0
+        @test minimum(Float64.(Re)) > 0
 
         tol = 1e-2
 
