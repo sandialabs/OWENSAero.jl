@@ -3,6 +3,15 @@ using OWENSAero
 
 const API_TEST_DIR, _ = splitdir(@__FILE__)
 
+@testset "public API bindings" begin
+    exported = names(OWENSAero)
+    @test :AC in exported
+    @test :DMS in exported
+    @test :AC_steady ∉ exported
+    @test isdefined(OWENSAero, :AC)
+    @test !isdefined(OWENSAero, :AC_steady)
+end
+
 @testset "public constructors and defaults" begin
     ntheta = 6
     af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
@@ -47,6 +56,12 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test us.ifw == false
     @test us.IECgust == false
     @test us.nominalVinf == 1.0
+end
+
+@testset "blade azimuth indexing wraps over all bins" begin
+    @test [OWENSAero._blade_azimuth_index(6, 2, ibld, 6) for ibld in 1:3] == [6, 2, 4]
+    @test [OWENSAero._blade_azimuth_index(1, 2, ibld, 6) for ibld in 1:3] == [1, 3, 5]
+    @test [OWENSAero._blade_azimuth_index(30, 10, ibld, 30) for ibld in 1:3] == [30, 10, 20]
 end
 
 @testset "pInt periodic integration" begin

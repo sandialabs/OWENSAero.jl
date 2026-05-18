@@ -56,6 +56,8 @@ global aziL_save = nothing
 global aziU_save = nothing
 global startingtwist
 
+_blade_azimuth_index(bld1_idx, dstep_bld, ibld, ntheta) = mod1(bld1_idx + dstep_bld * (ibld - 1), ntheta)
+
 """
 setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
@@ -337,10 +339,7 @@ steady=false) # each of these is size ntheta x nslices
             envslices[islice].gravity[:] = gravity[:]
             for ibld = 1:turbslices[1].B
 
-                bld_idx = (bld1_idx+dstep_bld*(ibld-1))%(ntheta-1)
-                if bld_idx == 0
-                    bld_idx = 1
-                end
+                bld_idx = _blade_azimuth_index(bld1_idx, dstep_bld, ibld, ntheta)
 
                 if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
                     turbslices[islice].r[bld_idx] = bld_x[ibld,islice]

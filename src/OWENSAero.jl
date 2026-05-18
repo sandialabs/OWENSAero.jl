@@ -7,7 +7,7 @@ export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
 
 # Actuator Cylinder
-export AC_steady, radialforce, pInt
+export AC, radialforce, pInt
 
 # DMS
 export DMS, streamtube, readaerodyn, readaerodyn_BV
