@@ -3,6 +3,8 @@ using Test
 
 println("Start Tests")
 
+include("dms_unit_tests.jl")
+
 include("simple_example.jl")
 
 # include("dyn_stall_tests.jl")

@@ -1,6 +1,7 @@
 *.png
 *.DS_Store
 Manifest.toml
+*.cov
 theta*
 *.aux
 *.bbl

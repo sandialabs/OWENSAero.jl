@@ -66,9 +66,9 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
         delta = turbine.delta
         omega = turbine.omega
         rotation = sign(mean(turbine.omega))
-        V_x = env.V_x[1]
-        V_y = env.V_y[1]
-        V_z = env.V_z[1]
+        V_xt = env.V_x[1]
+        V_yt = env.V_y[1]
+        V_zt = env.V_z[1]
         V_twist = env.V_twist[1]
         accel_flap = env.accel_flap[1]
         accel_edge = env.accel_edge[1]
@@ -213,9 +213,33 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
 
     V_xtemp = env.V_x .* cos(windangle) + env.V_y .* sin(windangle) # Vinf is V_x, t is for turbine direction f.o.r.
     V_ytemp = -env.V_x .* sin(windangle) + env.V_y .* cos(windangle)
-
-    env.V_x[:] = V_xtemp #TODO: ensure this doesn't mess up unsteady methods with persistent backend memory
-    env.V_y[:] = V_ytemp
+    env_turbine = Environment(
+        env.rho,
+        env.mu,
+        V_xtemp,
+        V_ytemp,
+        env.V_z,
+        env.V_twist,
+        env.windangle,
+        env.DynamicStallModel,
+        env.AeroModel,
+        env.Aero_AddedMass_Active,
+        env.Aero_Buoyancy_Active,
+        env.Aero_RotAccel_Active,
+        env.AddedMass_Coeff_Ca,
+        env.centrifugal_force_flag,
+        env.aw_warm,
+        env.steplast,
+        env.idx_RPI,
+        env.V_wake_old,
+        env.BV_DynamicFlagL,
+        env.BV_DynamicFlagD,
+        env.alpha_last,
+        env.suction,
+        env.accel_flap,
+        env.accel_edge,
+        env.gravity,
+    )
 
     # Unpack the rest
 
@@ -255,15 +279,15 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
         if idx_RPI[iter_RPI] == i
             iter_RPI += 1
             if solve
-                resid(a) = streamtube(a, thetavec[i], turbine, env; solvestep=true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
+                resid(a) = streamtube(a, thetavec[i], turbine, env_turbine; solvestep=true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env; output_all=true)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true)
         end
     end
 
-    Vxsave = mean(env.V_x)
+    Vxsave = mean(env_turbine.V_x)
 
     # For All Lower
     for i = Int(ntheta / 2 + 1):ntheta
@@ -271,25 +295,25 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
         if idx_RPI[iter_RPI] == i
             iter_RPI += 1
             a_used = astar[Int(ntheta / 2)-(i-Int(ntheta / 2))+1] # We index in a circle, but the streamtubes go straight through, swapping at 180 deg
-            if env.suction
-                Vxwake = (1.0 - a_used) / (1.0 + a_used) * env.V_x[i] # Eq. 6
+            if env_turbine.suction
+                Vxwake = (1.0 - a_used) / (1.0 + a_used) * env_turbine.V_x[i] # Eq. 6
             else
-                Vxwake = (1.0 - 2.0 * a_used) * env.V_x[i] # Eq. 3
+                Vxwake = (1.0 - 2.0 * a_used) * env_turbine.V_x[i] # Eq. 3
             end
 
             # Solve Residual
             if solve
-                resid(a) = streamtube(a, thetavec[i], turbine, env; Vxwake, solvestep=true) #Solve wrt negative theta on the back side?
+                resid(a) = streamtube(a, thetavec[i], turbine, env_turbine; Vxwake, solvestep=true) #Solve wrt negative theta on the back side?
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env; output_all=true, Vxwake)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true, Vxwake)
         end
     end
 
     # Aggregate Turbine Performance
     k = 1.0
-    CP = sum((k * turbine.B / (2 * pi) * dtheta * abs.(Q) * mean(abs.(turbine.omega))) / (0.5 * env.rho * 1.0 * 2 * turbine.R * Vxsave^3)) # Eq. 14, normalized by nominal radius R
+    CP = sum((k * turbine.B / (2 * pi) * dtheta * abs.(Q) * mean(abs.(turbine.omega))) / (0.5 * env_turbine.rho * 1.0 * 2 * turbine.R * Vxsave^3)) # Eq. 14, normalized by nominal radius R
 
     return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec .- windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
 end
