@@ -15,7 +15,9 @@ Double multiple streamtube individual streamtube calculation
 Output:
 
 if output_all
-    return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re
+    return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re,
+           M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp,
+           F_buoy, cm_af, M25
 else
     return CD-CT # Residual, section 2.4
 end
@@ -117,11 +119,23 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
     mach = Vloc / v_sound
     if env.DynamicStallModel == "BV"
-        cl, cd_af = af(alpha, Re, mach, env, V_twist, chord, dt, Vloc; solvestep, idx)
+        cl, cd_af, cm_af = OWENSAero._airfoil_coefficients(
+            af,
+            alpha,
+            Re,
+            mach,
+            env,
+            V_twist,
+            chord,
+            dt,
+            Vloc;
+            solvestep,
+            idx,
+        )
     elseif env.DynamicStallModel == "LB"
         error("LB Dynamic Stall Model Not Implemented Yet")
     else
-        cl, cd_af = af(alpha, Re, mach)
+        cl, cd_af, cm_af = OWENSAero._airfoil_coefficients(af, alpha, Re, mach)
     end
     ct = cd_af * cos(phi) - cl * sin(phi) # Eq. 9
     cn = cd_af * sin(phi) + cl * cos(phi) # Eq. 10
@@ -174,6 +188,7 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     # Instantaneous Forces (Unit Height) #Based on this, radial is inward positive and tangential is in direction of rotation positive
     Ab = chord * 1.0 # planform area Assuming unit section height
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
+    M25 = cm_af * q_loc * chord
 
     Np = cn .* q_loc + -F_addedmass_Np
     Rp = Np + F_buoy[2] + f_centrifugal# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
@@ -191,7 +206,7 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     CT = (k * B / (2 * pi) * dtheta * Th) ./ q_inf # Eq. 13
 
     if output_all
-        return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+        return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
     else
         return CD - CT # Residual, section 2.4
     end
@@ -265,6 +280,8 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
     alpha = zeros(Real, ntheta)
     cl = zeros(Real, ntheta)
     cd_af = zeros(Real, ntheta)
+    cm_af = zeros(Real, ntheta)
+    M25 = zeros(Real, ntheta)
     Re = zeros(Real, ntheta)
     M_addedmass_Np = zeros(Real, ntheta)
     M_addedmass_Tp = zeros(Real, ntheta)
@@ -283,7 +300,7 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:], cm_af[i], M25[i] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true)
         end
     end
 
@@ -307,7 +324,7 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true, Vxwake)
+            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:], cm_af[i], M25[i] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true, Vxwake)
         end
     end
 
@@ -315,5 +332,5 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
     k = 1.0
     CP = sum((k * turbine.B / (2 * pi) * dtheta * abs.(Q) * mean(abs.(turbine.omega))) / (0.5 * env_turbine.rho * 1.0 * 2 * turbine.R * Vxsave^3)) # Eq. 14, normalized by nominal radius R
 
-    return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec .- windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+    return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec .- windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
 end

@@ -305,13 +305,24 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     if env.DynamicStallModel == "BV"
         cl = zeros(Real,length(alpha))
         cd = zeros(Real,length(alpha))
+        cm = zeros(Real,length(alpha))
         for ii = 1:length(alpha)
-            cl[ii], cd[ii] = turbine.af(alpha[ii],Re[ii],mach[ii],env,V_twist[ii],chord,dt[ii],W[ii])
+            cl[ii], cd[ii], cm[ii] = OWENSAero._airfoil_coefficients(
+                turbine.af,
+                alpha[ii],
+                Re[ii],
+                mach[ii],
+                env,
+                V_twist[ii],
+                chord,
+                dt[ii],
+                W[ii],
+            )
         end
     elseif env.DynamicStallModel == "LB"
         error("LB Dynamic Stall Model Not Coupled Yet")
     else
-        cl, cd = turbine.af(alpha,Re,mach)
+        cl, cd, cm = OWENSAero._airfoil_coefficients(turbine.af, alpha, Re, mach)
     end
 
     # rotate force coefficients
@@ -391,6 +402,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
 
     # instantaneous forces #Based on this, radial is inward and tangential is in direction of rotation
     qdyn = 0.5*rho*W.^2
+    M25 = cm .* qdyn .* chord.^2
     Rp = cn.*qdyn*chord - F_addedmass_Np .+ F_buoy[2, :] # TODO CM: correct?
     Tp = (rotation*ct.*qdyn.*chord + F_addedmass_Tp)./cos.(delta)  .+ F_buoy[1, :] # TODO CM: correct?
     Zp = (cn.*qdyn.*chord - F_addedmass_Np).*tan.(delta)  .+ F_buoy[3, :] # TODO CM: correct?
@@ -418,7 +430,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     P = abs(mean(Omega))*B/(2*pi)*pInt(thetavec, Q)
     CP = P / (0.5*rho*mean(V_wind)^3 * Sref)
 
-    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy'
+    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy', cm, M25
 end
 
 # -----------------------------------------
@@ -539,9 +551,9 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
     idx = collect(1:ntheta)
     u = w[idx]
     v = w[ntheta .+ idx]
-    q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy = radialforce(u, v, theta, turbines[i], env)
+    q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm, M25 = radialforce(u, v, theta, turbines[i], env)
 
-    return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+    return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm, M25
 
 end
 # TODO: keep this as it shows how to handle multiple turbines, might also look at original code

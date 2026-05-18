@@ -219,6 +219,65 @@ end
     return FLOWMath.akima(x,y,xpt)
 end
 
+_zero_like(x) = zero(x)
+
+function _split_airfoil_coefficients(coefficients)
+    cl = coefficients[1]
+    cd = coefficients[2]
+    cm = length(coefficients) >= 3 ? coefficients[3] : _zero_like(cl)
+    return cl, cd, cm
+end
+
+function _airfoil_coefficients(af, alpha, Re, mach)
+    coefficients = try
+        af(alpha, Re, mach; return_cm = true)
+    catch err
+        if err isa MethodError
+            af(alpha, Re, mach)
+        else
+            rethrow()
+        end
+    end
+    return _split_airfoil_coefficients(coefficients)
+end
+
+function _airfoil_coefficients(
+    af,
+    alpha,
+    Re,
+    mach,
+    env,
+    V_twist,
+    chord,
+    dt,
+    U;
+    solvestep = false,
+    idx = 1,
+)
+    coefficients = try
+        af(
+            alpha,
+            Re,
+            mach,
+            env,
+            V_twist,
+            chord,
+            dt,
+            U;
+            solvestep,
+            idx,
+            return_cm = true,
+        )
+    catch err
+        if err isa MethodError
+            af(alpha, Re, mach, env, V_twist, chord, dt, U; solvestep, idx)
+        else
+            rethrow()
+        end
+    end
+    return _split_airfoil_coefficients(coefficients)
+end
+
 include("DMS.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")

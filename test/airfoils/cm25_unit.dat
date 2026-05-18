@@ -1,0 +1,20 @@
+Title: Cm25 unit test polar
+Thickness to Chord Ratio: 0.15
+Zero Lift AOA (deg): 0.0
+Reverse Camber Direction: 0
+
+Reynolds Number: 3.0e5
+BV Dyn. Stall Model - Positive Stall AOA (deg): 12.0
+BV Dyn. Stall Model - Negative Stall AOA (deg): -12.0
+LB Dyn. Stall Model - Lift Coeff. Slope at Zero Lift AOA (per radian): 6.283
+LB Dyn. Stall Model - Positive Critical Lift Coeff.: 1.20
+LB Dyn. Stall Model - Negative Critical Lift Coeff.: -1.20
+AOA (deg) CL CD Cm25
+-180.0000 0.0000 0.0200 0.0000
+-10.0000 -1.0000 0.0300 -0.0800
+-5.0000 -0.5000 0.0200 -0.0400
+0.0000 0.0000 0.0100 0.0000
+5.0000 0.5000 0.0200 0.0400
+10.0000 1.0000 0.0300 0.0800
+180.0000 0.0000 0.0200 0.0000
+EOT

@@ -15,11 +15,11 @@ These functions are intentionally stateful. A new call to `setupTurb` is require
 
 `setupTurb` expects blade centerline coordinates by slice, blade count, chord, rotation rate, and inflow. The examples use `shapeX` for radius-like positions and `shapeZ` for vertical station positions. Chord can be scalar or station-dependent depending on the call path.
 
-Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled.
+Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
 
 ## Output Shape
 
-The high-level functions return power, torque, per-slice distributed loads, azimuthal angles, local velocities, angles of attack, airfoil coefficients, Reynolds numbers, and model-specific auxiliary loads. The exact tuple differs between steady and unsteady workflows, so tests should destructure by the current function contract instead of assuming a shared tuple layout.
+The high-level functions return power, torque, per-slice distributed loads, azimuthal angles, local velocities, angles of attack, airfoil coefficients, Reynolds numbers, airfoil pitching moments, and model-specific auxiliary loads. The exact tuple differs between steady and unsteady workflows, so tests should destructure by the current function contract instead of assuming a shared tuple layout.
 
 ## Coupling Notes
 
@@ -28,6 +28,7 @@ When coupled to OWENS structural dynamics:
 - update `setupTurb` only for topology or discretization changes;
 - use `deformTurb` or the coupled wrapper to update blade deflection state;
 - keep aero and structural sign conventions visible in the test name and fixture;
+- verify `M25` separately when pitching-moment polars are used, because it maps to the structural DOF-4 distributed moment channel;
 - pin force components separately instead of testing only aggregate power.
 
 The examples in `test/full_turb.jl`, `test/full_turb_undersampling.jl`, and `examples/RM2/RM2_medium.jl` are the most useful starting points for complete turbine cases.

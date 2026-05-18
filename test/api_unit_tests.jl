@@ -117,3 +117,92 @@ end
     @test env.BV_DynamicFlagL[2] == 0
     @test env.BV_DynamicFlagD[2] == 0
 end
+
+@testset "airfoil Cm25 propagation" begin
+    filename = joinpath(API_TEST_DIR, "airfoils", "cm25_unit.dat")
+
+    af = OWENSAero.readaerodyn(filename)
+    cl, cd = af(5 * pi / 180, 3.0e5, 0.0)
+    cl_cm, cd_cm, cm = af(5 * pi / 180, 3.0e5, 0.0; return_cm=true)
+    @test (cl, cd) == (0.5, 0.02)
+    @test (cl_cm, cd_cm, cm) == (0.5, 0.02, 0.04)
+
+    cl_fallback, cd_fallback, cm_fallback =
+        OWENSAero._airfoil_coefficients((alpha, Re, mach) -> (2.0 * alpha, 0.01), 0.25, 1.0e5, 0.0)
+    @test (cl_fallback, cd_fallback, cm_fallback) == (0.5, 0.01, 0.0)
+
+    af_bv = OWENSAero.readaerodyn_BV(filename)
+    env_bv = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, 4),
+        zeros(4),
+        zeros(4),
+        zeros(4),
+        0.0,
+        "BV",
+        "DMS",
+        zeros(8),
+    )
+    cl_bv, cd_bv, cm_bv =
+        af_bv(5 * pi / 180, 3.0e5, 0.0, env_bv, 0.0, 0.2, 0.1, 5.0; solvestep=true, idx=2, return_cm=true)
+    @test cl_bv == 0.5
+    @test cd_bv == 0.02
+    @test cm_bv == 0.04
+
+    ntheta = 6
+    rho = 1.225
+    chord = 0.2
+    cm25 = 0.125
+    af_with_cm(alpha, Re, mach; return_cm=false) = begin
+        cl_local = zero(alpha)
+        cd_local = 0.01 .+ zero(alpha)
+        cm_local = cm25 .+ zero(alpha)
+        return_cm ? (cl_local, cd_local, cm_local) : (cl_local, cd_local)
+    end
+    turbine = OWENSAero.Turbine(
+        2.0,
+        fill(2.0, ntheta),
+        fill(chord, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(3.0, ntheta),
+        3,
+        af_with_cm,
+        ntheta,
+        false,
+    )
+    env = OWENSAero.Environment(
+        rho,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+
+    streamtube_result = OWENSAero.streamtube(0.0, pi / ntheta, turbine, env; output_all=true)
+    Vloc = streamtube_result[6]
+    @test streamtube_result[end-1] == cm25
+    @test streamtube_result[end] ≈ cm25 * 0.5 * rho * chord * Vloc^2 * chord atol=1e-14
+
+    turbine_ac = OWENSAero.Turbine(
+        2.0,
+        fill(2.0, ntheta),
+        chord,
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(3.0, ntheta),
+        3,
+        af_with_cm,
+        ntheta,
+        false,
+    )
+    theta = collect((2 * pi / ntheta) / 2:(2 * pi / ntheta):2 * pi)
+    radialforce_result = OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine_ac, env)
+    Vn = radialforce_result[12]
+    Vt = radialforce_result[13]
+    W = sqrt.(Vn .^ 2 .+ Vt .^ 2)
+    @test radialforce_result[end-1] == fill(cm25, ntheta)
+    @test radialforce_result[end] ≈ cm25 .* 0.5 .* rho .* W .^ 2 .* chord .^ 2 atol=1e-14
+end

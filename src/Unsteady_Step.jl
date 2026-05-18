@@ -25,6 +25,8 @@ calls inflow wind init
 * `alpha`: Local angle of attack array for each azimuthal position (includes induction) (rad) at this step
 * `cl`: Local lift coefficient used for each azimuthal position at this step
 * `cd_af`: Local drag coefficient used for each azimuthal position at this step
+* `cm_af`: Local Cm25 coefficient used for each azimuthal position at this step
+* `M25`: Local airfoil pitching moment per span used for each azimuthal position at this step (N-m/m)
 * `thetavec`: Azimuthal location of each discretization (rad)
 * `Re`: Reynolds number for each azimuthal position at this step
 
@@ -111,7 +113,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     aw_filtered = aw_warm[:] .* exp.(-[dt;dt] ./ tau_near) .+ awnew[:] .* (1.0 .- exp.(-[dt;dt] ./ tau_near))
 
     # Get the actual performance using the filtered induction factors
-    CP, Th, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy = steady(turbine, env; w=aw_filtered,idx_RPI,solve=false,ifw)
+    CP, Th, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25 = steady(turbine, env; w=aw_filtered,idx_RPI,solve=false,ifw)
 
     if env.steplast[1] != mystep
         env.aw_warm[:] = aw_filtered[:] #Mutate, do not link
@@ -121,5 +123,5 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     # env.idx_RPI[:] = idx_RPI_half #Mutate, do not link, TODO: fix this, is used for indexing outputs
     theta_temp = thetavec[idx_RPI_half[1]]
 
-    return CP,Th,Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+    return CP,Th,Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
 end
