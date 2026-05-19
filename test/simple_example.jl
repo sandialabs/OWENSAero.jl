@@ -153,7 +153,8 @@ function aerowrapper(x;RPI=true,returnall=false,windangle_D=0.0,AeroModel="DMS",
                 Vloc[step1] = Vloc_temp[rev_step]
                 Re[step1] = Re_temp[rev_step]
             end
-            thetavec[step1] = step1 #TODO: fix this
+            thetavec[step1] =
+                thetavec_temp[rev_step] + 2 * pi * floor(Int, (step1 - 1) / ntheta)
 
         end
         if ifw
@@ -201,6 +202,10 @@ for AeroModel in ["AC","DMS"]
             global Tp_us
             CP, Th, Q, Rp_us, Tp_us, Zp, Vloc, CD, CT, a, awstar, alpha, cl_af, cd_af, thetavec, Re = aerowrapper(xin;RPI,returnall=true,AeroModel,steady=false)
             test_unsteady_outputs(AeroModel, RPI, Rp_us, Tp_us, Zp, Vloc, Re, UNSTEADY_BASELINES[(AeroModel, RPI)])
+            @test thetavec[1] ≈ pi / ntheta atol=1e-14
+            @test thetavec[ntheta] ≈ 2 * pi - pi / ntheta atol=1e-14
+            @test thetavec[ntheta+1] ≈ 2 * pi + pi / ntheta atol=1e-14
+            @test thetavec[end] ≈ 4 * pi - pi / ntheta atol=1e-14
 
             # PyPlot.plot(thetavec./ntheta,Tp_us,label="Steady Wind RPI: $RPI",color=plot_cycle[i])
             # Tp_us_rollingave = RollingFunctions.runmean(Tp_us,filterwindow)
