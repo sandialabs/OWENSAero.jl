@@ -46,6 +46,10 @@ Model option strings are normalized at construction and setup time: `BV`/`boeing
 
 `towerShadowVelocity(velocity, relative_position; active=false, ...)` provides a pinned, off-by-default inflow-deficit primitive for tower shadow studies. The active model applies a Gaussian downstream velocity deficit in the supplied wind frame. It is intentionally not coupled into DMS or AC induction yet; callers must explicitly use the returned velocity in their own load-building workflow until a validated solver-integrated tower-shadow option is added.
 
+## Lifting Strut Scope
+
+`liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)` provides a pinned integrated segment-force primitive for lifting struts or other non-blade lifting members. It returns `0.5*rho*|V|^2*chord*span*(cl*lift_hat - cd*velocity_hat)`, where drag opposes the supplied relative velocity and the caller supplies the strut-geometry-projected positive-lift direction in the same frame. This helper is intentionally not coupled into DMS or AC induction yet; callers must explicitly map the returned force into the structural load workflow until a validated solver-integrated strut option is added.
+
 ## Unsteady Method and RPI
 
 `UnsteadyParams` controls the unsteady wake path. `RPI = true` enables reduced-pass interpolation to avoid recalculating every azimuthal point at every unsteady step. The `tau` vector controls wake propagation filtering. Existing tests pin representative unsteady results for both DMS and AC, but new use cases should add explicit baseline values for the selected `tau`, `RPI`, and time-step choices.

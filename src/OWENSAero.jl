@@ -9,6 +9,7 @@ export cpValidationMetrics
 export wholeRevolutionIndexRange, wholeRevolutionMean
 export jointDragForce
 export towerShadowVelocity
+export liftingStrutForce
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -299,6 +300,49 @@ function towerShadowVelocity(
         centerline_deficit * (tower_radius / wake_radius)^2 *
         exp(-0.5 * sum(abs2, lateral) / wake_radius^2)
     return @. velocity * (1 - deficit)
+end
+
+"""
+    liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
+
+Return the integrated force for a lifting strut segment in the same frame as
+`velocity`. The supplied `lift_direction` defines the caller-projected positive
+lift direction and must be perpendicular to the relative velocity when the
+velocity is nonzero. Drag opposes the relative velocity. This helper is not
+coupled into DMS or AC induction.
+"""
+function liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
+    rho isa Real && isfinite(rho) && rho >= 0 ||
+        throw(ArgumentError("rho must be a finite nonnegative real value"))
+    chord isa Real && isfinite(chord) && chord >= 0 ||
+        throw(ArgumentError("chord must be a finite nonnegative real value"))
+    span isa Real && isfinite(span) && span >= 0 ||
+        throw(ArgumentError("span must be a finite nonnegative real value"))
+    cl isa Real && isfinite(cl) ||
+        throw(ArgumentError("cl must be a finite real value"))
+    cd isa Real && isfinite(cd) && cd >= 0 ||
+        throw(ArgumentError("cd must be a finite nonnegative real value"))
+    velocity isa AbstractVector && lift_direction isa AbstractVector ||
+        throw(ArgumentError("velocity and lift_direction must be vectors"))
+    length(velocity) == length(lift_direction) && length(velocity) in (2, 3) ||
+        throw(ArgumentError("velocity and lift_direction must both have two or three components"))
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+    all(x -> x isa Real && isfinite(x), lift_direction) ||
+        throw(ArgumentError("lift_direction must contain only finite real values"))
+
+    speed = sqrt(sum(abs2, velocity))
+    speed == 0 && return zero.(velocity)
+    lift_norm = sqrt(sum(abs2, lift_direction))
+    lift_norm > 0 || throw(ArgumentError("lift_direction must be nonzero when velocity is nonzero"))
+
+    velocity_hat = velocity ./ speed
+    lift_hat = lift_direction ./ lift_norm
+    abs(sum(velocity_hat .* lift_hat)) <= 1e-8 ||
+        throw(ArgumentError("lift_direction must be perpendicular to velocity"))
+
+    q_area = 0.5 * rho * speed^2 * chord * span
+    return @. q_area * (cl * lift_hat - cd * velocity_hat)
 end
 
 function _finite_real_vector(values, name)

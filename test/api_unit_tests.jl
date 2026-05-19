@@ -12,6 +12,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :wholeRevolutionMean in exported
     @test :jointDragForce in exported
     @test :towerShadowVelocity in exported
+    @test :liftingStrutForce in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -329,6 +330,55 @@ end
     @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; wake_expansion = -0.1)
     @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; centerline_deficit = 1.0)
     @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, NaN], [1.0, 0.0])
+end
+
+@testset "lifting strut force helper" begin
+    @test OWENSAero.liftingStrutForce(
+        1.2,
+        [0.0, 0.0],
+        0.5,
+        2.0,
+        1.0,
+        0.1,
+        [0.0, 1.0],
+    ) == [0.0, 0.0]
+    @test OWENSAero.liftingStrutForce(
+        1.2,
+        [10.0, 0.0],
+        0.0,
+        2.0,
+        1.0,
+        0.1,
+        [0.0, 1.0],
+    ) == [0.0, 0.0]
+
+    force = OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, 1.0, 0.1, [0.0, 1.0])
+    @test force isa Vector{Float64}
+    @test force == [-6.0, 60.0]
+    @test sum(force .* [10.0, 0.0]) == -60.0
+    @test sum(force .* [0.0, 1.0]) == 60.0
+    @test sum(force .* [10.0, 0.0]) < 0.0
+
+    @test OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, 0.0, 0.1, [0.0, 1.0]) ==
+          [-6.0, 0.0]
+    @test OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, 1.0, 0.0, [0.0, 1.0]) ==
+          [0.0, 60.0]
+
+    negative_lift =
+        OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, -1.0, 0.1, [0.0, 1.0])
+    @test negative_lift == [-6.0, -60.0]
+
+    force_3d =
+        OWENSAero.liftingStrutForce(2.0, [0.0, 0.0, 5.0], 0.25, 4.0, 0.5, 0.2, [1.0, 0.0, 0.0])
+    @test force_3d == [12.5, 0.0, -5.0]
+
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(-1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], -1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, -1.0, 0.0, 0.0, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, NaN, 0.0, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, -0.1, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [1.0, 0.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, Inf], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
 end
 
 @testset "DMS added-mass force sign convention" begin

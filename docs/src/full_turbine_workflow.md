@@ -35,6 +35,7 @@ When coupled to OWENS structural dynamics:
 - verify `M25` separately when pitching-moment polars are used, because it maps to the structural DOF-4 distributed moment channel;
 - treat `towerShadowVelocity` as a caller-side inflow primitive until tower-shadow feedback is validated in the solver loop;
 - map lumped ancillary loads such as `jointDragForce` explicitly in the caller until a validated solver-integrated drag option exists;
+- map lifting-member loads from `liftingStrutForce` explicitly in the caller until strut geometry, projected lift directions, airfoil tables, and structural load transfer are validated end to end;
 - pin force components separately instead of testing only aggregate power.
 
 The examples in `test/full_turb.jl`, `test/full_turb_undersampling.jl`, and `examples/RM2/RM2_medium.jl` are the most useful starting points for complete turbine cases.
