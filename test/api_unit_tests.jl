@@ -49,6 +49,17 @@ end
     @test env.V_wake_old == fill(5.0, ntheta)
     @test env.gravity == [0.0, 0.0, -9.81]
 
+    env_mixed_strings = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        strip(" DMS "),
+        zeros(2 * ntheta),
+    )
+    @test env_mixed_strings.DynamicStallModel == "none"
+    @test env_mixed_strings.AeroModel == "DMS"
+
     us = OWENSAero.UnsteadyParams(true, [0.3, 3.0], false)
     @test us isa OWENSAero.UnsteadyParams
     @test us.RPI == true

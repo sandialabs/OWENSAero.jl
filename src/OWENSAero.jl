@@ -102,7 +102,7 @@ Contains specications for turbine slice environment/operating conditions as well
 * `none`:
 
 """
-struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
+struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     rho::TF
     mu::TF
     V_x::TAFx #Vinf is Vx
@@ -110,8 +110,8 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     V_z::TAF3
     V_twist::TAF3
     windangle::TF #radians
-    DynamicStallModel::TS
-    AeroModel::TS
+    DynamicStallModel::TS1
+    AeroModel::TS2
     Aero_AddedMass_Active::TB
     Aero_Buoyancy_Active::TB
     Aero_RotAccel_Active::TB
