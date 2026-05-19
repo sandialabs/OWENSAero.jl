@@ -41,7 +41,14 @@ end
     @test turbine.helical_offset == zeros(1)
     @test turbine.rhoA[] == 0
 
-    env = OWENSAero.Environment(1.225, 1.7894e-5, fill(5.0, ntheta), "none", "DMS", zeros(2 * ntheta))
+    env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
     @test env isa OWENSAero.Environment
     @test env.V_y == zeros(ntheta)
     @test env.V_z == zeros(ntheta)
@@ -73,9 +80,9 @@ end
 end
 
 @testset "blade azimuth indexing wraps over all bins" begin
-    @test [OWENSAero._blade_azimuth_index(6, 2, ibld, 6) for ibld in 1:3] == [6, 2, 4]
-    @test [OWENSAero._blade_azimuth_index(1, 2, ibld, 6) for ibld in 1:3] == [1, 3, 5]
-    @test [OWENSAero._blade_azimuth_index(30, 10, ibld, 30) for ibld in 1:3] == [30, 10, 20]
+    @test [OWENSAero._blade_azimuth_index(6, 2, ibld, 6) for ibld = 1:3] == [6, 2, 4]
+    @test [OWENSAero._blade_azimuth_index(1, 2, ibld, 6) for ibld = 1:3] == [1, 3, 5]
+    @test [OWENSAero._blade_azimuth_index(30, 10, ibld, 30) for ibld = 1:3] == [30, 10, 20]
 end
 
 @testset "whole-revolution averaging helpers" begin
@@ -91,22 +98,15 @@ end
     two_rev_values = collect(1.0:length(two_rev_azimuth))
     @test OWENSAero.wholeRevolutionIndexRange(two_rev_azimuth) == 1:8
     @test OWENSAero.wholeRevolutionIndexRange(two_rev_azimuth; revolutions = 1) == 5:8
-    @test OWENSAero.wholeRevolutionMean(
-        two_rev_values,
-        two_rev_azimuth;
-        revolutions = 1,
-    ) == 6.5
+    @test OWENSAero.wholeRevolutionMean(two_rev_values, two_rev_azimuth; revolutions = 1) ==
+          6.5
 
-    @test OWENSAero.wholeRevolutionIndexRange([0.0, pi/2, pi]; allow_partial = true) ==
-          1:3
+    @test OWENSAero.wholeRevolutionIndexRange([0.0, pi/2, pi]; allow_partial = true) == 1:3
     @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(Float64[])
     @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange([0.0, pi, pi/2])
     @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange([0.0, Inf, 2pi])
     @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(azimuth; period = 0.0)
-    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(
-        azimuth;
-        revolutions = 0,
-    )
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(azimuth; revolutions = 0)
     @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(
         azimuth;
         revolutions = 1.5,
@@ -118,7 +118,7 @@ end
 @testset "pInt periodic integration" begin
     ntheta = 24
     dtheta = 2 * pi / ntheta
-    theta = collect(dtheta / 2:dtheta:2 * pi - dtheta / 2)
+    theta = collect((dtheta/2):dtheta:(2*pi-dtheta/2))
 
     @test OWENSAero.pInt(theta, ones(ntheta)) ≈ 2 * pi atol=1e-14
     @test OWENSAero.pInt(theta, fill(3.0, ntheta)) ≈ 6 * pi atol=1e-14
@@ -130,16 +130,95 @@ end
 @testset "added-mass and buoyancy geometry helpers" begin
     chord = 0.2
     thickness = 0.04
-    @test OWENSAero.added_mass_flap_volume_per_unit_span(chord) ≈
-          0.031415926535897934 atol=1e-16
-    @test OWENSAero.added_mass_edge_volume_per_unit_span(thickness) ≈
-          1.2566370614359173e-5 atol=1e-20
+    @test OWENSAero.added_mass_flap_volume_per_unit_span(chord) ≈ 0.031415926535897934 atol=1e-16
+    @test OWENSAero.added_mass_edge_volume_per_unit_span(thickness) ≈ 1.2566370614359173e-5 atol=1e-20
     @test OWENSAero.buoyancy_section_area_per_unit_span(chord, thickness) == 0.004
 
     chords = [0.2, 0.4]
     thicknesses = [0.04, 0.08]
     @test OWENSAero.buoyancy_section_area_per_unit_span.(chords, thicknesses) ==
           [0.004, 0.016]
+end
+
+@testset "DMS added-mass force sign convention" begin
+    ntheta = 4
+    chord = 0.2
+    thickness = 0.04
+    rho = 1000.0
+    added_mass_coeff = 1.0
+    accel_flap = 0.3
+    accel_edge = 0.4
+    af(alpha, Re, M) = (0.0, 0.0, 0.0)
+
+    turbine = OWENSAero.Turbine(
+        1.0,
+        fill(1.0, ntheta),
+        0.5,
+        fill(chord, ntheta),
+        fill(thickness, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(2.0, ntheta),
+        1,
+        af,
+        ntheta,
+        false,
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(1),
+        zeros(ntheta),
+    )
+    env = OWENSAero.Environment(
+        rho,
+        1.0e-3,
+        fill(1.0, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        0.0,
+        "none",
+        "DMS",
+        true,
+        false,
+        false,
+        added_mass_coeff,
+        false,
+        zeros(2 * ntheta),
+        zeros(Int, 1),
+        collect(1:ntheta),
+        fill(1.0, ntheta),
+        zeros(Int, ntheta),
+        zeros(Int, ntheta),
+        zeros(ntheta),
+        false,
+        fill(accel_flap, ntheta),
+        fill(accel_edge, ntheta),
+        [0.0, 0.0, -9.81],
+    )
+
+    result = OWENSAero.streamtube(0.0, pi / 2, turbine, env; output_all = true)
+    rp = result[3]
+    tp = result[4]
+    zp = result[5]
+    m_addedmass_np = result[13]
+    m_addedmass_tp = result[14]
+    f_addedmass_np = result[15]
+    f_addedmass_tp = result[16]
+
+    expected_mass_np =
+        rho * added_mass_coeff * OWENSAero.added_mass_flap_volume_per_unit_span(chord)
+    expected_mass_tp =
+        rho * added_mass_coeff * OWENSAero.added_mass_edge_volume_per_unit_span(thickness)
+
+    @test m_addedmass_np ≈ 31.415926535897935 atol=1e-14
+    @test m_addedmass_tp ≈ 0.012566370614359173 atol=1e-17
+    @test m_addedmass_np ≈ expected_mass_np atol=1e-14
+    @test m_addedmass_tp ≈ expected_mass_tp atol=1e-17
+    @test f_addedmass_np ≈ 9.42477796076938 atol=1e-14
+    @test f_addedmass_tp ≈ 0.005026548245743669 atol=1e-17
+    @test rp ≈ -f_addedmass_np atol=1e-14
+    @test tp ≈ f_addedmass_tp atol=1e-17
+    @test zp == 0.0
 end
 
 @testset "CP validation metrics" begin
@@ -164,12 +243,7 @@ end
     @test metrics.reference_peak_cp == 6.0
     @test metrics.peak_cp_error == 3.0
 
-    @test_throws ArgumentError OWENSAero.cpValidationMetrics(
-        [1.0],
-        [1.0],
-        [1.0],
-        [1.0],
-    )
+    @test_throws ArgumentError OWENSAero.cpValidationMetrics([1.0], [1.0], [1.0], [1.0])
     @test_throws ArgumentError OWENSAero.cpValidationMetrics(
         [1.0, 1.0],
         [1.0, 2.0],
@@ -219,12 +293,14 @@ end
         zeros(8),
     )
 
-    cl_bv, cd_bv = af_bv(5 * pi / 180, 3.0e5, 0.0, env, 0.0, 0.2, 0.1, 5.0; solvestep=true, idx=2)
+    cl_bv, cd_bv =
+        af_bv(5 * pi / 180, 3.0e5, 0.0, env, 0.0, 0.2, 0.1, 5.0; solvestep = true, idx = 2)
     @test cl_bv ≈ 0.55 atol=1e-14
     @test cd_bv ≈ 0.0114 atol=1e-14
     @test env.alpha_last[2] == 0.0
 
-    cl_bv_update, cd_bv_update = af_bv(5 * pi / 180, 3.0e5, 0.0, env, 0.0, 0.2, 0.1, 5.0; idx=2)
+    cl_bv_update, cd_bv_update =
+        af_bv(5 * pi / 180, 3.0e5, 0.0, env, 0.0, 0.2, 0.1, 5.0; idx = 2)
     @test cl_bv_update ≈ 0.55 atol=1e-14
     @test cd_bv_update ≈ 0.0114 atol=1e-14
     @test env.alpha_last[2] ≈ 5 * pi / 180 atol=1e-14
@@ -252,8 +328,8 @@ end
         0.2,
         0.1,
         5.0;
-        idx=2,
-        return_cm=true,
+        idx = 2,
+        return_cm = true,
     )
     @test cl_stall ≈ 0.77 atol=1e-14
     @test cd_stall ≈ 0.01260229047028014 atol=1e-16
@@ -267,12 +343,16 @@ end
 
     af = OWENSAero.readaerodyn(filename)
     cl, cd = af(5 * pi / 180, 3.0e5, 0.0)
-    cl_cm, cd_cm, cm = af(5 * pi / 180, 3.0e5, 0.0; return_cm=true)
+    cl_cm, cd_cm, cm = af(5 * pi / 180, 3.0e5, 0.0; return_cm = true)
     @test (cl, cd) == (0.5, 0.02)
     @test (cl_cm, cd_cm, cm) == (0.5, 0.02, 0.04)
 
-    cl_fallback, cd_fallback, cm_fallback =
-        OWENSAero._airfoil_coefficients((alpha, Re, mach) -> (2.0 * alpha, 0.01), 0.25, 1.0e5, 0.0)
+    cl_fallback, cd_fallback, cm_fallback = OWENSAero._airfoil_coefficients(
+        (alpha, Re, mach) -> (2.0 * alpha, 0.01),
+        0.25,
+        1.0e5,
+        0.0,
+    )
     @test (cl_fallback, cd_fallback, cm_fallback) == (0.5, 0.01, 0.0)
 
     af_bv = OWENSAero.readaerodyn_BV(filename)
@@ -288,8 +368,19 @@ end
         "DMS",
         zeros(8),
     )
-    cl_bv, cd_bv, cm_bv =
-        af_bv(5 * pi / 180, 3.0e5, 0.0, env_bv, 0.0, 0.2, 0.1, 5.0; solvestep=true, idx=2, return_cm=true)
+    cl_bv, cd_bv, cm_bv = af_bv(
+        5 * pi / 180,
+        3.0e5,
+        0.0,
+        env_bv,
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        solvestep = true,
+        idx = 2,
+        return_cm = true,
+    )
     @test cl_bv == 0.5
     @test cd_bv == 0.02
     @test cm_bv == 0.04
@@ -298,7 +389,7 @@ end
     rho = 1.225
     chord = 0.2
     cm25 = 0.125
-    af_with_cm(alpha, Re, mach; return_cm=false) = begin
+    af_with_cm(alpha, Re, mach; return_cm = false) = begin
         cl_local = zero(alpha)
         cd_local = 0.01 .+ zero(alpha)
         cm_local = cm25 .+ zero(alpha)
@@ -325,7 +416,8 @@ end
         zeros(2 * ntheta),
     )
 
-    streamtube_result = OWENSAero.streamtube(0.0, pi / ntheta, turbine, env; output_all=true)
+    streamtube_result =
+        OWENSAero.streamtube(0.0, pi / ntheta, turbine, env; output_all = true)
     Vloc = streamtube_result[6]
     @test streamtube_result[end-1] == cm25
     @test streamtube_result[end] ≈ cm25 * 0.5 * rho * chord * Vloc^2 * chord atol=1e-14
@@ -342,8 +434,9 @@ end
         ntheta,
         false,
     )
-    theta = collect((2 * pi / ntheta) / 2:(2 * pi / ntheta):2 * pi)
-    radialforce_result = OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine_ac, env)
+    theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
+    radialforce_result =
+        OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine_ac, env)
     Vn = radialforce_result[12]
     Vt = radialforce_result[13]
     W = sqrt.(Vn .^ 2 .+ Vt .^ 2)
