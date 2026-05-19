@@ -552,9 +552,68 @@ end
     @test result.alpha ≈ [0.6994776303774515, 0.5480541413681285, 0.4507041304445113] atol=1e-14
     @test result.cl ≈ [4.394947569888396, 3.4435257285831486, 2.831857570294105] atol=1e-14
     @test result.cd ≈ [0.01978537910796909, 0.01600726683741513, 0.014062684263994861] atol=1e-16
+    @test result.phi ≈ [0.9263704331367143, 0.7051337740476181, 0.5205173005242845] atol=1e-14
+    @test result.W ≈ [8.791276993689102, 11.273067774005767, 14.384546719170629] atol=1e-14
+    @test result.F ≈ [0.8968409561516179, 0.8866494376308196, 0.5864227713099736] atol=1e-14
+    @test result.G ≈ [0.8825023082051282, 0.8763650449891087, 0.557240652519374] atol=1e-14
+    @test result.F ≈ [
+        OWENSAero.prandtlTipLossFactor(
+            3,
+            ri,
+            7.0,
+            phi;
+            hub_radius = 1.0,
+            include_root = true,
+        ) for (ri, phi) in zip(radial_positions, result.phi)
+    ] atol=1e-14
     @test length(result.sections) == 3
     @test length(result.operating_points) == 3
     @test length(result.outputs) == 3
+
+    no_tip_loss = OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        num_blades = 3,
+        hub_radius = 1.0,
+        tip_radius = 7.0,
+        pitch = deg2rad(1.0),
+        npts = 8,
+        tip_correction = nothing,
+    )
+    @test no_tip_loss.thrust ≈ 1358.5917214042925 atol=1e-10
+    @test no_tip_loss.torque ≈ 4560.112920353101 atol=1e-10
+    @test no_tip_loss.power ≈ 9120.225840706202 atol=1e-10
+    @test no_tip_loss.CP ≈ 0.18892245739572427 atol=1e-14
+    @test no_tip_loss.CT ≈ 0.22514222001793033 atol=1e-14
+    @test no_tip_loss.CQ ≈ 0.10795568994041388 atol=1e-14
+    @test no_tip_loss.Np ≈ [63.313035679103756, 93.11484488486717, 114.44310923091611] atol=1e-12
+    @test no_tip_loss.Tp ≈ [86.39512284182476, 79.90014150284394, 69.07234884105272] atol=1e-12
+    @test no_tip_loss.F == [1.0, 1.0, 1.0]
+    @test no_tip_loss.CP > result.CP
+
+    tip_only = OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        num_blades = 3,
+        hub_radius = 1.0,
+        tip_radius = 7.0,
+        pitch = deg2rad(1.0),
+        npts = 8,
+        tip_correction = OWENSAero.CCBlade.PrandtlTip(),
+    )
+    @test tip_only.F ≈ [0.9938328596172804, 0.887184048636017, 0.5864228719300733] atol=1e-14
+    @test tip_only.CP ≈ 0.1787337975487598 atol=1e-14
+    @test result.CP < tip_only.CP < no_tip_loss.CP
 
     @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
         Float64[],
@@ -630,6 +689,16 @@ end
         8.0,
         1.225;
         npts = 0,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        tip_correction = "Prandtl",
     )
 end
 

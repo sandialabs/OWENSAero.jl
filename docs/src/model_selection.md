@@ -57,7 +57,11 @@ provide a rigid-rotor adapter around `CCBlade.jl` for horizontal-axis BEM
 verification and examples. The adapter uses CCBlade's wind-turbine convention,
 dimensional radii/chords, radians for twist/pitch/precone, and returns
 integrated thrust, torque, power, `CP`, `CT`, `CQ`, and per-station induction
-and load arrays.
+and load arrays. `ccbladeHAWTSolve` exposes CCBlade's tip-correction object
+through `tip_correction`; the default is `CCBlade.PrandtlTipHub()`, and
+`tip_correction = nothing` disables the correction for controlled comparisons.
+The returned `F` and `G` arrays are CCBlade's load and effective wake-loss
+factors.
 
 `oyeDynamicInflowTimeConstants`, `oyeDynamicInflowDerivative`, and
 `oyeDynamicInflowStep` provide the matching tested Oye dynamic-inflow primitive.

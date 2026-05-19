@@ -25,6 +25,11 @@ The returned metrics are also pinned in `test/hawt_example_tests.jl`:
 - `torque = 4284.01010759976 N*m`
 - `power = 8568.02021519952 W`
 
+The default HAWT solve uses CCBlade's Prandtl tip-plus-hub correction. The API
+also exposes `tip_correction = nothing` and `tip_correction =
+CCBlade.PrandtlTip()` for comparison studies, and the tests pin the returned
+loss factors against OWENSAero's `prandtlTipLossFactor` helper.
+
 The Oye state update uses the steady CCBlade axial induction as the
 quasi-steady input. This keeps the future dynamic-inflow coupling explicit:
 the HAWT solver must own induction state, time constants, and load mapping
