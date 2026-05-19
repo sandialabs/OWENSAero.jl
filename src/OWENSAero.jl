@@ -13,6 +13,7 @@ export towerShadowVelocity
 export liftingStrutForce
 export prandtlTipLossFactor
 export oyeDynamicInflowTimeConstants, oyeDynamicInflowDerivative, oyeDynamicInflowStep
+export readAeroDynBladeFile, readAeroDynAirfoilInfo, aeroDynAirfoilFunction
 export ccbladeHAWTSections, ccbladeHAWTOperatingPoints, ccbladeHAWTSolve
 
 # Actuator Cylinder
@@ -876,6 +877,7 @@ end
 
 include("DMS.jl")
 include("DynamicInflow.jl")
+include("AeroDynInputs.jl")
 include("CCBladeHAWT.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")

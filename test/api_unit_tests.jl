@@ -18,12 +18,238 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :oyeDynamicInflowTimeConstants in exported
     @test :oyeDynamicInflowDerivative in exported
     @test :oyeDynamicInflowStep in exported
+    @test :readAeroDynBladeFile in exported
+    @test :readAeroDynAirfoilInfo in exported
+    @test :aeroDynAirfoilFunction in exported
     @test :ccbladeHAWTSections in exported
     @test :ccbladeHAWTOperatingPoints in exported
     @test :ccbladeHAWTSolve in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
+end
+
+@testset "AeroDyn HAWT input readers" begin
+    mktempdir() do tmpdir
+        blade_path = joinpath(tmpdir, "NRELOffshrBsline5MW_AeroDyn_blade.dat")
+        write(
+            blade_path,
+            """
+            ------- AERODYN v15.00.* BLADE DEFINITION INPUT FILE ----------------------------
+            NREL 5.0 MW offshore baseline aerodynamic blade input properties
+            ======  Blade Properties ========================================================
+                     3   NumBlNds           - Number of blade nodes used in the analysis (-)
+              BlSpn        BlCrvAC        BlSwpAC        BlCrvAng       BlTwist        BlChord          BlAFID
+               (m)           (m)            (m)            (deg)         (deg)           (m)              (-)
+            0.0E+00          0.0000000E+00  0.0000000E+00 0.0000000E+00  1.3308000E+01  3.5420000E+00        1
+            2.05E+01        -9.8316709E-02 -5.4850833E-01 0.0000000E+00  1.0162000E+01  4.4580000E+00        4
+            6.14E+01        -3.2815226E-04 -1.7737470E-01 0.0000000E+00  1.0600000E-01  1.4190000E+00        8
+
+            ! Extra row from the historical fixture is ignored because NumBlNds is three.
+            6.1500000E+01   -3.2815226E-04 -1.7737470E-01 0.0000000E+00  1.0600000E-01  1.4190000E+00        8
+            """,
+        )
+
+        blade = OWENSAero.readAeroDynBladeFile(blade_path)
+        @test blade.source == blade_path
+        @test blade.num_nodes == 3
+        @test blade.span == [0.0, 20.5, 61.4]
+        @test blade.curve_ac == [0.0, -0.098316709, -0.00032815226]
+        @test blade.sweep_ac == [0.0, -0.54850833, -0.1773747]
+        @test blade.curve_angle_deg == [0.0, 0.0, 0.0]
+        @test blade.curve_angle_rad == [0.0, 0.0, 0.0]
+        @test blade.twist_deg == [13.308, 10.162, 0.106]
+        @test blade.twist_rad ≈ deg2rad.([13.308, 10.162, 0.106]) atol=1e-16
+        @test blade.chord == [3.542, 4.458, 1.419]
+        @test blade.airfoil_ids == [1, 4, 8]
+        @test last(blade.span) == 61.4
+
+        bad_blade_path = joinpath(tmpdir, "bad_blade.dat")
+        write(
+            bad_blade_path,
+            """
+                    3   NumBlNds
+            0.0 0.0 0.0 0.0 13.308 3.542 1
+            20.5 0.0 0.0 0.0 10.162 4.458 4
+            """,
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynBladeFile(bad_blade_path)
+
+        nonmonotonic_blade_path = joinpath(tmpdir, "nonmonotonic_blade.dat")
+        write(
+            nonmonotonic_blade_path,
+            """
+                    3   NumBlNds
+            0.0 0.0 0.0 0.0 13.308 3.542 1
+            20.5 0.0 0.0 0.0 10.162 4.458 4
+            19.0 0.0 0.0 0.0 0.106 1.419 8
+            """,
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynBladeFile(nonmonotonic_blade_path)
+
+        airfoil_path = joinpath(tmpdir, "DU40_A17.dat")
+        write(
+            airfoil_path,
+            """
+            ! ------------ AirfoilInfo v1.01.x Input File ----------------------------------
+            "DEFAULT"     InterpOrd
+                      1   NonDimArea
+            @"DU40_A17_coords.txt"    NumCoords
+            "unused"      BL_file
+                      1   NumTabs
+            ! data for table 1
+                   0.75   Re
+                      0   UserProp
+            True          InclUAdata
+                   -3.2   alpha0
+                      9   alpha1
+                     -9   alpha2
+                      1   eta_e
+                 7.4888   C_nalpha
+                      3   T_f0
+                      6   T_V0
+                    1.7   T_p
+                     11   T_VL
+                   0.14   b1
+                   0.53   b2
+                      5   b5
+                    0.3   A1
+                    0.7   A2
+                      1   A5
+                      0   S1
+                      0   S2
+                      0   S3
+                      0   S4
+                 1.3519   Cn1
+                -0.3226   Cn2
+                   0.19   St_sh
+                   0.03   Cd0
+                  -0.05   Cm0
+                      0   k0
+                      0   k1
+                      0   k2
+                      0   k3
+                      0   k1_hat
+                    0.2   x_cp_bar
+            "DEFAULT"     UACutout
+            "DEFAULT"     filtCutOff
+                    5     NumAlf
+            !    Alpha      Cl      Cd        Cm
+               -180.00    0.000   0.0602   0.0000
+                  0.00    0.137   0.0113  -0.0573
+                  8.00    1.193   0.0198  -0.0968
+                 10.00    1.368   0.0393  -0.0926
+                180.00    0.000   0.0602   0.0000
+            """,
+        )
+
+        polar = OWENSAero.readAeroDynAirfoilInfo(airfoil_path)
+        @test polar.source == airfoil_path
+        @test polar.table_index == 1
+        @test polar.num_tables == 1
+        @test polar.reynolds_million == 0.75
+        @test polar.user_property == 0.0
+        @test polar.includes_unsteady_aero == true
+        @test polar.alpha0_deg == -3.2
+        @test polar.alpha1_deg == 9.0
+        @test polar.alpha2_deg == -9.0
+        @test polar.cn_alpha == 7.4888
+        @test polar.cd0 == 0.03
+        @test polar.cm0 == -0.05
+        @test polar.num_alpha == 5
+        @test polar.alpha_deg == [-180.0, 0.0, 8.0, 10.0, 180.0]
+        @test polar.alpha_rad ≈ deg2rad.([-180.0, 0.0, 8.0, 10.0, 180.0]) atol=1e-16
+        @test polar.cl == [0.0, 0.137, 1.193, 1.368, 0.0]
+        @test polar.cd == [0.0602, 0.0113, 0.0198, 0.0393, 0.0602]
+        @test polar.cm == [0.0, -0.0573, -0.0968, -0.0926, 0.0]
+
+        af = OWENSAero.aeroDynAirfoilFunction(polar)
+        @test af(0.0, 0.75e6, 0.0) == (0.137, 0.0113)
+        @test af(deg2rad(8.0), 0.75e6, 0.0; return_cm = true) == (1.193, 0.0198, -0.0968)
+        @test_throws ArgumentError af(deg2rad(181.0), 0.75e6, 0.0)
+        @test_throws ArgumentError af(NaN, 0.75e6, 0.0)
+
+        no_cm_path = joinpath(tmpdir, "no_cm.dat")
+        write(
+            no_cm_path,
+            """
+            "DEFAULT"     InterpOrd
+                      1   NonDimArea
+                      0   NumCoords
+            "unused"      BL_file
+                      1   NumTabs
+                   0.75   Re
+                      0   UserProp
+            True          InclUAdata
+                   -3.2   alpha0
+                      9   alpha1
+                     -9   alpha2
+                 7.4888   C_nalpha
+                   0.03   Cd0
+                  -0.05   Cm0
+                    5     NumAlf
+               -180.00    0.000   0.0602
+                  0.00    0.137   0.0113
+                  8.00    1.193   0.0198
+                 10.00    1.368   0.0393
+                180.00    0.000   0.0602
+            """,
+        )
+        no_cm = OWENSAero.readAeroDynAirfoilInfo(no_cm_path)
+        @test no_cm.cm == zeros(5)
+
+        static_airfoil_path = joinpath(tmpdir, "static_only.dat")
+        write(
+            static_airfoil_path,
+            """
+                      1   NumTabs
+                   2.00   Re
+                      0   UserProp
+            False         InclUAdata
+                    5     NumAlf
+               -180.00    0.000   0.0602   0.0000
+                  0.00    0.137   0.0113  -0.0573
+                  8.00    1.193   0.0198  -0.0968
+                 10.00    1.368   0.0393  -0.0926
+                180.00    0.000   0.0602   0.0000
+            """,
+        )
+        static_polar = OWENSAero.readAeroDynAirfoilInfo(static_airfoil_path)
+        @test static_polar.includes_unsteady_aero == false
+        @test static_polar.reynolds_million == 2.0
+        @test static_polar.alpha0_deg === nothing
+        @test static_polar.cn_alpha === nothing
+        @test static_polar.cm0 === nothing
+
+        @test_throws ArgumentError OWENSAero.readAeroDynAirfoilInfo(
+            airfoil_path;
+            table_index = 2,
+        )
+
+        bad_airfoil_path = joinpath(tmpdir, "bad_airfoil.dat")
+        write(
+            bad_airfoil_path,
+            """
+                      1   NumTabs
+                   0.75   Re
+                      0   UserProp
+            True          InclUAdata
+                   -3.2   alpha0
+                      9   alpha1
+                     -9   alpha2
+                 7.4888   C_nalpha
+                   0.03   Cd0
+                  -0.05   Cm0
+                    6     NumAlf
+               -180.00    0.000   0.0602   0.0000
+                  0.00    0.137   0.0113  -0.0573
+                  8.00    1.193   0.0198  -0.0968
+                 10.00    1.368   0.0393  -0.0926
+                180.00    0.000   0.0602   0.0000
+            """,
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynAirfoilInfo(bad_airfoil_path)
+    end
 end
 
 @testset "public constructors and defaults" begin

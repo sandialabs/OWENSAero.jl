@@ -11,6 +11,7 @@ makedocs(;
         "Full Turbine Workflow" => "full_turbine_workflow.md",
         "Dynamic Stall" => "dynamic_stall.md",
         "RM2 Example" => "rm2_example.md",
+        "AeroDyn Input Readers" => "aerodyn_inputs.md",
         "Rigid HAWT CCBlade Example" => "hawt_ccblade_example.md",
         "Frames, Units, and Outputs" => joinpath("theory", "frames_units.md"),
         "Validation and Testing" => "validation.md",
@@ -26,8 +27,5 @@ makedocs(;
 )
 
 if get(ENV, "CI", "false") == "true"
-    deploydocs(
-        repo = "github.com/sandialabs/OWENSAero.jl.git",
-        devbranch = "master",
-    )
+    deploydocs(repo = "github.com/sandialabs/OWENSAero.jl.git", devbranch = "master")
 end

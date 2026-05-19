@@ -30,6 +30,19 @@ also exposes `tip_correction = nothing` and `tip_correction =
 CCBlade.PrandtlTip()` for comparison studies, and the tests pin the returned
 loss factors against OWENSAero's `prandtlTipLossFactor` helper.
 
+The AeroDyn reader helpers can import the blade geometry and AirfoilInfo polar
+tables used by OpenFAST verification cases:
+
+```julia
+blade = readAeroDynBladeFile("NRELOffshrBsline5MW_AeroDyn_blade.dat")
+polar = readAeroDynAirfoilInfo("Airfoils/DU40_A17.dat")
+af = aeroDynAirfoilFunction(polar)
+```
+
+Those helpers are input-normalization tools, not a completed OpenFAST
+validation by themselves. The comparison still needs an explicit root-station
+policy, wind-source selection, and torque/power sign convention.
+
 The Oye state update uses the steady CCBlade axial induction as the
 quasi-steady input. This keeps the future dynamic-inflow coupling explicit:
 the HAWT solver must own induction state, time constants, and load mapping
