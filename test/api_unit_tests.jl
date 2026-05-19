@@ -21,9 +21,11 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :readAeroDynPrimaryFile in exported
     @test :readAeroDynBladeFile in exported
     @test :readAeroDynAirfoilInfo in exported
+    @test :readAeroDynDriverFile in exported
     @test :aeroDynAirfoilFunction in exported
     @test :aeroDynHAWTCCBladeInputs in exported
     @test :ccbladeHAWTSolveFromAeroDyn in exported
+    @test :ccbladeHAWTSolveFromAeroDynDriver in exported
     @test :ccbladeHAWTSections in exported
     @test :ccbladeHAWTOperatingPoints in exported
     @test :ccbladeHAWTSolve in exported
@@ -500,6 +502,146 @@ end
         @test solve_result.CP ≈ 0.022209302533387956 atol=1e-15
         @test solve_result.CT ≈ 0.02423411426065314 atol=1e-15
         @test solve_result.CQ ≈ 0.012691030019078833 atol=1e-15
+
+        inflow_path = joinpath(tmpdir, "ifw_primary.dat")
+        write(
+            inflow_path,
+            """
+            False         Echo
+                      1   WindType
+                      0   PropagationDir
+                      0   VFlowAng
+            False         VelInterpCubic
+                      0   NWindVel
+                      8   HWindSpeed
+                     90   RefHt
+                      0   PLExp
+            END
+            """,
+        )
+        driver_path = joinpath(tmpdir, "hawt_driver.dvr")
+        write(
+            driver_path,
+            """
+            True           Echo
+                      1    AnalysisType
+                    0.5    TMax
+                   0.01    DT
+            "./solve_primary.dat"     AeroFile
+                  1.225    FldDens
+            1.460734693877551E-05     KinVisc
+                    335    SpdSound
+                      1    CompInflow
+            "./ifw_primary.dat"       InflowFile
+                     10    HWindSpeed
+                    200    RefHt
+                      0    PLExp
+                      1    NumTurbines
+            False         BasicHAWTFormat(1)
+            True          HAWTprojection(1)
+                      3   NumBlades(1)
+                    1.0   BldHubRad_bl(1_1)
+                    1.0   BldHubRad_bl(1_2)
+                    1.0   BldHubRad_bl(1_3)
+                      0   RotMotionType(1)
+            19.09859317102744 RotSpeed(1)
+                      0   BldMotionType(1)
+                    1.0   BldPitch(1_1)
+                    1.0   BldPitch(1_2)
+                    1.0   BldPitch(1_3)
+                    2.0   VTKHubRad
+            """,
+        )
+        driver = OWENSAero.readAeroDynDriverFile(driver_path; base_directory = tmpdir)
+        @test driver.source == driver_path
+        @test driver.aero_file == solve_primary_path
+        @test driver.inflow_file == inflow_path
+        @test driver.analysis_type == 1
+        @test driver.comp_inflow == 1
+        @test driver.turbine_index == 1
+        @test driver.num_blades == 3
+        @test driver.fluid_density == 1.225
+        @test driver.kinematic_viscosity ≈ 1.460734693877551e-5 atol=1e-20
+        @test driver.dynamic_viscosity ≈ 1.7894e-5 atol=1e-18
+        @test driver.speed_of_sound == 335.0
+        @test driver.inflow.source == inflow_path
+        @test driver.inflow.wind_type == 1
+        @test driver.inflow_speed == 8.0
+        @test driver.inflow.reference_height == 90.0
+        @test driver.rot_speed_rpm ≈ 19.09859317102744 atol=1e-14
+        @test driver.rotor_speed_rad_per_s ≈ 2.0 atol=1e-15
+        @test driver.blade_pitch_deg == [1.0, 1.0, 1.0]
+        @test driver.pitch_deg == 1.0
+        @test driver.pitch_rad ≈ deg2rad(1.0) atol=1e-16
+        @test driver.blade_hub_radius == [1.0, 1.0, 1.0]
+        @test driver.vtk_hub_radius == 2.0
+
+        driver_result = OWENSAero.ccbladeHAWTSolveFromAeroDynDriver(
+            driver_path;
+            base_directory = tmpdir,
+            tip_radius = 7.0,
+            npts = 8,
+        )
+        @test driver_result.aerodyn_driver_file == driver_path
+        @test driver_result.driver_hub_radius_used == 1.0
+        @test driver_result.aerodyn_driver.inflow_speed == 8.0
+        @test driver_result.thrust ≈ solve_result.thrust atol=1e-10
+        @test driver_result.torque ≈ solve_result.torque atol=1e-10
+        @test driver_result.power ≈ solve_result.power atol=1e-10
+        @test driver_result.CP ≈ solve_result.CP atol=1e-15
+        @test driver_result.CT ≈ solve_result.CT atol=1e-15
+        @test driver_result.CQ ≈ solve_result.CQ atol=1e-15
+
+        steady_driver_path = joinpath(tmpdir, "steady_driver.dvr")
+        write(
+            steady_driver_path,
+            replace(
+                read(driver_path, String),
+                "          1    CompInflow" => "          0    CompInflow",
+            ),
+        )
+        steady_driver =
+            OWENSAero.readAeroDynDriverFile(steady_driver_path; base_directory = tmpdir)
+        @test steady_driver.inflow_file === nothing
+        @test steady_driver.comp_inflow == 0
+        @test steady_driver.inflow_speed == 10.0
+        @test steady_driver.inflow.reference_height == 200.0
+
+        nonuniform_pitch_path = joinpath(tmpdir, "nonuniform_pitch_driver.dvr")
+        write(
+            nonuniform_pitch_path,
+            replace(
+                read(driver_path, String),
+                "1.0   BldPitch(1_3)" => "2.0   BldPitch(1_3)",
+            ),
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynDriverFile(
+            nonuniform_pitch_path;
+            base_directory = tmpdir,
+        )
+
+        bad_inflow_path = joinpath(tmpdir, "bad_ifw_primary.dat")
+        write(
+            bad_inflow_path,
+            replace(read(inflow_path, String), "1   WindType" => "3   WindType"),
+        )
+        bad_driver_path = joinpath(tmpdir, "bad_driver.dvr")
+        write(
+            bad_driver_path,
+            replace(
+                read(driver_path, String),
+                "./ifw_primary.dat" => "./bad_ifw_primary.dat",
+            ),
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynDriverFile(
+            bad_driver_path;
+            base_directory = tmpdir,
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynDriverFile(
+            driver_path;
+            base_directory = tmpdir,
+            turbine_index = 2,
+        )
 
         @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
             solve_primary_path;

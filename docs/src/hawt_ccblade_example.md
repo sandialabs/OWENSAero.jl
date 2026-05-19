@@ -39,6 +39,7 @@ blade = readAeroDynBladeFile("NRELOffshrBsline5MW_AeroDyn_blade.dat")
 polar = readAeroDynAirfoilInfo("Airfoils/DU40_A17.dat")
 af = aeroDynAirfoilFunction(polar)
 inputs = aeroDynHAWTCCBladeInputs("ad_primary.dat"; hub_radius = 1.0)
+driver = readAeroDynDriverFile("HAWT_standalone_test.dvr")
 ```
 
 Those helpers are input-normalization tools, not a completed OpenFAST

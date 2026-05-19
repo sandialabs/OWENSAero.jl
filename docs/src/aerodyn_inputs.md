@@ -33,6 +33,19 @@ result = ccbladeHAWTSolveFromAeroDyn(
 )
 ```
 
+For AeroDyn-driver validation fixtures, prefer reading the driver operating
+point instead of copying density, wind speed, rotor speed, and pitch into a
+test script:
+
+```julia
+driver = readAeroDynDriverFile("HAWT_standalone_test.dvr")
+result = ccbladeHAWTSolveFromAeroDynDriver(
+    "HAWT_standalone_test.dvr";
+    root_station_policy = :drop_zero_span,
+    hub_radius = hub_radius,
+)
+```
+
 Use `aeroDynHAWTCCBladeInputs(...)` when you need to inspect the parsed
 geometry, selected airfoil files, station indices, or comparison notes before
 running the solve.
@@ -43,6 +56,15 @@ tangential induction, induction-drag flags, table column mapping, airfoil-file
 paths, blade-file paths, and `UseBlCm`. Paths are preserved as written; callers
 should decide whether they are relative to the driver, primary file, or current
 working directory.
+
+`readAeroDynDriverFile` extracts the steady HAWT operating point from
+`AnalysisType = 1` AeroDyn-driver files. It supports direct steady wind
+(`CompInflow = 0`) and steady InflowWind files (`CompInflow = 1`,
+`WindType = 1`), and returns the resolved AeroDyn/InflowWind filenames,
+density, dynamic viscosity, sound speed, rotor speed, uniform blade pitch, and
+driver hub-radius metadata. It intentionally rejects non-steady inflow and
+nonuniform blade pitch because those need a time-marching validation harness
+rather than a single rigid CCBlade solve.
 
 `readAeroDynBladeFile` consumes exactly `NumBlNds` blade rows. This matters for
 the checked NREL 5 MW fixture, which carries a historical note and an extra

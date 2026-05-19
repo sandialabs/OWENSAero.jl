@@ -35,6 +35,14 @@ function _aerodyn_find_keyword_value(lines, keyword)
     throw(ArgumentError("AeroDyn keyword $(repr(keyword)) was not found"))
 end
 
+function _aerodyn_find_optional_keyword_value(lines, keyword)
+    for line in lines
+        value = _aerodyn_keyword_value(line, keyword)
+        value === nothing || return value
+    end
+    return nothing
+end
+
 function _aerodyn_parse_bool(token, keyword)
     token_lower = lowercase(strip(token))
     token_lower == "true" && return true
@@ -173,6 +181,15 @@ end
 
 function _aerodyn_required_float(lines, keyword)
     value = tryparse(Float64, _aerodyn_find_keyword_value(lines, keyword))
+    value === nothing &&
+        throw(ArgumentError("AeroDyn keyword $(repr(keyword)) must be numeric"))
+    return value
+end
+
+function _aerodyn_optional_float(lines, keyword)
+    raw_value = _aerodyn_find_optional_keyword_value(lines, keyword)
+    raw_value === nothing && return nothing
+    value = tryparse(Float64, raw_value)
     value === nothing &&
         throw(ArgumentError("AeroDyn keyword $(repr(keyword)) must be numeric"))
     return value
@@ -401,6 +418,130 @@ function aeroDynAirfoilFunction(table)
     return af
 end
 
+function _aerodyn_uniform_driver_pitch(pitch_deg)
+    isempty(pitch_deg) && throw(ArgumentError("AeroDyn driver must define blade pitch"))
+    reference = first(pitch_deg)
+    all(pitch -> isapprox(pitch, reference; atol = 1e-12, rtol = 0.0), pitch_deg) || throw(
+        ArgumentError(
+            "AeroDyn driver blade pitches must be identical for a rigid CCBlade solve",
+        ),
+    )
+    return reference
+end
+
+function _read_aerodyn_steady_inflow(inflow_file)
+    lines = readlines(inflow_file)
+    wind_type = _aerodyn_required_int(lines, "WindType")
+    wind_type == 1 ||
+        throw(ArgumentError("Only InflowWind WindType=1 steady inflow is supported"))
+    return (
+        source = inflow_file,
+        wind_type = wind_type,
+        horizontal_wind_speed = _aerodyn_required_float(lines, "HWindSpeed"),
+        reference_height = _aerodyn_required_float(lines, "RefHt"),
+        power_law_exponent = _aerodyn_required_float(lines, "PLExp"),
+    )
+end
+
+"""
+    readAeroDynDriverFile(filename; base_directory=dirname(filename),
+                          turbine_index=1)
+
+Read the operating-point fields needed to replay a steady HAWT AeroDyn-driver
+case through OWENSAero's CCBlade adapter. The reader supports the common
+`AnalysisType=1` constant-rotor-speed driver layout with either direct steady
+wind (`CompInflow=0`) or an InflowWind `WindType=1` steady-wind file
+(`CompInflow=1`).
+
+The returned named tuple includes resolved AeroDyn/InflowWind filenames,
+environment properties, rotor speed in rpm and rad/s, blade pitch in degrees
+and radians, and driver hub-radius metadata. The driver `VTKHubRad` is retained
+for traceability but is not treated as a physical BEM hub radius.
+"""
+function readAeroDynDriverFile(
+    filename;
+    base_directory = dirname(filename),
+    turbine_index = 1,
+)
+    turbine_index isa Integer && turbine_index >= 1 ||
+        throw(ArgumentError("turbine_index must be a positive integer"))
+    lines = readlines(filename)
+
+    analysis_type = _aerodyn_required_int(lines, "AnalysisType")
+    analysis_type == 1 ||
+        throw(ArgumentError("Only AeroDyn driver AnalysisType=1 is supported"))
+    num_turbines = _aerodyn_required_int(lines, "NumTurbines")
+    turbine_index <= num_turbines ||
+        throw(ArgumentError("turbine_index must select one of the driver turbines"))
+
+    comp_inflow = _aerodyn_required_int(lines, "CompInflow")
+    aero_file = _aerodyn_resolve_path(
+        base_directory,
+        _aerodyn_unquote(_aerodyn_find_keyword_value(lines, "AeroFile")),
+    )
+    inflow_file =
+        comp_inflow == 1 ?
+        _aerodyn_resolve_path(
+            base_directory,
+            _aerodyn_unquote(_aerodyn_find_keyword_value(lines, "InflowFile")),
+        ) : nothing
+    inflow = if comp_inflow == 0
+        (
+            source = nothing,
+            wind_type = 0,
+            horizontal_wind_speed = _aerodyn_required_float(lines, "HWindSpeed"),
+            reference_height = _aerodyn_required_float(lines, "RefHt"),
+            power_law_exponent = _aerodyn_required_float(lines, "PLExp"),
+        )
+    elseif comp_inflow == 1
+        _read_aerodyn_steady_inflow(inflow_file)
+    else
+        throw(ArgumentError("Only AeroDyn driver CompInflow=0 or 1 is supported"))
+    end
+
+    num_blades = _aerodyn_required_int(lines, "NumBlades($turbine_index)")
+    num_blades > 0 || throw(ArgumentError("AeroDyn driver NumBlades must be positive"))
+    pitch_deg = [
+        _aerodyn_required_float(lines, "BldPitch($(turbine_index)_$blade_index)") for
+        blade_index = 1:num_blades
+    ]
+    uniform_pitch_deg = _aerodyn_uniform_driver_pitch(pitch_deg)
+    blade_hub_radius = [
+        _aerodyn_required_float(lines, "BldHubRad_bl($(turbine_index)_$blade_index)")
+        for blade_index = 1:num_blades
+    ]
+
+    rot_speed_rpm = _aerodyn_required_float(lines, "RotSpeed($turbine_index)")
+    fluid_density = _aerodyn_required_float(lines, "FldDens")
+    kinematic_viscosity = _aerodyn_required_float(lines, "KinVisc")
+    speed_of_sound = _aerodyn_required_float(lines, "SpdSound")
+
+    return (
+        source = filename,
+        base_directory = base_directory,
+        aero_file = aero_file,
+        inflow_file = inflow_file,
+        analysis_type = analysis_type,
+        comp_inflow = comp_inflow,
+        num_turbines = num_turbines,
+        turbine_index = turbine_index,
+        num_blades = num_blades,
+        fluid_density = fluid_density,
+        kinematic_viscosity = kinematic_viscosity,
+        dynamic_viscosity = fluid_density * kinematic_viscosity,
+        speed_of_sound = speed_of_sound,
+        inflow = inflow,
+        inflow_speed = inflow.horizontal_wind_speed,
+        rot_speed_rpm = rot_speed_rpm,
+        rotor_speed_rad_per_s = rot_speed_rpm * 2pi / 60,
+        blade_pitch_deg = pitch_deg,
+        pitch_deg = uniform_pitch_deg,
+        pitch_rad = deg2rad(uniform_pitch_deg),
+        blade_hub_radius = blade_hub_radius,
+        vtk_hub_radius = _aerodyn_optional_float(lines, "VTKHubRad"),
+    )
+end
+
 function _aerodyn_resolve_path(base_directory, path)
     isabspath(path) && return normpath(path)
     return normpath(joinpath(base_directory, path))
@@ -610,5 +751,60 @@ function ccbladeHAWTSolveFromAeroDyn(
         aerodyn_station_indices = inputs.station_indices,
         root_station_policy = inputs.root_station_policy,
         comparison_notes = inputs.comparison_notes,
+    )
+end
+
+"""
+    ccbladeHAWTSolveFromAeroDynDriver(driver_file; kwargs...)
+
+Read a steady AeroDyn-driver operating point with `readAeroDynDriverFile`, then
+run `ccbladeHAWTSolveFromAeroDyn` using the driver's AeroDyn primary file,
+steady inflow, density, viscosity, sound speed, rotor speed, and uniform blade
+pitch. Geometry-resolution keywords are forwarded to
+`ccbladeHAWTSolveFromAeroDyn`; by default `hub_radius` is the largest
+`BldHubRad_bl` value in the driver file.
+
+The returned named tuple includes the CCBlade solve outputs plus
+`aerodyn_driver` metadata. This helper is meant to make validation scripts
+explicit about operating conditions before comparing against OpenFAST channels.
+"""
+function ccbladeHAWTSolveFromAeroDynDriver(
+    driver_file;
+    base_directory = dirname(driver_file),
+    turbine_index = 1,
+    blade_index = 1,
+    root_station_policy = :drop_zero_span,
+    hub_radius = nothing,
+    tip_radius = nothing,
+    precone = 0.0,
+    npts = 10,
+    tip_correction = :from_aerodyn,
+)
+    driver = readAeroDynDriverFile(driver_file; base_directory, turbine_index)
+    solve_hub_radius =
+        hub_radius === nothing ? maximum(driver.blade_hub_radius) : hub_radius
+    result = ccbladeHAWTSolveFromAeroDyn(
+        driver.aero_file,
+        driver.rotor_speed_rad_per_s,
+        driver.inflow_speed,
+        driver.fluid_density;
+        blade_index,
+        base_directory = dirname(driver.aero_file),
+        root_station_policy,
+        hub_radius = solve_hub_radius,
+        tip_radius,
+        pitch = driver.pitch_rad,
+        precone,
+        mu = driver.dynamic_viscosity,
+        asound = driver.speed_of_sound,
+        npts,
+        tip_correction,
+    )
+
+    return (
+        result...,
+        aerodyn_driver = driver,
+        aerodyn_driver_file = driver.source,
+        driver_hub_radius_used = solve_hub_radius,
     )
 end
