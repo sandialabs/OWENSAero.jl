@@ -358,8 +358,8 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
         thickness = turbine.thick#[idx]
         rho = env.rho
 
-        Vol_flap = @. pi * (chord / 2)^2 * 1.0
-        Vol_edge = @. pi * ((thickness / 10) / 2)^2 * 1.0
+        Vol_flap = @. added_mass_flap_volume_per_unit_span(chord)
+        Vol_edge = @. added_mass_edge_volume_per_unit_span(thickness)
 
         if env.Aero_RotAccel_Active
             accel_rot = @. omega^2 * r
@@ -387,7 +387,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
 
     # Buoyancy
     F_buoy = zeros(3, ntheta)
-    section_area = chord * thickness / 2 * 1.0 # per unit length TODO: input volume
+    section_area = @. buoyancy_section_area_per_unit_span(chord, thickness)
     mass = -env.gravity .* (rho * section_area .- turbine.rhoA) # buoyancy mass minus structural mass since added mass requires moving the gravity here
     if env.Aero_Buoyancy_Active
         for (itheta, theta) in enumerate(thetavec)

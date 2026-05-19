@@ -167,6 +167,32 @@ end
 UnsteadyParams(RPI,tau,ifw) = UnsteadyParams(RPI,tau,ifw,false,1.0,0.0,1.0,1.0)
 
 """
+    added_mass_flap_volume_per_unit_span(chord)
+
+Return the current OWENSAero flap-direction added-mass reference volume per
+unit span. The model uses a circular projected section with diameter equal to
+the local chord.
+"""
+added_mass_flap_volume_per_unit_span(chord) = pi * (chord / 2)^2
+
+"""
+    added_mass_edge_volume_per_unit_span(thickness)
+
+Return the current OWENSAero edge-direction added-mass reference volume per
+unit span. This preserves the legacy `thickness / 10` projected-diameter
+convention so the formula is explicit and test-pinned.
+"""
+added_mass_edge_volume_per_unit_span(thickness) = pi * ((thickness / 10) / 2)^2
+
+"""
+    buoyancy_section_area_per_unit_span(chord, thickness)
+
+Return the current triangular-section buoyancy area per unit span used by the
+DMS and actuator-cylinder paths.
+"""
+buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
+
+"""
     steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
 
 Calculates steady state aerodynamics for a single VAWT slice

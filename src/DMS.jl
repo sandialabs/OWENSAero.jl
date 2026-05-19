@@ -141,8 +141,8 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     cn = cd_af * sin(phi) + cl * cos(phi) # Eq. 10
 
     if Aero_AddedMass_Active
-        Vol_flap = pi * (chord / 2)^2 * 1.0
-        Vol_edge = pi * ((thickness / 10) / 2)^2 * 1.0
+        Vol_flap = added_mass_flap_volume_per_unit_span(chord)
+        Vol_edge = added_mass_edge_volume_per_unit_span(thickness)
 
         if Aero_RotAccel_Active
             accel_rot = omega^2 * r
@@ -170,7 +170,7 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     end
 
     if Aero_Buoyancy_Active
-        section_area = chord * thickness / 2 * 1.0 # per unit length TODO: input volume
+        section_area = buoyancy_section_area_per_unit_span(chord, thickness)
         dcm = [cos(theta) -sin(theta) 0
             sin(theta) cos(theta) 0
             0 0 1]

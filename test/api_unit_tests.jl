@@ -76,6 +76,21 @@ end
     @test OWENSAero.pInt(theta, sin.(theta) .^ 2) ≈ pi atol=1e-14
 end
 
+@testset "added-mass and buoyancy geometry helpers" begin
+    chord = 0.2
+    thickness = 0.04
+    @test OWENSAero.added_mass_flap_volume_per_unit_span(chord) ≈
+          0.031415926535897934 atol=1e-16
+    @test OWENSAero.added_mass_edge_volume_per_unit_span(thickness) ≈
+          1.2566370614359173e-5 atol=1e-20
+    @test OWENSAero.buoyancy_section_area_per_unit_span(chord, thickness) == 0.004
+
+    chords = [0.2, 0.4]
+    thicknesses = [0.04, 0.08]
+    @test OWENSAero.buoyancy_section_area_per_unit_span.(chords, thicknesses) ==
+          [0.004, 0.016]
+end
+
 @testset "AeroDyn airfoil readers" begin
     filename = joinpath(API_TEST_DIR, "airfoils", "NACA_0015_RE3E5.dat")
 
