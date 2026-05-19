@@ -187,3 +187,53 @@ end
     @test positive[5] ≈ expected_tp atol=1e-14
     @test negative[5] ≈ -expected_tp atol=1e-14
 end
+
+@testset "DMS wind-angle rotation invariance" begin
+    ntheta = 8
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
+
+    function run_dms(windangle)
+        freestream = 5.0
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            1.0,
+            fill(0.2, ntheta),
+            fill(0.1, ntheta),
+            fill(0.05, ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(freestream * cos(windangle), ntheta),
+            fill(freestream * sin(windangle), ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            windangle,
+            "none",
+            "DMS",
+            zeros(2 * ntheta),
+        )
+
+        return OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    end
+
+    baseline = run_dms(0.0)
+    rotated = run_dms(pi / 6)
+
+    @test baseline[1] ≈ 0.09762438364772608 atol=1e-14
+    @test rotated[1] ≈ 0.09762438364772608 atol=1e-14
+    @test baseline[15][1] ≈ 0.39269908169872414 atol=1e-14
+    @test rotated[15][1] ≈ -0.13089969389957468 atol=1e-14
+    @test rotated[15][end] ≈ 5.3668874498825625 atol=1e-14
+    @test rotated[15] ≈ baseline[15] .- pi / 6 atol=1e-14
+    @test rotated[4] ≈ baseline[4] atol=1e-14
+    @test rotated[5] ≈ baseline[5] atol=1e-14
+    @test rotated[7] ≈ baseline[7] atol=1e-14
+    @test rotated[12] ≈ baseline[12] atol=1e-14
+end
