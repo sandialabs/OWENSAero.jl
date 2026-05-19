@@ -770,7 +770,7 @@ function wholeRevolutionMean(values, azimuth; kwargs...)
 end
 
 """
-    steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
+    steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta, solve=true, ifw=false, finite_span_factor=1.0)
 
 Calculates steady state aerodynamics for a single VAWT slice
 
@@ -781,6 +781,7 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `idx_RPI::Array(<:Int)`: Optional, used to specify the azimuthal indices needed for a partial solve (i.e. not every azimuthal index), such as is used in the RPI method
 * `solve::Bool`: Optional, False is used when you want the model outputs for a given set of induction factors without resolving them.
 * `ifw::Bool`: Optional, used to tell the Vinf lookup to attempt to use the dynamic inflow wind library, requires preprocessing as is shown in the test cases.
+* `finite_span_factor::Union{Real,AbstractVector}`: Optional caller-supplied finite-span scaling factor. It must be a finite nonnegative scalar or length-`ntheta` vector and scales aerodynamic blade loads, induction source terms, torque, thrust, and pitching moment without scaling added mass, buoyancy, or centrifugal terms.
 
 
 # Outputs:

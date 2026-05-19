@@ -1860,7 +1860,7 @@ end
     theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
     af(alpha, Re, M) = (2.0 .* alpha, 0.01 .+ alpha .^ 2)
 
-    function dms_at_slice_z(z; finite_span_factor = 1.0)
+    function dms_turbine_env_at_slice_z(z)
         turbine = OWENSAero.Turbine(
             1.5,
             fill(1.5, ntheta),
@@ -1886,6 +1886,11 @@ end
             "DMS",
             zeros(2 * ntheta),
         )
+        return turbine, env
+    end
+
+    function dms_at_slice_z(z; finite_span_factor = 1.0)
+        turbine, env = dms_turbine_env_at_slice_z(z)
         return OWENSAero.DMS(
             turbine,
             env;
@@ -1895,7 +1900,18 @@ end
         )
     end
 
-    function ac_at_slice_z(z; finite_span_factor = 1.0)
+    function dms_steady_at_slice_z(z; finite_span_factor = 1.0)
+        turbine, env = dms_turbine_env_at_slice_z(z)
+        return OWENSAero.steady(
+            turbine,
+            env;
+            w = zeros(2 * ntheta),
+            solve = false,
+            finite_span_factor,
+        )
+    end
+
+    function ac_turbine_env_at_slice_z(z)
         turbine = OWENSAero.Turbine(
             1.5,
             fill(1.5, ntheta),
@@ -1941,6 +1957,11 @@ end
             zeros(ntheta),
             [0.0, 0.0, -9.81],
         )
+        return turbine, env
+    end
+
+    function ac_at_slice_z(z; finite_span_factor = 1.0)
+        turbine, env = ac_turbine_env_at_slice_z(z)
         return OWENSAero.radialforce(
             zeros(ntheta),
             zeros(ntheta),
@@ -1951,14 +1972,29 @@ end
         )
     end
 
+    function ac_steady_at_slice_z(z; finite_span_factor = 1.0)
+        turbine, env = ac_turbine_env_at_slice_z(z)
+        return OWENSAero.steady(
+            turbine,
+            env;
+            w = zeros(2 * ntheta),
+            solve = false,
+            finite_span_factor,
+        )
+    end
+
     dms_midspan = dms_at_slice_z(0.0)
     dms_near_tip = dms_at_slice_z(1.0)
     dms_explicit_default = dms_at_slice_z(0.0; finite_span_factor = 1.0)
     dms_half_loads = dms_at_slice_z(0.0; finite_span_factor = 0.5)
+    dms_steady_default = dms_steady_at_slice_z(0.0; finite_span_factor = 1.0)
+    dms_steady_half_loads = dms_steady_at_slice_z(0.0; finite_span_factor = 0.5)
     ac_midspan = ac_at_slice_z(0.0)
     ac_near_tip = ac_at_slice_z(1.0)
     ac_explicit_default = ac_at_slice_z(0.0; finite_span_factor = 1.0)
     ac_half_loads = ac_at_slice_z(0.0; finite_span_factor = 0.5)
+    ac_steady_default = ac_steady_at_slice_z(0.0; finite_span_factor = 1.0)
+    ac_steady_half_loads = ac_steady_at_slice_z(0.0; finite_span_factor = 0.5)
 
     expected_dms_torque = [
         0.13216300752723198,
@@ -2074,6 +2110,14 @@ end
     @test dms_near_tip[3] ≈ dms_midspan[3] atol=0.0
     @test dms_near_tip[4] ≈ dms_midspan[4] atol=0.0
     @test dms_near_tip[5] ≈ dms_midspan[5] atol=0.0
+    @test dms_steady_default[1] ≈ dms_midspan[1] atol=0.0
+    @test dms_steady_default[2] ≈ dms_midspan[2] atol=0.0
+    @test dms_steady_default[3] ≈ dms_midspan[3] atol=0.0
+    @test dms_steady_half_loads[1] ≈ dms_half_loads[1] atol=0.0
+    @test dms_steady_half_loads[2] ≈ dms_half_loads[2] atol=0.0
+    @test dms_steady_half_loads[3] ≈ dms_half_loads[3] atol=0.0
+    @test dms_steady_half_loads[4] ≈ dms_half_loads[4] atol=0.0
+    @test dms_steady_half_loads[5] ≈ dms_half_loads[5] atol=0.0
 
     @test ac_midspan[4] ≈ 0.09869472822476016 atol=1e-14
     @test ac_midspan[1] ≈ expected_ac_source atol=1e-14
@@ -2098,10 +2142,24 @@ end
     @test ac_near_tip[5] ≈ ac_midspan[5] atol=0.0
     @test ac_near_tip[6] ≈ ac_midspan[6] atol=0.0
     @test ac_near_tip[15] ≈ ac_midspan[15] atol=0.0
+    @test ac_steady_default[1] ≈ ac_midspan[4] atol=0.0
+    @test ac_steady_default[3] ≈ ac_midspan[15] atol=0.0
+    @test ac_steady_default[4] ≈ ac_midspan[5] atol=0.0
+    @test ac_steady_default[5] ≈ ac_midspan[6] atol=0.0
+    @test ac_steady_default[8] ≈ ac_midspan[3] atol=0.0
+    @test ac_steady_half_loads[1] ≈ ac_half_loads[4] atol=0.0
+    @test ac_steady_half_loads[3] ≈ ac_half_loads[15] atol=0.0
+    @test ac_steady_half_loads[4] ≈ ac_half_loads[5] atol=0.0
+    @test ac_steady_half_loads[5] ≈ ac_half_loads[6] atol=0.0
+    @test ac_steady_half_loads[8] ≈ ac_half_loads[3] atol=0.0
 
     vector_factor = fill(0.5, ntheta)
     @test dms_at_slice_z(0.0; finite_span_factor = vector_factor)[3] ≈ dms_half_loads[3] atol=0.0
     @test ac_at_slice_z(0.0; finite_span_factor = vector_factor)[15] ≈ ac_half_loads[15] atol=0.0
+    @test dms_steady_at_slice_z(0.0; finite_span_factor = vector_factor)[3] ≈
+          dms_half_loads[3] atol=0.0
+    @test ac_steady_at_slice_z(0.0; finite_span_factor = vector_factor)[3] ≈
+          ac_half_loads[15] atol=0.0
 
     @test_throws ArgumentError dms_at_slice_z(0.0; finite_span_factor = -0.1)
     @test_throws ArgumentError dms_at_slice_z(0.0; finite_span_factor = NaN)
@@ -2111,6 +2169,8 @@ end
     )
     @test_throws ArgumentError ac_at_slice_z(0.0; finite_span_factor = -0.1)
     @test_throws ArgumentError ac_at_slice_z(0.0; finite_span_factor = [1.0, Inf])
+    @test_throws ArgumentError dms_steady_at_slice_z(0.0; finite_span_factor = -0.1)
+    @test_throws ArgumentError ac_steady_at_slice_z(0.0; finite_span_factor = [1.0, Inf])
 
     function dms_with_auxiliary_loads(finite_span_factor)
         turbine = OWENSAero.Turbine(
