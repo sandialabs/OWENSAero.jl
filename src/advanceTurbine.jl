@@ -126,7 +126,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `DynamicStallModel`:  Dynamic stall model "BV" or "none" or "LB" when we get it working
 * `AeroModel`:  Aerodynamic model "DMS" or "AC"
 * `windangle_D`:  Inflow wind angle (degrees)
-* `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
+* `afname`: airfoil path and name e.g. "examples/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
 * `ifw_libfile`:  inflow wind dynamic library location e.g. joinpath(dirname(@__FILE__), "../../../openfast/build/modules/inflowwind/libifw_c_binding"))
 * `Aero_AddedMass_Active::bool`: flag to turn on added mass effects
@@ -155,7 +155,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     DynamicStallModel = "BV",
     AeroModel = "DMS",
     windangle_D = 0.0,
-    afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
+    afname = joinpath(dirname(path), "examples", "airfoils", "NACA_0015_RE3E5.dat"), #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = nothing,
     Aero_AddedMass_Active = false,
@@ -165,6 +165,9 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     AddedMass_Coeff_Ca = 1.0,
     af_thick = 0.18,
     rhoA_in=zeros(length(bld_x)))
+
+    DynamicStallModel = _canonical_dynamic_stall_model(DynamicStallModel)
+    AeroModel = _canonical_aero_model(AeroModel)
 
     global dt = 0.0 #might not be used
     global last_step1 = 0

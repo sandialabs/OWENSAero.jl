@@ -70,6 +70,55 @@ end
     @test env_mixed_strings.DynamicStallModel == "none"
     @test env_mixed_strings.AeroModel == "DMS"
 
+    env_aliases = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "NONE",
+        "ac",
+        zeros(2 * ntheta),
+    )
+    @test env_aliases.DynamicStallModel == "none"
+    @test env_aliases.AeroModel == "AC"
+
+    env_bv = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "boeing-vertol",
+        "dms",
+        zeros(2 * ntheta),
+    )
+    @test env_bv.DynamicStallModel == "BV"
+    @test env_bv.AeroModel == "DMS"
+
+    env_analytic = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "analytic",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+    @test env_analytic.DynamicStallModel == "analytic"
+
+    @test_throws ArgumentError OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "LB",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+    @test_throws ArgumentError OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "BEM",
+        zeros(2 * ntheta),
+    )
+
     us = OWENSAero.UnsteadyParams(true, [0.3, 3.0], false)
     @test us isa OWENSAero.UnsteadyParams
     @test us.RPI == true
@@ -77,6 +126,53 @@ end
     @test us.ifw == false
     @test us.IECgust == false
     @test us.nominalVinf == 1.0
+end
+
+@testset "setupTurb model option normalization" begin
+    blade_z = [0.0, 0.5, 1.0]
+    blade_x = [1.0, 1.0, 1.0]
+
+    OWENSAero.setupTurb(
+        blade_x,
+        blade_z,
+        2,
+        [0.2],
+        2.0,
+        5.0;
+        DynamicStallModel = "NONE",
+        AeroModel = "dms",
+        Nslices = 1,
+        ntheta = 4,
+        RPI = false,
+    )
+    @test OWENSAero.envslices[1].DynamicStallModel == "none"
+    @test OWENSAero.envslices[1].AeroModel == "DMS"
+    @test OWENSAero.turbslices[1].af(0.0, 1.0e5, 0.0; return_cm = true) isa Tuple{Float64,Float64,Float64}
+
+    @test_throws ArgumentError OWENSAero.setupTurb(
+        blade_x,
+        blade_z,
+        2,
+        [0.2],
+        2.0,
+        5.0;
+        DynamicStallModel = "LB",
+        AeroModel = "DMS",
+        Nslices = 1,
+        ntheta = 4,
+    )
+    @test_throws ArgumentError OWENSAero.setupTurb(
+        blade_x,
+        blade_z,
+        2,
+        [0.2],
+        2.0,
+        5.0;
+        DynamicStallModel = "none",
+        AeroModel = "BEM",
+        Nslices = 1,
+        ntheta = 4,
+    )
 end
 
 @testset "blade azimuth indexing wraps over all bins" begin
@@ -631,6 +727,13 @@ end
     @test cdp5 ≈ 0.0114 atol=1e-14
     @test clm5 ≈ -0.55 atol=1e-14
     @test cdm5 ≈ 0.0114 atol=1e-14
+
+    af_new_static = OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "NONE")
+    cl_new, cd_new, cm_new = af_new_static(5 * pi / 180, 3.0e5, 0.0; return_cm = true)
+    @test cl_new ≈ 0.55 atol=1e-14
+    @test cd_new ≈ 0.0114 atol=1e-14
+    @test cm_new == 0.0
+    @test_throws ArgumentError OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "LB")
 
     af_bv = OWENSAero.readaerodyn_BV(filename)
     env = OWENSAero.Environment(

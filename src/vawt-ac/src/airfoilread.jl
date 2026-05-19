@@ -192,6 +192,8 @@ for a file with multiple reynolds numbers create airfoil lookup function with bo
 * `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad. Use `return_cm=true` to also return Cm25.
 """
 function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple dispatch to simplify this
+    DynamicStallModel = _canonical_dynamic_stall_model(DynamicStallModel)
+
     # Loop through the file and determine how many Reynolds numbers there are
     nRe = 0
     open(filename) do f
@@ -261,21 +263,39 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         end
     end
 
-    # clspl = Dierckx.Spline2D(alphas, REs, cls)
-    # cdspl = Dierckx.Spline2D(alphas, REs, cds)
-    # Assume cls is filled appropriately: size = (length(alphas), length(REs))
-    
-    itpcl = Interpolations.interpolate((alphas, REs), cls, Interpolations.Gridded(Interpolations.Linear()))
-    clspl = Interpolations.extrapolate(itpcl, Interpolations.Flat())  
+    if nRe == 0
+        throw(ArgumentError("No Reynolds-number airfoil tables were found in $(repr(filename))."))
+    elseif nRe == 1
+        itpcl = Interpolations.interpolate((alphas,), cls[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cl_alpha = Interpolations.extrapolate(itpcl, Interpolations.Flat())
 
-    itpcd = Interpolations.interpolate((alphas, REs), cds, Interpolations.Gridded(Interpolations.Linear()))
-    cdspl = Interpolations.extrapolate(itpcd, Interpolations.Flat())  
+        itpcd = Interpolations.interpolate((alphas,), cds[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cd_alpha = Interpolations.extrapolate(itpcd, Interpolations.Flat())
 
-    itpcm = Interpolations.interpolate((alphas, REs), cms, Interpolations.Gridded(Interpolations.Linear()))
-    cmspl = Interpolations.extrapolate(itpcm, Interpolations.Flat())
+        itpcm = Interpolations.interpolate((alphas,), cms[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cm_alpha = Interpolations.extrapolate(itpcm, Interpolations.Flat())
 
-    aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
-    aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+        clspl = (alpha, Re) -> cl_alpha(alpha)
+        cdspl = (alpha, Re) -> cd_alpha(alpha)
+        cmspl = (alpha, Re) -> cm_alpha(alpha)
+        aoaStallPosspl = Re -> aoaStallPosVec[1]
+        aoaStallNegspl = Re -> aoaStallNegVec[1]
+    else
+        # clspl = Dierckx.Spline2D(alphas, REs, cls)
+        # cdspl = Dierckx.Spline2D(alphas, REs, cds)
+        # Assume cls is filled appropriately: size = (length(alphas), length(REs))
+        itpcl = Interpolations.interpolate((alphas, REs), cls, Interpolations.Gridded(Interpolations.Linear()))
+        clspl = Interpolations.extrapolate(itpcl, Interpolations.Flat())
+
+        itpcd = Interpolations.interpolate((alphas, REs), cds, Interpolations.Gridded(Interpolations.Linear()))
+        cdspl = Interpolations.extrapolate(itpcd, Interpolations.Flat())
+
+        itpcm = Interpolations.interpolate((alphas, REs), cms, Interpolations.Gridded(Interpolations.Linear()))
+        cmspl = Interpolations.extrapolate(itpcm, Interpolations.Flat())
+
+        aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
+        aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+    end
 
     # Create the base airfoil wrapper function
     function af2(alpha,Re,umach=0.0,family_factor=1.0; return_cm=false)

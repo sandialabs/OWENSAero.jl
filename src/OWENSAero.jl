@@ -26,6 +26,30 @@ const path,_ = splitdir(@__FILE__)
 
 # Common Structs
 
+function _canonical_dynamic_stall_model(model)
+    token = lowercase(strip(string(model)))
+    if token in ("bv", "boeing-vertol", "boeing_vertol")
+        return "BV"
+    elseif token in ("none", "no", "off", "nods", "no_ds", "no-ds")
+        return "none"
+    elseif token == "analytic"
+        return "analytic"
+    elseif token in ("lb", "leishman-beddoes", "leishman_beddoes")
+        throw(ArgumentError("DynamicStallModel = \"LB\" is not implemented; use \"BV\" or \"none\"."))
+    end
+    throw(ArgumentError("DynamicStallModel must be \"BV\", \"none\", or the internal \"analytic\" test mode; got $(repr(model))."))
+end
+
+function _canonical_aero_model(model)
+    token = uppercase(strip(string(model)))
+    if token == "DMS"
+        return "DMS"
+    elseif token == "AC"
+        return "AC"
+    end
+    throw(ArgumentError("AeroModel must be \"DMS\" or \"AC\"; got $(repr(model))."))
+end
+
 """
     Turbine(R::TF,r::TAF,z::TF,chord::TAF3,twist::TAF5,delta::TAF,omega::TAF4,B::TI,af::TFN,ntheta::TI,r_delta_influence::TB,centerX::TAF2,centerY::TAF2)
     Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)))
@@ -131,9 +155,12 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     accel_edge::TAF4
     gravity::TAF5
 end
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) =
+    Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) =
+    Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) =
+    Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)
