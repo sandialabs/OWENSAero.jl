@@ -20,8 +20,13 @@ Set `AeroModel = "AC"` for the actuator-cylinder path. The implementation is bas
 Use AC when:
 
 - actuator-cylinder loading is the intended validation basis;
-- multi-turbine or radial-influence behavior is being investigated;
+- single-turbine radial-influence behavior is being investigated;
 - the extra cost is acceptable relative to DMS.
+
+The internal actuator-cylinder implementation contains multi-turbine assembly
+building blocks, but the public `AC` path currently rejects multi-turbine calls.
+Treat multi-turbine AC as open solver work until the public path is restored
+and validated.
 
 ## Finite-Span and Tip-Loss Scope
 
@@ -31,6 +36,13 @@ identical slice from mid-span to a tip-adjacent `z` location does not change the
 computed CP, torque, or distributed loads. Any future finite-span or tip-loss
 correction should introduce an explicit model option and validation data, then
 update that baseline with tests that show the expected numerical change.
+
+`prandtlTipLossFactor(num_blades, radial_position, rotor_radius, inflow_angle;
+hub_radius=0.0, include_root=false)` provides a pinned Prandtl finite-blade
+loss primitive for caller-side axial-flow studies and future HAWT work. It is
+not automatically applied inside DMS or AC because those VAWT solvers need a
+separate finite-height validation basis before their load baselines should
+change.
 
 ## Dynamic Stall
 

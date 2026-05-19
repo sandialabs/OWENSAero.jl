@@ -10,6 +10,7 @@ export wholeRevolutionIndexRange, wholeRevolutionMean
 export jointDragForce
 export towerShadowVelocity
 export liftingStrutForce
+export prandtlTipLossFactor
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -223,6 +224,76 @@ Return the current triangular-section buoyancy area per unit span used by the
 DMS and actuator-cylinder paths.
 """
 buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
+
+function _prandtl_loss_factor(exponent)
+    return (2 / pi) * acos(clamp(exp(exponent), zero(exponent), one(exponent)))
+end
+
+"""
+    prandtlTipLossFactor(num_blades, radial_position, rotor_radius, inflow_angle;
+                         hub_radius=0.0, include_root=false)
+
+Return a Prandtl finite-blade loss factor for an axial-flow blade element.
+`radial_position`, `rotor_radius`, and `hub_radius` are dimensional radii in
+the same units, and `inflow_angle` is the local flow angle in radians. With
+`include_root=true`, the returned value is the product of the tip-loss factor
+and the matching root-loss factor.
+
+This helper is a validated primitive for caller-side studies and future HAWT
+or finite-span work. It is not coupled into the current DMS or actuator-cylinder
+VAWT solvers, which remain stacked two-dimensional slice models unless a caller
+explicitly applies a correction outside those solvers.
+"""
+function prandtlTipLossFactor(
+    num_blades,
+    radial_position,
+    rotor_radius,
+    inflow_angle;
+    hub_radius = 0.0,
+    include_root = false,
+)
+    num_blades isa Integer && num_blades > 0 ||
+        throw(ArgumentError("num_blades must be a positive integer"))
+    radial_position isa Real && isfinite(radial_position) ||
+        throw(ArgumentError("radial_position must be a finite real value"))
+    rotor_radius isa Real && isfinite(rotor_radius) && rotor_radius > 0 ||
+        throw(ArgumentError("rotor_radius must be a finite positive real value"))
+    inflow_angle isa Real && isfinite(inflow_angle) ||
+        throw(ArgumentError("inflow_angle must be a finite real value in radians"))
+    hub_radius isa Real && isfinite(hub_radius) && hub_radius >= 0 ||
+        throw(ArgumentError("hub_radius must be a finite nonnegative real value"))
+    include_root isa Bool || throw(ArgumentError("include_root must be a Bool"))
+    zero(radial_position) < radial_position <= rotor_radius ||
+        throw(ArgumentError("radial_position must satisfy 0 < radial_position <= rotor_radius"))
+    hub_radius < rotor_radius ||
+        throw(ArgumentError("hub_radius must be smaller than rotor_radius"))
+    include_root && radial_position < hub_radius &&
+        throw(ArgumentError("radial_position must be at least hub_radius when include_root=true"))
+
+    loss_zero = (radial_position + rotor_radius + inflow_angle + hub_radius) * 0
+    radial_position == rotor_radius && return loss_zero
+    include_root && hub_radius > 0 && radial_position == hub_radius && return loss_zero
+
+    sin_phi = abs(sin(inflow_angle))
+    if sin_phi <= sqrt(eps(Float64))
+        return (radial_position + rotor_radius + inflow_angle) * 0 + 1.0
+    end
+
+    blade_count = float(num_blades)
+    tip_exponent =
+        -(blade_count / 2) * (rotor_radius - radial_position) /
+        (radial_position * sin_phi)
+    loss_factor = _prandtl_loss_factor(tip_exponent)
+
+    if include_root && hub_radius > 0
+        root_exponent =
+            -(blade_count / 2) * (radial_position - hub_radius) /
+            (hub_radius * sin_phi)
+        loss_factor *= _prandtl_loss_factor(root_exponent)
+    end
+
+    return loss_factor
+end
 
 """
     jointDragForce(rho, velocity, CdA)

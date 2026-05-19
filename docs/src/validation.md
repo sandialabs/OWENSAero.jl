@@ -11,7 +11,9 @@ OWENSAero validation has two layers: pinned regression tests for code behavior a
 | Unsteady method | `test/simple_example.jl` covers RPI and non-RPI cases, including InflowWind-driven branches. |
 | Gradients | steady DMS gradient checks compare AD behavior for representative calls; AC gradient coverage remains open. |
 | Full turbine | `test/full_turb.jl` and `test/full_turb_undersampling.jl` exercise the stateful turbine workflow. |
-| API sanity | `test/api_unit_tests.jl` pins constructors, types, and selected helper behavior. |
+| API sanity | `test/api_unit_tests.jl` pins constructors, types, selected helper behavior, and the standalone Prandtl tip/root-loss primitive. |
+
+See [Aero Model Audit](@ref) for the current coupled-versus-helper status of each aerodynamic addition.
 
 ## Validation Rules for New Cases
 

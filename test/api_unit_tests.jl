@@ -1,4 +1,5 @@
 using Test
+import ForwardDiff
 using OWENSAero
 
 const API_TEST_DIR, _ = splitdir(@__FILE__)
@@ -13,6 +14,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :jointDragForce in exported
     @test :towerShadowVelocity in exported
     @test :liftingStrutForce in exported
+    @test :prandtlTipLossFactor in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -254,6 +256,78 @@ end
     thicknesses = [0.04, 0.08]
     @test OWENSAero.buoyancy_section_area_per_unit_span.(chords, thicknesses) ==
           [0.004, 0.016]
+end
+
+@testset "Prandtl finite-blade loss helper" begin
+    @test OWENSAero.prandtlTipLossFactor(3, 9.0, 10.0, pi / 6) ≈
+          0.4914573713022735 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(3, 5.0, 10.0, pi / 6) ≈
+          0.9682914590545574 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(2, 8.0, 10.0, pi / 4) ≈
+          0.504412749448464 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(3, 10.0, 10.0, pi / 6) == 0.0
+    @test OWENSAero.prandtlTipLossFactor(3, 10.0, 10.0, 1e-16) == 0.0
+    @test OWENSAero.prandtlTipLossFactor(3, 5.0, 10.0, 1e-16) == 1.0
+
+    root_loss = OWENSAero.prandtlTipLossFactor(
+        3,
+        2.0,
+        10.0,
+        pi / 6;
+        hub_radius = 1.0,
+        include_root = true,
+    )
+    @test root_loss ≈ 0.9682876715563039 atol=1e-15
+    @test root_loss < OWENSAero.prandtlTipLossFactor(3, 2.0, 10.0, pi / 6)
+    @test OWENSAero.prandtlTipLossFactor(
+        3,
+        1.0,
+        10.0,
+        pi / 6;
+        hub_radius = 1.0,
+        include_root = true,
+    ) == 0.0
+
+    derivative = ForwardDiff.derivative(
+        phi -> OWENSAero.prandtlTipLossFactor(3, 9.0, 10.0, phi),
+        pi / 6,
+    )
+    @test derivative ≈ -0.3775515482822952 atol=1e-14
+
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(0, 9.0, 10.0, pi / 6)
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(3, 0.0, 10.0, pi / 6)
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(3, 11.0, 10.0, pi / 6)
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(3, 9.0, 0.0, pi / 6)
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(3, 9.0, 10.0, NaN)
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(
+        3,
+        9.0,
+        10.0,
+        pi / 6;
+        hub_radius = -1.0,
+    )
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(
+        3,
+        9.0,
+        10.0,
+        pi / 6;
+        hub_radius = 10.0,
+    )
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(
+        3,
+        0.5,
+        10.0,
+        pi / 6;
+        hub_radius = 1.0,
+        include_root = true,
+    )
+    @test_throws ArgumentError OWENSAero.prandtlTipLossFactor(
+        3,
+        9.0,
+        10.0,
+        pi / 6;
+        include_root = 1,
+    )
 end
 
 @testset "lumped joint drag helper" begin

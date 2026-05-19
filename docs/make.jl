@@ -7,6 +7,7 @@ makedocs(;
         "Home" => "index.md",
         "Quickstart" => "quickstart.md",
         "Model Selection" => "model_selection.md",
+        "Aero Model Audit" => "model_audit.md",
         "Full Turbine Workflow" => "full_turbine_workflow.md",
         "Dynamic Stall" => "dynamic_stall.md",
         "RM2 Example" => "rm2_example.md",
