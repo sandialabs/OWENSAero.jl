@@ -233,6 +233,59 @@ end
     @test_throws ArgumentError OWENSAero.wholeRevolutionMean([1.0, 2.0], azimuth)
 end
 
+@testset "unsteady wake input contracts" begin
+    @test OWENSAero._unsteady_rotation_direction(fill(2.0, 4), true) == 1.0
+    @test OWENSAero._unsteady_rotation_direction(fill(-2.0, 4), false) == -1.0
+    @test_throws ArgumentError OWENSAero._unsteady_rotation_direction(fill(-2.0, 4), true)
+    @test_throws ArgumentError OWENSAero._unsteady_rotation_direction(fill(0.0, 4), false)
+    @test_throws ArgumentError OWENSAero._unsteady_rotation_direction([2.0, Inf], false)
+    @test_throws ArgumentError OWENSAero._unsteady_rotation_direction(fill(2.0, 4), 1)
+
+    @test OWENSAero._positive_unsteady_wake_speed(5.0) == 5.0
+    @test OWENSAero._positive_unsteady_wake_speed(-5.0) == 5.0
+    @test OWENSAero._positive_unsteady_wake_speed(0.0) == sqrt(eps(Float64))
+    @test_throws ArgumentError OWENSAero._positive_unsteady_wake_speed(Inf)
+
+    @test OWENSAero._validated_unsteady_tau([0.3, 3.0]) == [0.3, 3.0]
+    @test_throws ArgumentError OWENSAero._validated_unsteady_tau([0.3])
+    @test_throws ArgumentError OWENSAero._validated_unsteady_tau([0.3, 0.0])
+    @test_throws ArgumentError OWENSAero._validated_unsteady_tau([0.3, NaN])
+
+    ntheta = 6
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2, 0.0)
+    turbine = OWENSAero.Turbine(
+        1.5,
+        fill(1.5, ntheta),
+        1.0,
+        fill(0.2, ntheta),
+        fill(0.1, ntheta),
+        zeros(ntheta),
+        fill(-2.0, ntheta),
+        3,
+        af,
+        ntheta,
+        false,
+    )
+    env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        0.0,
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+    @test_throws ArgumentError OWENSAero.Unsteady_Step(
+        turbine,
+        env,
+        OWENSAero.UnsteadyParams(true, [0.3, 3.0], false),
+        1,
+    )
+end
+
 @testset "pInt periodic integration" begin
     ntheta = 24
     dtheta = 2 * pi / ntheta

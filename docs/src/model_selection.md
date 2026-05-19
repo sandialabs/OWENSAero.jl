@@ -66,6 +66,14 @@ Model option strings are normalized at construction and setup time: `BV`/`boeing
 
 `UnsteadyParams` controls the unsteady wake path. `RPI = true` enables reduced-pass interpolation to avoid recalculating every azimuthal point at every unsteady step. The `tau` vector controls wake propagation filtering. Existing tests pin representative unsteady results for both DMS and AC, but new use cases should add explicit baseline values for the selected `tau`, `RPI`, and time-step choices.
 
+`tau` must contain two finite positive values. The filtered wake update uses
+the magnitude of the prior wake speed with a small positive floor, so a
+transient negative or zero wake estimate does not create zero time constants.
+RPI with negative mean rotor speed is intentionally rejected because the
+clockwise/negative-RPM unsteady-RPI path is not yet validated; use `RPI=false`
+for negative-RPM regression work until the full clockwise unsteady path is
+implemented and pinned.
+
 ## InflowWind
 
 Set `ifw = true` in `UnsteadyParams` or the high-level setup when turbulent inflow is provided by OpenFAST InflowWind. The `.bts` files are external TurbSim/OpenFAST inputs; the test data under `test/data/ifw` shows the required layout.
