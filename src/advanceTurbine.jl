@@ -62,6 +62,23 @@ global startingtwist
 
 _blade_azimuth_index(bld1_idx, dstep_bld, ibld, ntheta) = mod1(bld1_idx + dstep_bld * (ibld - 1), ntheta)
 
+function _helical_azimuth_offset_bins(shape_x, shape_y, ntheta)
+    length(shape_x) == length(shape_y) ||
+        throw(ArgumentError("helical shape x/y arrays must have the same length"))
+    ntheta > 0 || throw(ArgumentError("ntheta must be positive"))
+
+    offset = round.(Int, atan.(shape_y, shape_x) ./ (2 * pi) .* ntheta)
+    !isempty(offset) && (offset[1] = 0)
+    return offset
+end
+
+function _helical_blade_index(step, helical_offset, iblade, B, ntheta)
+    ntheta % B == 0 ||
+        throw(ArgumentError("ntheta must be divisible by the number of blades"))
+    dstep_bld = div(ntheta, B)
+    return mod1(Int(step) + Int(helical_offset) + dstep_bld * (Int(iblade) - 1), ntheta)
+end
+
 """
 setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
@@ -176,8 +193,9 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     shapeY = safeakima(bld_z, bld_y, shapeZ)
     rhoA = safeakima(bld_z,rhoA_in,shapeZ)
 
-    blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
-    blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
+    # Local helical azimuth offset in discrete azimuth bins. The first node is
+    # anchored at the root connection so downstream indexing has a fixed phase.
+    blade_helical = _helical_azimuth_offset_bins(shapeX, shapeY, ntheta)
 
     global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0
     global z3Dnorm = (z3D)./Height
@@ -529,10 +547,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             # Intermediate base loads
             r = turbslices[islice].r
             for iblade = 1:B
-                bld_idx = Int(step1+helical_offset-floor(Int,(step1+helical_offset-1)/ntheta)*ntheta + (iblade-1)*ntheta/B)
-                if bld_idx>ntheta
-                    bld_idx = Int(bld_idx-ntheta)
-                end
+                bld_idx = _helical_blade_index(step1, helical_offset, iblade, B, ntheta)
 
                 Fx[islice] += Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
                 Fy[islice] += -Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
@@ -561,10 +576,11 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             end
             integralpower[islice] = B/(2*pi)*OWENSAero.pInt(thetavec_temp, Tp_temp.*r.*omega)
 
-            cl[islice,step_idx] = cl_temp[rev_step]
-            cd_af[islice,step_idx] = cd_temp[rev_step]
-            cm_af[islice,step_idx] = cm_temp[rev_step]
-            Re[islice,step_idx] = Re_temp[rev_step]
+            scalar_output_idx = _helical_blade_index(step1, helical_offset, 1, B, ntheta)
+            cl[islice,step_idx] = cl_temp[scalar_output_idx]
+            cd_af[islice,step_idx] = cd_temp[scalar_output_idx]
+            cm_af[islice,step_idx] = cm_temp[scalar_output_idx]
+            Re[islice,step_idx] = Re_temp[scalar_output_idx]
 
         end
 

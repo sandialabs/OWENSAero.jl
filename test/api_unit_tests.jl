@@ -85,6 +85,23 @@ end
     @test [OWENSAero._blade_azimuth_index(30, 10, ibld, 30) for ibld = 1:3] == [30, 10, 20]
 end
 
+@testset "helical azimuth mapping helpers" begin
+    shape_x = ones(4)
+    shape_y = [0.0, 1.0, 0.0, -1.0]
+    @test OWENSAero._helical_azimuth_offset_bins(shape_x, shape_y, 8) == [0, 1, 0, -1]
+    @test OWENSAero._helical_azimuth_offset_bins([0.0, 1.0], [1.0, 1.0], 12) == [0, 2]
+
+    @test [OWENSAero._helical_blade_index(1, 1, ibld, 2, 8) for ibld = 1:2] ==
+          [2, 6]
+    @test [OWENSAero._helical_blade_index(1, -1, ibld, 2, 8) for ibld = 1:2] ==
+          [8, 4]
+    @test OWENSAero._helical_blade_index(9, 1, 1, 2, 8) == 2
+
+    @test_throws ArgumentError OWENSAero._helical_azimuth_offset_bins([1.0], [0.0, 1.0], 8)
+    @test_throws ArgumentError OWENSAero._helical_azimuth_offset_bins([1.0], [0.0], 0)
+    @test_throws ArgumentError OWENSAero._helical_blade_index(1, 0, 1, 3, 8)
+end
+
 @testset "whole-revolution averaging helpers" begin
     azimuth = collect(0.0:(pi/2):(7pi/2))
     values = collect(1.0:length(azimuth))

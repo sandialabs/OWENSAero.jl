@@ -17,6 +17,8 @@ These functions are intentionally stateful. A new call to `setupTurb` is require
 
 Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled. For single-Reynolds-table reads, the BV reader uses the stall-angle, zero-lift-angle, and thickness metadata in the polar header. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
 
+For helical blades, pass the optional `bld_y` centerline coordinates alongside `bld_x` and `bld_z`. `setupTurb` converts the local `atan(bld_y, bld_x)` phase into integer azimuth-bin offsets for each slice, with the first node anchored at the blade-root connection. `advanceTurb` applies that same helical offset when it selects blade loads and the scalar per-slice diagnostics (`cl`, `cd_af`, `cm_af`, and `Re`) so those diagnostics follow the shifted blade section rather than the unshifted revolution step.
+
 ## Output Shape
 
 The high-level functions return power, torque, per-slice distributed loads, azimuthal angles, local velocities, angles of attack, airfoil coefficients, Reynolds numbers, airfoil pitching moments, and model-specific auxiliary loads. The exact tuple differs between steady and unsteady workflows, so tests should destructure by the current function contract instead of assuming a shared tuple layout.
