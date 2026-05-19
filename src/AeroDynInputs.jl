@@ -134,20 +134,141 @@ function _aerodyn_airfoil_metadata(lines, start_index)
     throw(ArgumentError("AeroDyn airfoil table is missing NumAlf"))
 end
 
-function _aerodyn_required_float(metadata, keyword)
+function _aerodyn_required_metadata_float(metadata, keyword)
     haskey(metadata, keyword) ||
         throw(ArgumentError("AeroDyn airfoil table is missing $(repr(keyword))"))
     return parse(Float64, metadata[keyword])
 end
 
-function _aerodyn_optional_float(metadata, keyword)
+function _aerodyn_optional_metadata_float(metadata, keyword)
     return haskey(metadata, keyword) ? parse(Float64, metadata[keyword]) : nothing
 end
 
-function _aerodyn_required_bool(metadata, keyword)
+function _aerodyn_required_metadata_bool(metadata, keyword)
     haskey(metadata, keyword) ||
         throw(ArgumentError("AeroDyn airfoil table is missing $(repr(keyword))"))
     return _aerodyn_parse_bool(metadata[keyword], keyword)
+end
+
+function _aerodyn_unquote(token)
+    stripped = strip(String(token))
+    if length(stripped) >= 2 && first(stripped) == '"' && last(stripped) == '"'
+        return stripped[2:(end-1)]
+    end
+    return stripped
+end
+
+function _aerodyn_required_int(lines, keyword)
+    value = _aerodyn_find_keyword_value(lines, keyword)
+    parsed = tryparse(Int, value)
+    parsed !== nothing && return parsed
+    numeric = tryparse(Float64, value)
+    numeric !== nothing && return _aerodyn_exact_integer(numeric, keyword)
+    throw(ArgumentError("AeroDyn keyword $(repr(keyword)) must be an integer"))
+end
+
+function _aerodyn_required_bool(lines, keyword)
+    return _aerodyn_parse_bool(_aerodyn_find_keyword_value(lines, keyword), keyword)
+end
+
+function _aerodyn_required_float(lines, keyword)
+    value = tryparse(Float64, _aerodyn_find_keyword_value(lines, keyword))
+    value === nothing &&
+        throw(ArgumentError("AeroDyn keyword $(repr(keyword)) must be numeric"))
+    return value
+end
+
+function _aerodyn_collect_airfoil_files(lines, num_airfoil_files)
+    af_line = findfirst(line -> _aerodyn_keyword_value(line, "AFNames") !== nothing, lines)
+    af_line === nothing && throw(ArgumentError("AeroDyn primary file is missing AFNames"))
+
+    files = String[]
+    for line in lines[af_line:end]
+        tokens = _aerodyn_tokens(line)
+        isempty(tokens) && continue
+        startswith(strip(tokens[1]), "\"") || break
+        push!(files, _aerodyn_unquote(tokens[1]))
+        length(files) == num_airfoil_files && break
+    end
+
+    length(files) == num_airfoil_files || throw(
+        ArgumentError(
+            "AeroDyn primary file expected $num_airfoil_files airfoil files but found $(length(files))",
+        ),
+    )
+    return files
+end
+
+function _aerodyn_collect_blade_files(lines)
+    files = String[]
+    for line in lines
+        tokens = _aerodyn_tokens(line)
+        length(tokens) >= 2 || continue
+        startswith(tokens[2], "ADBlFile") || continue
+        push!(files, _aerodyn_unquote(tokens[1]))
+    end
+    isempty(files) &&
+        throw(ArgumentError("AeroDyn primary file is missing ADBlFile entries"))
+    return files
+end
+
+function _aerodyn_required_input_column(lines, keyword)
+    column = _aerodyn_required_int(lines, keyword)
+    column >= 0 ||
+        throw(ArgumentError("AeroDyn keyword $(repr(keyword)) must be nonnegative"))
+    return column
+end
+
+"""
+    readAeroDynPrimaryFile(filename)
+
+Read the AeroDyn primary input fields needed to reproduce a steady BEM HAWT
+case with OWENSAero's CCBlade adapter. The returned named tuple includes wake
+and airfoil model switches, BEM options, input-column mapping, airfoil-file
+paths, blade-file paths, and the `UseBlCm` moment flag.
+
+The reader intentionally does not execute AeroDyn or resolve secondary-file
+paths. It preserves file paths exactly as written so callers can choose whether
+to resolve them relative to the AeroDyn primary file, the driver file, or the
+current working directory.
+"""
+function readAeroDynPrimaryFile(filename)
+    lines = readlines(filename)
+    num_airfoil_files = _aerodyn_required_int(lines, "NumAFfiles")
+    num_airfoil_files > 0 ||
+        throw(ArgumentError("AeroDyn primary file must list at least one airfoil file"))
+
+    return (
+        source = String(filename),
+        wake_model = _aerodyn_required_int(lines, "WakeMod"),
+        airfoil_aero_model = _aerodyn_required_int(lines, "AFAeroMod"),
+        skew_model = _aerodyn_required_int(lines, "SkewMod"),
+        tip_loss = _aerodyn_required_bool(lines, "TipLoss"),
+        hub_loss = _aerodyn_required_bool(lines, "HubLoss"),
+        tangential_induction = _aerodyn_required_bool(lines, "TanInd"),
+        axial_induction_drag = _aerodyn_required_bool(lines, "AIDrag"),
+        tangential_induction_drag = _aerodyn_required_bool(lines, "TIDrag"),
+        induction_tolerance = _aerodyn_unquote(
+            _aerodyn_find_keyword_value(lines, "IndToler"),
+        ),
+        max_iterations = _aerodyn_required_int(lines, "MaxIter"),
+        dbemt_model = _aerodyn_required_int(lines, "DBEMT_Mod"),
+        tau1_const = _aerodyn_required_float(lines, "tau1_const"),
+        unsteady_aero_model = _aerodyn_required_int(lines, "UAMod"),
+        f_lookup = _aerodyn_required_bool(lines, "FLookup"),
+        airfoil_table_model = _aerodyn_required_int(lines, "AFTabMod"),
+        input_columns = (
+            alpha = _aerodyn_required_input_column(lines, "InCol_Alfa"),
+            cl = _aerodyn_required_input_column(lines, "InCol_Cl"),
+            cd = _aerodyn_required_input_column(lines, "InCol_Cd"),
+            cm = _aerodyn_required_input_column(lines, "InCol_Cm"),
+            cpmin = _aerodyn_required_input_column(lines, "InCol_Cpmin"),
+        ),
+        num_airfoil_files = num_airfoil_files,
+        airfoil_files = _aerodyn_collect_airfoil_files(lines, num_airfoil_files),
+        use_blade_cm = _aerodyn_required_bool(lines, "UseBlCm"),
+        blade_files = _aerodyn_collect_blade_files(lines),
+    )
 end
 
 """
@@ -218,15 +339,15 @@ function readAeroDynAirfoilInfo(filename; table_index = 1)
         source = String(filename),
         table_index = Int(table_index),
         num_tables = num_tabs,
-        reynolds_million = _aerodyn_required_float(metadata, "Re"),
-        user_property = _aerodyn_required_float(metadata, "UserProp"),
-        includes_unsteady_aero = _aerodyn_required_bool(metadata, "InclUAdata"),
-        alpha0_deg = _aerodyn_optional_float(metadata, "alpha0"),
-        alpha1_deg = _aerodyn_optional_float(metadata, "alpha1"),
-        alpha2_deg = _aerodyn_optional_float(metadata, "alpha2"),
-        cn_alpha = _aerodyn_optional_float(metadata, "C_nalpha"),
-        cd0 = _aerodyn_optional_float(metadata, "Cd0"),
-        cm0 = _aerodyn_optional_float(metadata, "Cm0"),
+        reynolds_million = _aerodyn_required_metadata_float(metadata, "Re"),
+        user_property = _aerodyn_required_metadata_float(metadata, "UserProp"),
+        includes_unsteady_aero = _aerodyn_required_metadata_bool(metadata, "InclUAdata"),
+        alpha0_deg = _aerodyn_optional_metadata_float(metadata, "alpha0"),
+        alpha1_deg = _aerodyn_optional_metadata_float(metadata, "alpha1"),
+        alpha2_deg = _aerodyn_optional_metadata_float(metadata, "alpha2"),
+        cn_alpha = _aerodyn_optional_metadata_float(metadata, "C_nalpha"),
+        cd0 = _aerodyn_optional_metadata_float(metadata, "Cd0"),
+        cm0 = _aerodyn_optional_metadata_float(metadata, "Cm0"),
         num_alpha = num_alpha,
         alpha_deg = alpha_deg,
         alpha_rad = deg2rad.(alpha_deg),

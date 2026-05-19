@@ -1,11 +1,13 @@
 # AeroDyn Input Readers
 
 OWENSAero includes lightweight readers for AeroDyn v15 blade-definition files
-and AirfoilInfo v1 polar files. These helpers support the HAWT validation path:
-they make the OpenFAST/AeroDyn blade and polar inputs visible to the CCBlade
-adapter without routing through the native AeroDyn wrapper.
+and AirfoilInfo v1 polar files, plus the primary AeroDyn option file. These
+helpers support the HAWT validation path: they make the OpenFAST/AeroDyn BEM
+settings, blade geometry, and polar inputs visible to the CCBlade adapter
+without routing through the native AeroDyn wrapper.
 
 ```julia
+primary = readAeroDynPrimaryFile("ad_primary.dat")
 blade = readAeroDynBladeFile("NRELOffshrBsline5MW_AeroDyn_blade.dat")
 polar = readAeroDynAirfoilInfo("Airfoils/DU40_A17.dat")
 airfoil = aeroDynAirfoilFunction(polar)
@@ -17,6 +19,13 @@ sections = ccbladeHAWTSections(
     airfoil,
 )
 ```
+
+`readAeroDynPrimaryFile` extracts the steady BEM and airfoil-table controls
+needed for comparison studies: `WakeMod`, `AFAeroMod`, tip and hub loss flags,
+tangential induction, induction-drag flags, table column mapping, airfoil-file
+paths, blade-file paths, and `UseBlCm`. Paths are preserved as written; callers
+should decide whether they are relative to the driver, primary file, or current
+working directory.
 
 `readAeroDynBladeFile` consumes exactly `NumBlNds` blade rows. This matters for
 the checked NREL 5 MW fixture, which carries a historical note and an extra
@@ -38,6 +47,9 @@ For HAWT comparisons, keep the frame conventions explicit:
 - AeroDyn blade files can include a root station at zero span, while CCBlade
   sections require positive radial positions. The validation setup must state
   whether it drops the root station or applies a documented hub/root policy.
+- AeroDyn BEM option flags are not one-to-one with CCBlade defaults. In
+  particular, drag-in-induction and hub-loss settings need explicit matching
+  before comparing coefficients.
 - OpenFAST driver files may delegate wind to InflowWind; do not assume the
   driver's `HWindSpeed` is the operating wind speed when `CompInflow = 1`.
 - Existing wrapper fixtures can report torque and power with the OpenFAST

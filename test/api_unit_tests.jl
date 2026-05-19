@@ -18,6 +18,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :oyeDynamicInflowTimeConstants in exported
     @test :oyeDynamicInflowDerivative in exported
     @test :oyeDynamicInflowStep in exported
+    @test :readAeroDynPrimaryFile in exported
     @test :readAeroDynBladeFile in exported
     @test :readAeroDynAirfoilInfo in exported
     @test :aeroDynAirfoilFunction in exported
@@ -31,6 +32,113 @@ end
 
 @testset "AeroDyn HAWT input readers" begin
     mktempdir() do tmpdir
+        primary_path = joinpath(tmpdir, "ad_primary.dat")
+        write(
+            primary_path,
+            """
+            ------- AERODYN v15 for OpenFAST INPUT FILE ------------------------------------
+                      1   WakeMod
+                      1   AFAeroMod
+                      1   SkewMod
+            True          TipLoss
+            True          HubLoss
+            True          TanInd
+            False         AIDrag
+            False         TIDrag
+            "Default"     IndToler
+                    100   MaxIter
+                      2   DBEMT_Mod
+                      4   tau1_const
+                      3   UAMod
+            True          FLookup
+                      1   AFTabMod
+                      1   InCol_Alfa
+                      2   InCol_Cl
+                      3   InCol_Cd
+                      4   InCol_Cm
+                      0   InCol_Cpmin
+                      3   NumAFfiles
+            "./Airfoils/Cylinder1.dat"    AFNames
+            "./Airfoils/DU40_A17.dat"
+            "./Airfoils/NACA64_A17.dat"
+            True          UseBlCm
+            "./NRELOffshrBsline5MW_AeroDyn_blade.dat"    ADBlFile(1)
+            "./NRELOffshrBsline5MW_AeroDyn_blade.dat"    ADBlFile(2)
+            "./NRELOffshrBsline5MW_AeroDyn_blade.dat"    ADBlFile(3)
+            """,
+        )
+
+        primary = OWENSAero.readAeroDynPrimaryFile(primary_path)
+        @test primary.source == primary_path
+        @test primary.wake_model == 1
+        @test primary.airfoil_aero_model == 1
+        @test primary.skew_model == 1
+        @test primary.tip_loss == true
+        @test primary.hub_loss == true
+        @test primary.tangential_induction == true
+        @test primary.axial_induction_drag == false
+        @test primary.tangential_induction_drag == false
+        @test primary.induction_tolerance == "Default"
+        @test primary.max_iterations == 100
+        @test primary.dbemt_model == 2
+        @test primary.tau1_const == 4.0
+        @test primary.unsteady_aero_model == 3
+        @test primary.f_lookup == true
+        @test primary.airfoil_table_model == 1
+        @test primary.input_columns == (alpha = 1, cl = 2, cd = 3, cm = 4, cpmin = 0)
+        @test primary.num_airfoil_files == 3
+        @test primary.airfoil_files == [
+            "./Airfoils/Cylinder1.dat",
+            "./Airfoils/DU40_A17.dat",
+            "./Airfoils/NACA64_A17.dat",
+        ]
+        @test primary.use_blade_cm == true
+        @test primary.blade_files == fill("./NRELOffshrBsline5MW_AeroDyn_blade.dat", 3)
+
+        bad_primary_path = joinpath(tmpdir, "bad_primary.dat")
+        write(
+            bad_primary_path,
+            replace(
+                read(primary_path, String),
+                "True          TipLoss" => "Maybe         TipLoss",
+            ),
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynPrimaryFile(bad_primary_path)
+
+        short_primary_path = joinpath(tmpdir, "short_primary.dat")
+        write(
+            short_primary_path,
+            """
+                      1   WakeMod
+                      1   AFAeroMod
+                      1   SkewMod
+            True          TipLoss
+            True          HubLoss
+            True          TanInd
+            False         AIDrag
+            False         TIDrag
+            "Default"     IndToler
+                    100   MaxIter
+                      2   DBEMT_Mod
+                      4   tau1_const
+                      3   UAMod
+            True          FLookup
+                      1   AFTabMod
+                      1   InCol_Alfa
+                      2   InCol_Cl
+                      3   InCol_Cd
+                      4   InCol_Cm
+                      0   InCol_Cpmin
+                      4   NumAFfiles
+            "./Airfoils/Cylinder1.dat"    AFNames
+            "./Airfoils/DU40_A17.dat"
+            "./Airfoils/NACA64_A17.dat"
+            True          UseBlCm
+            "./NRELOffshrBsline5MW_AeroDyn_blade.dat"    ADBlFile(1)
+            """,
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynPrimaryFile(short_primary_path)
+
         blade_path = joinpath(tmpdir, "NRELOffshrBsline5MW_AeroDyn_blade.dat")
         write(
             blade_path,
