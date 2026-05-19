@@ -30,7 +30,7 @@ The direct slice path returns `Rp`, `Tp`, and `Zp`:
 
 The coupled turbine path maps those sectional quantities to blade and global loads before passing them to OWENS. Any new coupled validation should assert both local aerodynamic loads and transformed structural loads to catch sign or frame mistakes.
 
-DMS computes `CP` from the signed torque history `Q`, not `abs(Q)`. Negative torque sectors therefore reduce the net power coefficient instead of being counted as production. The current implementation still uses the rotor-speed magnitude in the CP scaling; signed-RPM and clockwise-rotor behavior are tracked separately.
+DMS computes `CP` from the signed torque history `Q`, not `abs(Q)`. Negative torque sectors therefore reduce the net power coefficient instead of being counted as production. Direct DMS and AC slice tests pin the current negative-RPM convention: `CP` and `Q` remain in the power frame, while `Tp` changes sign with the rotor direction. Full clockwise multi-rotor and 3D unsteady propagation are tracked separately.
 
 ## Airfoil Data
 

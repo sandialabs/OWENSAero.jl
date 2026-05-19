@@ -303,6 +303,92 @@ end
     @test zp == zeros(ntheta)
 end
 
+@testset "AC negative RPM power-frame convention" begin
+    ntheta = 8
+    theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
+    af(alpha, Re, M) = (2.0 .* alpha, 0.01 .+ alpha .^ 2)
+
+    function run_ac(omega)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            1.0,
+            0.2,
+            0.1,
+            zeros(ntheta),
+            zeros(ntheta),
+            fill(omega, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            zeros(1),
+            0.0,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "AC",
+            false,
+            false,
+            false,
+            0.0,
+            false,
+            zeros(2 * ntheta),
+            zeros(Int, 1),
+            collect(1:ntheta),
+            fill(1.0, ntheta),
+            zeros(Int, ntheta),
+            zeros(Int, ntheta),
+            zeros(ntheta),
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            [0.0, 0.0, -9.81],
+        )
+
+        return OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
+    end
+
+    positive = run_ac(2.0)
+    negative = run_ac(-2.0)
+    expected_torque = [
+        0.27967876123505137,
+        4.474352791343868,
+        8.957294191955247,
+        8.361694418259795,
+        7.755298442377075,
+        9.355425618531791,
+        5.854983184917381,
+        0.9809290791619916,
+    ]
+    expected_tp = [
+        0.18645250749003425,
+        2.982901860895912,
+        5.971529461303498,
+        5.5744629455065295,
+        5.170198961584717,
+        6.236950412354528,
+        3.903322123278254,
+        0.6539527194413277,
+    ]
+
+    @test positive[4] ≈ 0.09869472822476016 atol=1e-14
+    @test negative[4] ≈ 0.09869472822476016 atol=1e-14
+    @test positive[15] ≈ expected_torque atol=1e-14
+    @test negative[15] ≈ expected_torque atol=1e-14
+    @test positive[6] ≈ expected_tp atol=1e-14
+    @test negative[6] ≈ -expected_tp atol=1e-14
+end
+
 @testset "CP validation metrics" begin
     metrics = OWENSAero.cpValidationMetrics(
         [3.0, 1.0, 2.0],

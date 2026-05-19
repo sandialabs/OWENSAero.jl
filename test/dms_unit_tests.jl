@@ -122,3 +122,68 @@ end
     @test result[1] ≈ -0.04038508084755988 atol=1e-14
     @test abs(result[1] - 0.04512872592797231) > 0.08
 end
+
+@testset "DMS negative RPM power-frame convention" begin
+    ntheta = 8
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
+
+    function run_dms(omega)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            1.0,
+            fill(0.2, ntheta),
+            fill(0.1, ntheta),
+            fill(0.05, ntheta),
+            fill(omega, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "DMS",
+            zeros(2 * ntheta),
+        )
+
+        return OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    end
+
+    positive = run_dms(2.0)
+    negative = run_dms(-2.0)
+    expected_torque = [
+        0.13216300752723198,
+        4.155328939728862,
+        8.747381434947037,
+        10.518927273475686,
+        11.899127897963252,
+        10.482424731039607,
+        5.94768269035212,
+        0.8606922816284484,
+    ]
+    expected_tp = [
+        0.08821892236601551,
+        2.7736856779962813,
+        5.838884708767798,
+        7.021393095350895,
+        7.9426782115064585,
+        6.997027616556331,
+        3.970083363983335,
+        0.5745128458760576,
+    ]
+
+    @test positive[1] ≈ 0.1148162791981763 atol=1e-14
+    @test negative[1] ≈ 0.1148162791981763 atol=1e-14
+    @test positive[3] ≈ expected_torque atol=1e-14
+    @test negative[3] ≈ expected_torque atol=1e-14
+    @test positive[5] ≈ expected_tp atol=1e-14
+    @test negative[5] ≈ -expected_tp atol=1e-14
+end
