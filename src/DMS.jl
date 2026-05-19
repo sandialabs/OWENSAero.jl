@@ -23,7 +23,15 @@ else
 end
 
 """
-function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, solvestep=false)
+function streamtube(
+    a,
+    theta,
+    turbine,
+    env;
+    output_all = false,
+    Vxwake = nothing,
+    solvestep = false,
+)
 
     # Unpack Vars
     B = turbine.B
@@ -104,8 +112,14 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     # TSR = abs(omega)*r/sqrt(V_x^2+V_y^2) # Tip Speed Ratio, section 2.3, however since this is being used for relative local velocities, we use the local radius r, and not the nominal radius R
     # Vt = V_x*(1-a)*cos(theta)+V_y*sin(theta)+V_y*(a)*cos(theta)+TSR
 
-    Vn = (V_xt * (1 - a) * sin(theta) - V_yt * cos(theta) + V_yt * (a) * sin(theta)) * cos.(delta) + V_zt * sin(delta)
-    Vt = V_xt * ((1 - a) * cos(theta)) + V_yt * sin(theta) + V_yt * (1 - a) * cos(theta) + abs(omega) * r
+    Vn =
+        (V_xt * (1 - a) * sin(theta) - V_yt * cos(theta) + V_yt * (a) * sin(theta)) *
+        cos.(delta) + V_zt * sin(delta)
+    Vt =
+        V_xt * ((1 - a) * cos(theta)) +
+        V_yt * sin(theta) +
+        V_yt * (1 - a) * cos(theta) +
+        abs(omega) * r
     Vloc = sqrt(Vn^2 + Vt^2)
     phi = atan(Vn, Vt)
     alpha = phi - twist
@@ -171,9 +185,11 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
 
     if Aero_Buoyancy_Active
         section_area = buoyancy_section_area_per_unit_span(chord, thickness)
-        dcm = [cos(theta) -sin(theta) 0
+        dcm = [
+            cos(theta) -sin(theta) 0
             sin(theta) cos(theta) 0
-            0 0 1]
+            0 0 1
+        ]
         F_buoy = dcm * -gravity .* (rho * section_area - rhoA) #buoyancy mass minus structural mass since added mass requires moving the gravity here
     else
         F_buoy = [0.0, 0.0, 0.0]
@@ -206,7 +222,25 @@ function streamtube(a, theta, turbine, env; output_all=false, Vxwake=nothing, so
     CT = (k * B / (2 * pi) * dtheta * Th) ./ q_inf # Eq. 13
 
     if output_all
-        return Th, Q, Rp, Tp, Zp, Vloc, CD, CT, alpha, cl, cd_af, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
+        return Th,
+        Q,
+        Rp,
+        Tp,
+        Zp,
+        Vloc,
+        CD,
+        CT,
+        alpha,
+        cl,
+        cd_af,
+        Re,
+        M_addedmass_Np,
+        M_addedmass_Tp,
+        F_addedmass_Np,
+        F_addedmass_Tp,
+        F_buoy,
+        cm_af,
+        M25
     else
         return CD - CT # Residual, section 2.4
     end
@@ -219,7 +253,7 @@ see ?steady for detailed i/o description
 
 Double multiple streamtube model
 """
-function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
+function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
     #TODO: Inputs documentation
     a_in = w
     ntheta = turbine.ntheta
@@ -260,7 +294,7 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
 
     dtheta = 2 * pi / (ntheta)
     # thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
-    thetavec = collect(dtheta/2:dtheta:2*pi)
+    thetavec = collect((dtheta/2):dtheta:(2*pi))
 
     astar = zeros(Real, ntheta * 2)#env.aw_warm[1:ntheta] #zeros(ntheta)
 
@@ -287,31 +321,51 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
     M_addedmass_Tp = zeros(Real, ntheta)
     F_addedmass_Np = zeros(Real, ntheta)
     F_addedmass_Tp = zeros(Real, ntheta)
-    F_buoy = zeros(Real, ntheta,3)
+    F_buoy = zeros(Real, ntheta, 3)
 
     # For All Upper
     iter_RPI = 1
-    for i = 1:Int(ntheta / 2)
+    for i = 1:Int(ntheta/2)
         # Solve Residual
         if idx_RPI[iter_RPI] == i
             iter_RPI += 1
             if solve
-                resid(a) = streamtube(a, thetavec[i], turbine, env_turbine; solvestep=true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
+                resid(a) =
+                    streamtube(a, thetavec[i], turbine, env_turbine; solvestep = true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:], cm_af[i], M25[i] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true)
+            Th[i],
+            Q[i],
+            Rp[i],
+            Tp[i],
+            Zp[i],
+            Vloc[i],
+            CD[i],
+            CT[i],
+            alpha[i],
+            cl[i],
+            cd_af[i],
+            Re[i],
+            M_addedmass_Np[i],
+            M_addedmass_Tp[i],
+            F_addedmass_Np[i],
+            F_addedmass_Tp[i],
+            F_buoy[i, :],
+            cm_af[i],
+            M25[i] =
+                streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all = true)
         end
     end
 
     Vxsave = mean(env_turbine.V_x)
 
     # For All Lower
-    for i = Int(ntheta / 2 + 1):ntheta
+    for i = Int(ntheta/2+1):ntheta
         # Update Downstream Inflow based on upstream solution
         if idx_RPI[iter_RPI] == i
             iter_RPI += 1
-            a_used = astar[Int(ntheta / 2)-(i-Int(ntheta / 2))+1] # We index in a circle, but the streamtubes go straight through, swapping at 180 deg
+            a_used = astar[Int(ntheta/2)-(i-Int(ntheta/2))+1] # We index in a circle, but the streamtubes go straight through, swapping at 180 deg
             if env_turbine.suction
                 Vxwake = (1.0 - a_used) / (1.0 + a_used) * env_turbine.V_x[i] # Eq. 6
             else
@@ -320,17 +374,74 @@ function DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
 
             # Solve Residual
             if solve
-                resid(a) = streamtube(a, thetavec[i], turbine, env_turbine; Vxwake, solvestep=true) #Solve wrt negative theta on the back side?
+                resid(a) = streamtube(
+                    a,
+                    thetavec[i],
+                    turbine,
+                    env_turbine;
+                    Vxwake,
+                    solvestep = true,
+                ) #Solve wrt negative theta on the back side?
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
-            Th[i], Q[i], Rp[i], Tp[i], Zp[i], Vloc[i], CD[i], CT[i], alpha[i], cl[i], cd_af[i], Re[i], M_addedmass_Np[i], M_addedmass_Tp[i], F_addedmass_Np[i], F_addedmass_Tp[i], F_buoy[i,:], cm_af[i], M25[i] = streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all=true, Vxwake)
+            Th[i],
+            Q[i],
+            Rp[i],
+            Tp[i],
+            Zp[i],
+            Vloc[i],
+            CD[i],
+            CT[i],
+            alpha[i],
+            cl[i],
+            cd_af[i],
+            Re[i],
+            M_addedmass_Np[i],
+            M_addedmass_Tp[i],
+            F_addedmass_Np[i],
+            F_addedmass_Tp[i],
+            F_buoy[i, :],
+            cm_af[i],
+            M25[i] = streamtube(
+                astar[i],
+                thetavec[i],
+                turbine,
+                env_turbine;
+                output_all = true,
+                Vxwake,
+            )
         end
     end
 
     # Aggregate Turbine Performance
     k = 1.0
-    CP = sum((k * turbine.B / (2 * pi) * dtheta * abs.(Q) * mean(abs.(turbine.omega))) / (0.5 * env_turbine.rho * 1.0 * 2 * turbine.R * Vxsave^3)) # Eq. 14, normalized by nominal radius R
+    CP = sum(
+        (k * turbine.B / (2 * pi) * dtheta * Q * mean(abs.(turbine.omega))) /
+        (0.5 * env_turbine.rho * 1.0 * 2 * turbine.R * Vxsave^3),
+    ) # Eq. 14, normalized by nominal radius R
 
-    return CP, Th, Q, Rp, Tp, Zp, Vloc, CD, CT, mean(astar[1:ntheta]), astar, alpha, cl, cd_af, thetavec .- windangle, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
+    return CP,
+    Th,
+    Q,
+    Rp,
+    Tp,
+    Zp,
+    Vloc,
+    CD,
+    CT,
+    mean(astar[1:ntheta]),
+    astar,
+    alpha,
+    cl,
+    cd_af,
+    thetavec .- windangle,
+    Re,
+    M_addedmass_Np,
+    M_addedmass_Tp,
+    F_addedmass_Np,
+    F_addedmass_Tp,
+    F_buoy,
+    cm_af,
+    M25
 end

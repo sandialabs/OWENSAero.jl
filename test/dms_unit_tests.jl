@@ -17,9 +17,9 @@ using OWENSAero
         zeros(8),
     )
 
-    out = OWENSAero.streamtube(0.2, pi / 3, turbine, env; output_all=true)
+    out = OWENSAero.streamtube(0.2, pi / 3, turbine, env; output_all = true)
 
-    @test out isa NTuple{19, Any}
+    @test out isa NTuple{19,Any}
     @test out[1] ≈ 3.120186136285371 atol=1e-12
     @test out[2] ≈ 2.100708299227373 atol=1e-12
     @test out[6] ≈ 6.53305459604201 atol=1e-12
@@ -63,14 +63,62 @@ end
 
     vx_global = copy(env.V_x)
     vy_global = copy(env.V_y)
-    result_1 = OWENSAero.DMS(turbine, env; w=zeros(2 * ntheta), solve=false)
-    result_2 = OWENSAero.DMS(turbine, env; w=zeros(2 * ntheta), solve=false)
+    result_1 = OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    result_2 = OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
 
     @test env.V_x == vx_global
     @test env.V_y == vy_global
     @test result_1[1] ≈ 0.08429279232669457 atol=1e-14
     @test result_2[1] ≈ result_1[1] atol=1e-14
     @test result_1[10] == 0.0
-    @test result_1[12] ≈ [0.7610205044672681, 1.629220639954444, -1.2396968194374036, -0.42285018527264395] atol=1e-14
-    @test result_1[16] ≈ [82105.99225005694, 29404.070092675687, 68549.89675104182, 91517.5549025191] atol=1e-8
+    @test result_1[12] ≈
+          [0.7610205044672681, 1.629220639954444, -1.2396968194374036, -0.42285018527264395] atol=1e-14
+    @test result_1[16] ≈
+          [82105.99225005694, 29404.070092675687, 68549.89675104182, 91517.5549025191] atol=1e-8
+end
+
+@testset "DMS CP uses signed torque" begin
+    ntheta = 8
+    af(alpha, Re, M) = (0.0, 0.5)
+    turbine = OWENSAero.Turbine(
+        1.5,
+        fill(1.5, ntheta),
+        1.0,
+        fill(0.2, ntheta),
+        fill(0.1, ntheta),
+        fill(0.05, ntheta),
+        fill(2.0, ntheta),
+        2,
+        af,
+        ntheta,
+        false,
+    )
+    env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        fill(0.5, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        0.0,
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+
+    result = OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    torque = result[3]
+
+    @test torque ≈ [
+        -6.383478423454256,
+        -3.636152142701073,
+        -0.6225483502083994,
+        0.5266952578259413,
+        0.5628607215812882,
+        -0.17690166794402218,
+        -2.850013476873858,
+        -5.972358432573441,
+    ] atol=1e-14
+    @test result[1] ≈ -0.04038508084755988 atol=1e-14
+    @test abs(result[1] - 0.04512872592797231) > 0.08
 end

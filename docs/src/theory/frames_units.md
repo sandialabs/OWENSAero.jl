@@ -30,6 +30,8 @@ The direct slice path returns `Rp`, `Tp`, and `Zp`:
 
 The coupled turbine path maps those sectional quantities to blade and global loads before passing them to OWENS. Any new coupled validation should assert both local aerodynamic loads and transformed structural loads to catch sign or frame mistakes.
 
+DMS computes `CP` from the signed torque history `Q`, not `abs(Q)`. Negative torque sectors therefore reduce the net power coefficient instead of being counted as production. The current implementation still uses the rotor-speed magnitude in the CP scaling; signed-RPM and clockwise-rotor behavior are tracked separately.
+
 ## Airfoil Data
 
 Airfoil reader functions expect angle-of-attack and coefficient tables compatible with the selected model. Tables may include a fourth `Cm25` column. The readers keep the older `cl, cd = af(alpha, Re, Mach)` call pattern intact, and `af(alpha, Re, Mach; return_cm=true)` returns `cl`, `cd`, and `Cm25`.
