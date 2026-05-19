@@ -166,7 +166,7 @@ end
         zeros(ntheta),
         zeros(ntheta),
         zeros(1),
-        zeros(ntheta),
+        0.0,
     )
     env = OWENSAero.Environment(
         rho,
@@ -219,6 +219,88 @@ end
     @test rp ≈ -f_addedmass_np atol=1e-14
     @test tp ≈ f_addedmass_tp atol=1e-17
     @test zp == 0.0
+end
+
+@testset "AC added-mass force sign convention" begin
+    ntheta = 4
+    theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
+    chord = 0.2
+    thickness = 0.04
+    rho = 1000.0
+    added_mass_coeff = 1.0
+    accel_flap = 0.3
+    accel_edge = 0.4
+    af(alpha, Re, M) = (zero(alpha), zero(alpha), zero(alpha))
+
+    turbine = OWENSAero.Turbine(
+        1.0,
+        fill(1.0, ntheta),
+        0.5,
+        chord,
+        thickness,
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(2.0, ntheta),
+        1,
+        af,
+        ntheta,
+        false,
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(1),
+        0.0,
+    )
+    env = OWENSAero.Environment(
+        rho,
+        1.0e-3,
+        fill(1.0, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        0.0,
+        "none",
+        "AC",
+        true,
+        false,
+        false,
+        added_mass_coeff,
+        false,
+        zeros(2 * ntheta),
+        zeros(Int, 1),
+        collect(1:ntheta),
+        fill(1.0, ntheta),
+        zeros(Int, ntheta),
+        zeros(Int, ntheta),
+        zeros(ntheta),
+        false,
+        fill(accel_flap, ntheta),
+        fill(accel_edge, ntheta),
+        [0.0, 0.0, -9.81],
+    )
+
+    result = OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
+    rp = result[5]
+    tp = result[6]
+    zp = result[7]
+    m_addedmass_np = result[16]
+    m_addedmass_tp = result[17]
+    f_addedmass_np = result[18]
+    f_addedmass_tp = result[19]
+
+    expected_mass_np =
+        rho * added_mass_coeff * OWENSAero.added_mass_flap_volume_per_unit_span(chord)
+    expected_mass_tp =
+        rho * added_mass_coeff * OWENSAero.added_mass_edge_volume_per_unit_span(thickness)
+
+    @test m_addedmass_np ≈ fill(31.415926535897935, ntheta) atol=1e-14
+    @test m_addedmass_tp ≈ fill(0.012566370614359173, ntheta) atol=1e-17
+    @test m_addedmass_np ≈ fill(expected_mass_np, ntheta) atol=1e-14
+    @test m_addedmass_tp ≈ fill(expected_mass_tp, ntheta) atol=1e-17
+    @test f_addedmass_np ≈ fill(9.42477796076938, ntheta) atol=1e-14
+    @test f_addedmass_tp ≈ fill(0.005026548245743669, ntheta) atol=1e-17
+    @test rp ≈ -f_addedmass_np atol=1e-14
+    @test tp ≈ f_addedmass_tp atol=1e-17
+    @test zp == zeros(ntheta)
 end
 
 @testset "CP validation metrics" begin
