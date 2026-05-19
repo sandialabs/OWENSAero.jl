@@ -44,16 +44,28 @@ not automatically applied inside DMS or AC because those VAWT solvers need a
 separate finite-height validation basis before their load baselines should
 change.
 
-## HAWT Dynamic Inflow Scope
+## HAWT CCBlade and Dynamic Inflow Scope
+
+`ccbladeHAWTSections`, `ccbladeHAWTOperatingPoints`, and `ccbladeHAWTSolve`
+provide a rigid-rotor adapter around `CCBlade.jl` for horizontal-axis BEM
+verification and examples. The adapter uses CCBlade's wind-turbine convention,
+dimensional radii/chords, radians for twist/pitch/precone, and returns
+integrated thrust, torque, power, `CP`, `CT`, `CQ`, and per-station induction
+and load arrays.
 
 `oyeDynamicInflowTimeConstants`, `oyeDynamicInflowDerivative`, and
-`oyeDynamicInflowStep` provide a tested Oye dynamic-inflow primitive for future
-CCBlade-based HAWT work. The helper follows the AeroDyn DBEMT continuous
-state-space form and advances axial or tangential induction states at radial
-stations. It is not a replacement for the current DMS wake-speed filter and is
-not yet coupled into a HAWT solver path; callers must provide the quasi-steady
-induction from a BEM backend such as CCBlade and map the resulting dynamic
-induction into loads explicitly.
+`oyeDynamicInflowStep` provide the matching tested Oye dynamic-inflow primitive.
+The helper follows the AeroDyn DBEMT continuous state-space form and advances
+axial or tangential induction states at radial stations. It is not a
+replacement for the current DMS wake-speed filter and is not yet coupled into
+the CCBlade wrapper automatically; callers must combine the quasi-steady
+CCBlade induction arrays with the Oye state update when building unsteady HAWT
+studies.
+
+The HAWT path is not yet coupled into OWENS structural dynamics. Structural load
+mapping, global rotor/tower frame bookkeeping, and OpenFAST/AeroDyn validation
+remain open work before this should be treated as a production aeroelastic HAWT
+solver.
 
 ## Dynamic Stall
 

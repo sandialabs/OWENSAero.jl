@@ -18,6 +18,9 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :oyeDynamicInflowTimeConstants in exported
     @test :oyeDynamicInflowDerivative in exported
     @test :oyeDynamicInflowStep in exported
+    @test :ccbladeHAWTSections in exported
+    @test :ccbladeHAWTOperatingPoints in exported
+    @test :ccbladeHAWTSolve in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -483,6 +486,180 @@ end
         2.0,
         [0.5, 1.5];
         k = 1.2,
+    )
+end
+
+@testset "CCBlade HAWT adapter" begin
+    af(alpha, Re, M) = (2 * pi * alpha, 0.01 + 0.02 * alpha^2, -0.05)
+    radial_positions = [2.0, 4.0, 6.0]
+    chord = [0.5, 0.45, 0.35]
+    twist = deg2rad.([12.0, 8.0, 3.0])
+
+    sections = OWENSAero.ccbladeHAWTSections(radial_positions, chord, twist, af)
+    @test length(sections) == 3
+    @test sections[1].r == 2.0
+    @test sections[2].chord == 0.45
+    @test sections[3].theta == 0.05235987755982989
+    @test sections[1].af(0.1, 1.0e6, 0.05) ==
+          (0.6283185307179586, 0.0102)
+
+    station_airfoils = [
+        (alpha, Re, M) -> (alpha, 0.01),
+        (alpha, Re, M) -> (2 * alpha, 0.02),
+        (alpha, Re, M) -> (3 * alpha, 0.03),
+    ]
+    station_sections =
+        OWENSAero.ccbladeHAWTSections(radial_positions, chord, twist, station_airfoils)
+    @test station_sections[1].af(0.1, 1.0e6, 0.05) == (0.1, 0.01)
+    @test station_sections[2].af(0.1, 1.0e6, 0.05) == (0.2, 0.02)
+    @test station_sections[3].af(0.1, 1.0e6, 0.05) ==
+          (0.30000000000000004, 0.03)
+
+    operating_points = OWENSAero.ccbladeHAWTOperatingPoints(
+        [2.0, 4.0],
+        8.0,
+        2.0,
+        1.225;
+        pitch = 0.1,
+        mu = 1.8e-5,
+        asound = 340.0,
+        precone = 0.2,
+    )
+    @test length(operating_points) == 2
+    @test operating_points[1].Vx == 7.840532622729933
+    @test operating_points[1].Vy == 3.9202663113649665
+    @test operating_points[2].Vy == 7.840532622729933
+    @test operating_points[1].rho == 1.225
+    @test operating_points[1].pitch == 0.1
+    @test operating_points[1].mu == 1.8e-5
+    @test operating_points[1].asound == 340.0
+
+    vy_sensitivity = ForwardDiff.derivative(
+        omega -> OWENSAero.ccbladeHAWTOperatingPoints([2.0], 8.0, omega, 1.225)[1].Vy,
+        2.0,
+    )
+    @test vy_sensitivity == 2.0
+
+    result = OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        num_blades = 3,
+        hub_radius = 1.0,
+        tip_radius = 7.0,
+        pitch = deg2rad(1.0),
+        npts = 8,
+    )
+    @test result.thrust ≈ 1327.9868847915095 atol=1e-10
+    @test result.torque ≈ 4284.01010759976 atol=1e-10
+    @test result.power ≈ 8568.02021519952 atol=1e-10
+    @test result.CP ≈ 0.1774837007705498 atol=1e-14
+    @test result.CT ≈ 0.22007046759243654 atol=1e-14
+    @test result.CQ ≈ 0.10141925758317133 atol=1e-14
+    @test result.Np ≈ [62.865738419854246, 92.21574781864915, 109.28812777561564] atol=1e-12
+    @test result.Tp ≈ [82.88015137958851, 77.74878545431243, 61.930292380739424] atol=1e-12
+    @test result.a ≈ [0.12148242946405534, 0.0866902801884321, 0.1057684801932912] atol=1e-14
+    @test result.ap ≈ [0.3203169929126651, 0.07309016252407914, 0.039957209359377265] atol=1e-14
+    @test result.alpha ≈ [0.6994776303774515, 0.5480541413681285, 0.4507041304445113] atol=1e-14
+    @test result.cl ≈ [4.394947569888396, 3.4435257285831486, 2.831857570294105] atol=1e-14
+    @test result.cd ≈ [0.01978537910796909, 0.01600726683741513, 0.014062684263994861] atol=1e-16
+    @test length(result.sections) == 3
+    @test length(result.operating_points) == 3
+    @test length(result.outputs) == 3
+
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
+        Float64[],
+        Float64[],
+        Float64[],
+        af,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
+        [2.0, 4.0],
+        [0.5],
+        [0.1, 0.0],
+        af,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
+        [2.0, 4.0],
+        [0.5, -0.2],
+        [0.1, 0.0],
+        af,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
+        [4.0, 2.0],
+        [0.5, 0.2],
+        [0.1, 0.0],
+        af,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSections(
+        [2.0, 4.0],
+        [0.5, 0.2],
+        [0.1, 0.0],
+        [af],
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
+        [2.0],
+        -8.0,
+        2.0,
+        1.225,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
+        [2.0],
+        8.0,
+        0.0,
+        1.225,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
+        [2.0],
+        8.0,
+        2.0,
+        0.0,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        num_blades = 0,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        hub_radius = 3.0,
+        tip_radius = 7.0,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        hub_radius = 1.0,
+        tip_radius = 5.0,
+    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
+        radial_positions,
+        chord,
+        twist,
+        af,
+        2.0,
+        8.0,
+        1.225;
+        npts = 0,
     )
 end
 

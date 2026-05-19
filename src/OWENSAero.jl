@@ -1,4 +1,5 @@
 module OWENSAero
+import CCBlade
 import Statistics:mean
 import Interpolations
 import OWENSOpenFASTWrappers
@@ -12,6 +13,7 @@ export towerShadowVelocity
 export liftingStrutForce
 export prandtlTipLossFactor
 export oyeDynamicInflowTimeConstants, oyeDynamicInflowDerivative, oyeDynamicInflowStep
+export ccbladeHAWTSections, ccbladeHAWTOperatingPoints, ccbladeHAWTSolve
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -697,6 +699,7 @@ end
 
 include("DMS.jl")
 include("DynamicInflow.jl")
+include("CCBladeHAWT.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")
 include("Unsteady_Step.jl")
