@@ -8,6 +8,8 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :AC in exported
     @test :DMS in exported
     @test :cpValidationMetrics in exported
+    @test :wholeRevolutionIndexRange in exported
+    @test :wholeRevolutionMean in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -74,6 +76,43 @@ end
     @test [OWENSAero._blade_azimuth_index(6, 2, ibld, 6) for ibld in 1:3] == [6, 2, 4]
     @test [OWENSAero._blade_azimuth_index(1, 2, ibld, 6) for ibld in 1:3] == [1, 3, 5]
     @test [OWENSAero._blade_azimuth_index(30, 10, ibld, 30) for ibld in 1:3] == [30, 10, 20]
+end
+
+@testset "whole-revolution averaging helpers" begin
+    azimuth = collect(0.0:(pi/2):(7pi/2))
+    values = collect(1.0:length(azimuth))
+
+    one_rev_window = OWENSAero.wholeRevolutionIndexRange(azimuth)
+    @test one_rev_window == 4:7
+    @test azimuth[first(one_rev_window)] + 2pi == azimuth[last(one_rev_window)+1]
+    @test OWENSAero.wholeRevolutionMean(values, azimuth) == 5.5
+
+    two_rev_azimuth = collect(0.0:(pi/2):4pi)
+    two_rev_values = collect(1.0:length(two_rev_azimuth))
+    @test OWENSAero.wholeRevolutionIndexRange(two_rev_azimuth) == 1:8
+    @test OWENSAero.wholeRevolutionIndexRange(two_rev_azimuth; revolutions = 1) == 5:8
+    @test OWENSAero.wholeRevolutionMean(
+        two_rev_values,
+        two_rev_azimuth;
+        revolutions = 1,
+    ) == 6.5
+
+    @test OWENSAero.wholeRevolutionIndexRange([0.0, pi/2, pi]; allow_partial = true) ==
+          1:3
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(Float64[])
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange([0.0, pi, pi/2])
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange([0.0, Inf, 2pi])
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(azimuth; period = 0.0)
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(
+        azimuth;
+        revolutions = 0,
+    )
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange(
+        azimuth;
+        revolutions = 1.5,
+    )
+    @test_throws ArgumentError OWENSAero.wholeRevolutionIndexRange([0.0, pi/2, pi])
+    @test_throws ArgumentError OWENSAero.wholeRevolutionMean([1.0, 2.0], azimuth)
 end
 
 @testset "pInt periodic integration" begin

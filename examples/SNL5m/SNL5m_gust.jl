@@ -480,9 +480,12 @@ r_end = 25.0;
 # PyPlot.savefig("$(path)/figs/gust/SNL5m_ALL_Transient_Rp$(bnum)_$(slice)_gtime$(us_param.gustT).pdf",transparent = true)
 
 println("Radial")
-idx_start = round(Int, length(Rp_filt_AC)/2)
-twod_filt = -Rp_filt_AC[idx_start:end].*cos.(turbine2D.delta[1])
-twod_RPI = -Rp_RPI_AC[idx_start:end].*cos.(turbine2D.delta[1])
+comparison_window = OWENSAero.wholeRevolutionIndexRange(
+    collect(rev_array .* 2pi);
+    revolutions = max(1, floor(Int, N_Rev / 2)),
+)
+twod_filt = -Rp_filt_AC[comparison_window].*cos.(turbine2D.delta[1])
+twod_RPI = -Rp_RPI_AC[comparison_window].*cos.(turbine2D.delta[1])
 maxerr = maximum(abs.((twod_filt .- twod_RPI)./twod_filt))
 meanerr = mean(abs.((twod_filt .- twod_RPI)./twod_filt))
 println("Max: $(maxerr)")

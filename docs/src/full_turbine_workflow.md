@@ -21,6 +21,8 @@ Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `Dyna
 
 The high-level functions return power, torque, per-slice distributed loads, azimuthal angles, local velocities, angles of attack, airfoil coefficients, Reynolds numbers, airfoil pitching moments, and model-specific auxiliary loads. The exact tuple differs between steady and unsteady workflows, so tests should destructure by the current function contract instead of assuming a shared tuple layout.
 
+For unsteady CP, torque, or load-history averages, use `wholeRevolutionIndexRange` or `wholeRevolutionMean` on the continuously increasing azimuth history. These helpers select complete terminal revolutions and exclude the repeated terminal phase so validation metrics are not biased by partial cycles or duplicated boundary samples.
+
 ## Coupling Notes
 
 When coupled to OWENS structural dynamics:

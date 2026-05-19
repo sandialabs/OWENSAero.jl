@@ -6,6 +6,7 @@ import OWENSOpenFASTWrappers
 export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
 export cpValidationMetrics
+export wholeRevolutionIndexRange, wholeRevolutionMean
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -275,6 +276,88 @@ function cpValidationMetrics(model_tsr, model_cp, reference_tsr, reference_cp)
         reference_tsr = reference_x_overlap,
         reference_cp = reference_y_overlap,
     )
+end
+
+"""
+    wholeRevolutionIndexRange(azimuth; revolutions=nothing, period=2*pi, atol=1e-10, allow_partial=false)
+
+Return a suffix index range that covers complete revolutions in a monotonically
+increasing azimuth history. The terminal repeated phase is excluded so arithmetic
+means do not double-count the revolution boundary.
+
+When `revolutions` is omitted, all complete revolutions available at the end of
+the signal are used. If `revolutions` exceeds the number available, the request
+is clamped to the available count.
+"""
+function wholeRevolutionIndexRange(
+    azimuth;
+    revolutions = nothing,
+    period = 2*pi,
+    atol = 1e-10,
+    allow_partial = false,
+)
+    isempty(azimuth) && throw(ArgumentError("azimuth history must not be empty"))
+    period <= 0 && throw(ArgumentError("period must be positive"))
+
+    az = collect(float.(azimuth))
+    all(isfinite, az) ||
+        throw(ArgumentError("azimuth history must contain only finite values"))
+    if any(diff(az) .< -atol)
+        throw(ArgumentError("azimuth history must be monotonically increasing"))
+    end
+
+    available_revolutions = floor(Int, max((az[end] - az[1]) / period, 0.0) + atol)
+    if available_revolutions < 1
+        allow_partial || throw(
+            ArgumentError("azimuth history must span at least one complete revolution"),
+        )
+        return firstindex(azimuth):lastindex(azimuth)
+    end
+
+    requested_revolutions = if isnothing(revolutions)
+        available_revolutions
+    else
+        requested = try
+            Int(revolutions)
+        catch
+            throw(ArgumentError("revolutions must be an integer count"))
+        end
+        requested == revolutions ||
+            throw(ArgumentError("revolutions must be an integer count"))
+        requested
+    end
+    n_revolutions = min(requested_revolutions, available_revolutions)
+    n_revolutions < 1 && throw(ArgumentError("revolutions must be at least 1"))
+
+    stop_azimuth = az[end]
+    start_azimuth = stop_azimuth - n_revolutions * period
+    local_start = findfirst(x -> x >= start_azimuth - atol, az)
+    local_stop = findlast(x -> x < stop_azimuth - atol, az)
+    isnothing(local_start) &&
+        throw(ArgumentError("whole-revolution window has no start sample"))
+    isnothing(local_stop) &&
+        throw(ArgumentError("whole-revolution window has no stop sample"))
+
+    idx_start = firstindex(azimuth) + local_start - 1
+    idx_stop = firstindex(azimuth) + local_stop - 1
+    idx_start <= idx_stop || throw(
+        ArgumentError("whole-revolution window has no samples before the terminal phase"),
+    )
+    return idx_start:idx_stop
+end
+
+"""
+    wholeRevolutionMean(values, azimuth; kwargs...)
+
+Compute the arithmetic mean of `values` over the window returned by
+[`wholeRevolutionIndexRange`](@ref). This is intended for unsteady CP, torque,
+and load histories where partial revolutions should not bias validation metrics.
+"""
+function wholeRevolutionMean(values, azimuth; kwargs...)
+    length(values) == length(azimuth) ||
+        throw(ArgumentError("values and azimuth must have the same length"))
+    window = wholeRevolutionIndexRange(azimuth; kwargs...)
+    return mean(values[window])
 end
 
 """
