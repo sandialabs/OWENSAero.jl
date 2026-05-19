@@ -4,6 +4,12 @@ OWENSAero exposes the Boeing-Vertol dynamic-stall model through
 `Boeing_Vertol` and through the high-level turbine workflow when
 `DynamicStallModel = "BV"`.
 
+When `readaerodyn_BV` or `setupTurb(...; DynamicStallModel = "BV")` reads an
+OWENSAero polar file, the Boeing-Vertol positive stall angle, negative stall
+angle, zero-lift angle, and thickness-to-chord ratio come from the first
+Reynolds-number table in that file. This keeps dynamic-stall state transitions
+tied to the checked-in polar metadata rather than hidden reader defaults.
+
 The CI regression test in `test/dyn_stall_tests.jl` runs the NACA 0012
 pitching case derived from Sadr et al. figure data. It pins the full
 angle-of-attack, lift, drag, and pitching-moment histories against the

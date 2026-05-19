@@ -15,7 +15,7 @@ These functions are intentionally stateful. A new call to `setupTurb` is require
 
 `setupTurb` expects blade centerline coordinates by slice, blade count, chord, rotation rate, and inflow. The examples use `shapeX` for radius-like positions and `shapeZ` for vertical station positions. Chord can be scalar or station-dependent depending on the call path.
 
-Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
+Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled. For single-Reynolds-table reads, the BV reader uses the stall-angle, zero-lift-angle, and thickness metadata in the polar header. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
 
 ## Output Shape
 

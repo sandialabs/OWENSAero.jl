@@ -6,10 +6,69 @@
 import FLOWMath
 import Interpolations
 
+_parse_airfoil_header_number(line) = parse(Float64, split(strip(line))[end])
+
+function _read_first_reynolds_airfoil_table(filename)
+    alpha = Float64[]
+    cl = Float64[]
+    cd = Float64[]
+    cm = Float64[]
+
+    thickness_to_chord = 0.0
+    zero_lift_aoa = 0.0
+    positive_stall_aoa = 10 * pi / 180
+    negative_stall_aoa = -10 * pi / 180
+    in_table = false
+
+    open(filename) do f
+        for line in eachline(f)
+            stripped = strip(line)
+            isempty(stripped) && continue
+
+            if startswith(stripped, "Thickness to Chord Ratio")
+                thickness_to_chord = _parse_airfoil_header_number(stripped)
+            elseif startswith(stripped, "Zero Lift AOA")
+                zero_lift_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "BV Dyn. Stall Model - Positive Stall AOA")
+                positive_stall_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "BV Dyn. Stall Model - Negative Stall AOA")
+                negative_stall_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "AOA")
+                in_table = true
+            elseif stripped == "EOT" || startswith(stripped, "Reynolds Number")
+                if in_table && !isempty(alpha)
+                    break
+                end
+            elseif in_table
+                parts = split(stripped)
+                length(parts) >= 3 ||
+                    throw(ArgumentError("airfoil data row in $(filename) has fewer than 3 columns"))
+                push!(alpha, parse(Float64, parts[1]))
+                push!(cl, parse(Float64, parts[2]))
+                push!(cd, parse(Float64, parts[3]))
+                push!(cm, length(parts) >= 4 ? parse(Float64, parts[4]) : 0.0)
+            end
+        end
+    end
+
+    isempty(alpha) && throw(ArgumentError("no airfoil data rows found in $(filename)"))
+    return (
+        alpha = alpha,
+        cl = cl,
+        cd = cd,
+        cm = cm,
+        thickness_to_chord = thickness_to_chord,
+        zero_lift_aoa = zero_lift_aoa,
+        positive_stall_aoa = positive_stall_aoa,
+        negative_stall_aoa = negative_stall_aoa,
+    )
+end
+
 """
     readaerodyn(filename)
 
-create airfoil lookup for a file with only one reynolds number
+create airfoil lookup for the first Reynolds-number table in an OWENSAero
+airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
@@ -20,33 +79,11 @@ create airfoil lookup for a file with only one reynolds number
 
 """
 function readaerodyn(filename)
-    """currently only reads one Reynolds number if multiple exist"""
-
-    alpha = Float64[]
-    cl = Float64[]
-    cd = Float64[]
-    cm = Float64[]
-
-    open(filename) do f
-
-        # skip header
-        for i = 1:13
-            readline(f)
-        end
-
-        # read until EOT
-        while true
-            line = readline(f)
-            if occursin(line, "EOT")
-                break
-            end
-            parts = split(line)
-            push!(alpha, parse(Float64,parts[1]))
-            push!(cl, parse(Float64,parts[2]))
-            push!(cd, parse(Float64,parts[3]))
-            push!(cm, length(parts) >= 4 ? parse(Float64,parts[4]) : 0.0)
-        end
-    end
+    table = _read_first_reynolds_airfoil_table(filename)
+    alpha = table.alpha
+    cl = table.cl
+    cd = table.cd
+    cm = table.cm
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -76,7 +113,8 @@ end
 """
     readaerodyn_BV(filename)
 
-create airfoil lookup function with boeing vertol dynamic stall model for a file with only one reynolds number
+create airfoil lookup function with Boeing-Vertol dynamic stall metadata from
+the first Reynolds-number table in an OWENSAero airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
@@ -86,33 +124,11 @@ create airfoil lookup function with boeing vertol dynamic stall model for a file
 
 """
 function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
-    """currently only reads one Reynolds number if multiple exist"""
-
-    alpha = Float64[]
-    cl = Float64[]
-    cd = Float64[]
-    cm = Float64[]
-
-    open(filename) do f
-
-        # skip header
-        for i = 1:13
-            readline(f)
-        end
-
-        # read until EOT
-        while true
-            line = readline(f)
-            if occursin(line, "EOT")
-                break
-            end
-            parts = split(line)
-            push!(alpha, parse(Float64,parts[1]))
-            push!(cl, parse(Float64,parts[2]))
-            push!(cd, parse(Float64,parts[3]))
-            push!(cm, length(parts) >= 4 ? parse(Float64,parts[4]) : 0.0)
-        end
-    end
+    table = _read_first_reynolds_airfoil_table(filename)
+    alpha = table.alpha
+    cl = table.cl
+    cd = table.cd
+    cm = table.cm
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -137,11 +153,10 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
         return cl, cd, cm
     end
 
-    #TODO: Get these from the airfoil data
-    aoaStallPos = 10*pi/180
-    aoaStallNeg = -10*pi/180
-    AOA0 = 0.0
-    tc = 0.12
+    aoaStallPos = table.positive_stall_aoa
+    aoaStallNeg = table.negative_stall_aoa
+    AOA0 = table.zero_lift_aoa
+    tc = table.thickness_to_chord
 
     function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
         if idx==1

@@ -191,6 +191,36 @@ end
     @test env.alpha_last[2] ≈ 5 * pi / 180 atol=1e-14
     @test env.BV_DynamicFlagL[2] == 0
     @test env.BV_DynamicFlagD[2] == 0
+
+    stall_env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, 4),
+        zeros(4),
+        zeros(4),
+        zeros(4),
+        0.0,
+        "BV",
+        "DMS",
+        zeros(8),
+    )
+    cl_stall, cd_stall, cm_stall = af_bv(
+        7 * pi / 180,
+        3.0e5,
+        0.0,
+        stall_env,
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        idx=2,
+        return_cm=true,
+    )
+    @test cl_stall ≈ 0.77 atol=1e-14
+    @test cd_stall ≈ 0.01260229047028014 atol=1e-16
+    @test cm_stall == 0.0
+    @test stall_env.BV_DynamicFlagL == [1, 1, 0, 0]
+    @test stall_env.BV_DynamicFlagD == [1, 1, 0, 0]
 end
 
 @testset "airfoil Cm25 propagation" begin
