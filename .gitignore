@@ -19,3 +19,6 @@ theta*
 *.vscode
 *.png
 *.pdf
+
+# Generated polar conversion outputs
+examples/**/airfoils/*_DMS.dat
