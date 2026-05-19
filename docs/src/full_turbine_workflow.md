@@ -33,6 +33,7 @@ When coupled to OWENS structural dynamics:
 - use `deformTurb` or the coupled wrapper to update blade deflection state;
 - keep aero and structural sign conventions visible in the test name and fixture;
 - verify `M25` separately when pitching-moment polars are used, because it maps to the structural DOF-4 distributed moment channel;
+- treat `towerShadowVelocity` as a caller-side inflow primitive until tower-shadow feedback is validated in the solver loop;
 - map lumped ancillary loads such as `jointDragForce` explicitly in the caller until a validated solver-integrated drag option exists;
 - pin force components separately instead of testing only aggregate power.
 

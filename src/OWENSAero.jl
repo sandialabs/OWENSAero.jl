@@ -8,6 +8,7 @@ export Turbine, Environment, UnsteadyParams
 export cpValidationMetrics
 export wholeRevolutionIndexRange, wholeRevolutionMean
 export jointDragForce
+export towerShadowVelocity
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -242,6 +243,62 @@ function jointDragForce(rho, velocity, CdA)
 
     speed = sqrt(sum(abs2, velocity))
     return @. -0.5 * rho * CdA * speed * velocity
+end
+
+"""
+    towerShadowVelocity(velocity, relative_position; active=false,
+                        tower_radius=0.0, wake_expansion=0.0,
+                        centerline_deficit=0.0)
+
+Return the inflow velocity after an optional tower-shadow deficit. `velocity`
+is the undisturbed local flow vector, and `relative_position` points from the
+tower center to the evaluation point in the same frame. With `active=false`,
+the input velocity is returned unchanged. With `active=true`, a Gaussian
+downstream deficit is applied along the supplied wind direction. This helper is
+not coupled into DMS or AC induction.
+"""
+function towerShadowVelocity(
+    velocity,
+    relative_position;
+    active = false,
+    tower_radius = 0.0,
+    wake_expansion = 0.0,
+    centerline_deficit = 0.0,
+)
+    active isa Bool || throw(ArgumentError("active must be a Bool"))
+    velocity isa AbstractVector && relative_position isa AbstractVector ||
+        throw(ArgumentError("velocity and relative_position must be vectors"))
+    length(velocity) == length(relative_position) && length(velocity) in (2, 3) ||
+        throw(ArgumentError("velocity and relative_position must both have two or three components"))
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+    all(x -> x isa Real && isfinite(x), relative_position) ||
+        throw(ArgumentError("relative_position must contain only finite real values"))
+    tower_radius isa Real && isfinite(tower_radius) && tower_radius >= 0 ||
+        throw(ArgumentError("tower_radius must be a finite nonnegative real value"))
+    wake_expansion isa Real && isfinite(wake_expansion) && wake_expansion >= 0 ||
+        throw(ArgumentError("wake_expansion must be a finite nonnegative real value"))
+    centerline_deficit isa Real && isfinite(centerline_deficit) &&
+        0 <= centerline_deficit < 1 ||
+        throw(ArgumentError("centerline_deficit must be finite and satisfy 0 <= centerline_deficit < 1"))
+
+    active || return collect(velocity)
+    tower_radius == 0 && return collect(velocity)
+    centerline_deficit == 0 && return collect(velocity)
+
+    speed = sqrt(sum(abs2, velocity))
+    speed == 0 && return collect(velocity)
+
+    wind_direction = velocity ./ speed
+    downstream_distance = sum(relative_position .* wind_direction)
+    downstream_distance > 0 || return collect(velocity)
+
+    lateral = relative_position .- downstream_distance .* wind_direction
+    wake_radius = tower_radius + wake_expansion * downstream_distance
+    deficit =
+        centerline_deficit * (tower_radius / wake_radius)^2 *
+        exp(-0.5 * sum(abs2, lateral) / wake_radius^2)
+    return @. velocity * (1 - deficit)
 end
 
 function _finite_real_vector(values, name)

@@ -11,6 +11,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :wholeRevolutionIndexRange in exported
     @test :wholeRevolutionMean in exported
     @test :jointDragForce in exported
+    @test :towerShadowVelocity in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -268,6 +269,66 @@ end
     @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0, 0.0, 0.0], -0.5)
     @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0], 0.5)
     @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0, Inf, 0.0], 0.5)
+end
+
+@testset "tower shadow velocity helper" begin
+    velocity = [10.0, 0.0]
+    @test OWENSAero.towerShadowVelocity(
+        velocity,
+        [2.0, 0.0];
+        tower_radius = 1.0,
+        centerline_deficit = 0.2,
+    ) == velocity
+    @test OWENSAero.towerShadowVelocity(
+        velocity,
+        [-2.0, 0.0];
+        active = true,
+        tower_radius = 1.0,
+        centerline_deficit = 0.2,
+    ) == velocity
+    @test OWENSAero.towerShadowVelocity(
+        [0.0, 0.0],
+        [2.0, 0.0];
+        active = true,
+        tower_radius = 1.0,
+        centerline_deficit = 0.2,
+    ) == [0.0, 0.0]
+
+    centerline = OWENSAero.towerShadowVelocity(
+        velocity,
+        [2.0, 0.0];
+        active = true,
+        tower_radius = 1.0,
+        centerline_deficit = 0.2,
+    )
+    @test centerline == [8.0, 0.0]
+
+    lateral = OWENSAero.towerShadowVelocity(
+        velocity,
+        [2.0, 1.0];
+        active = true,
+        tower_radius = 1.0,
+        centerline_deficit = 0.2,
+    )
+    @test lateral == [10.0 * (1 - 0.2 * exp(-0.5)), 0.0]
+
+    expanded = OWENSAero.towerShadowVelocity(
+        [0.0, 12.0, 0.0],
+        [0.0, 4.0, 1.0];
+        active = true,
+        tower_radius = 1.0,
+        wake_expansion = 0.5,
+        centerline_deficit = 0.3,
+    )
+    expected_deficit = 0.3 * (1 / 3)^2 * exp(-0.5 / 9)
+    @test expanded == [0.0, 12.0 * (1 - expected_deficit), 0.0]
+
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0], [1.0]; active = true)
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; active = "yes")
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; tower_radius = -1.0)
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; wake_expansion = -0.1)
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; centerline_deficit = 1.0)
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, NaN], [1.0, 0.0])
 end
 
 @testset "DMS added-mass force sign convention" begin
