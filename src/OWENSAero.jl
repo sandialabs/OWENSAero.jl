@@ -14,7 +14,7 @@ export liftingStrutForce
 export prandtlTipLossFactor
 export oyeDynamicInflowTimeConstants, oyeDynamicInflowDerivative, oyeDynamicInflowStep
 export readAeroDynPrimaryFile, readAeroDynBladeFile, readAeroDynAirfoilInfo
-export aeroDynAirfoilFunction
+export aeroDynAirfoilFunction, aeroDynHAWTCCBladeInputs, ccbladeHAWTSolveFromAeroDyn
 export ccbladeHAWTSections, ccbladeHAWTOperatingPoints, ccbladeHAWTSolve
 
 # Actuator Cylinder

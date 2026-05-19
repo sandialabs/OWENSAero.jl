@@ -400,3 +400,215 @@ function aeroDynAirfoilFunction(table)
 
     return af
 end
+
+function _aerodyn_resolve_path(base_directory, path)
+    isabspath(path) && return normpath(path)
+    return normpath(joinpath(base_directory, path))
+end
+
+function _aerodyn_hawt_station_indices(span, root_station_policy)
+    if root_station_policy == :drop_zero_span
+        indices = findall(x -> x > 0.0, span)
+        isempty(indices) && throw(
+            ArgumentError("root_station_policy=:drop_zero_span removed every station"),
+        )
+        return indices
+    elseif root_station_policy == :strict_positive
+        any(x -> x <= 0.0, span) && throw(
+            ArgumentError(
+                "AeroDyn blade contains nonpositive span stations; use root_station_policy=:drop_zero_span or provide a positive-span blade file",
+            ),
+        )
+        return collect(eachindex(span))
+    end
+    throw(ArgumentError("root_station_policy must be :drop_zero_span or :strict_positive"))
+end
+
+function _ccblade_tip_correction_from_aerodyn(primary)
+    if primary.tip_loss && primary.hub_loss
+        return CCBlade.PrandtlTipHub()
+    elseif primary.tip_loss && !primary.hub_loss
+        return CCBlade.PrandtlTip()
+    elseif !primary.tip_loss && !primary.hub_loss
+        return nothing
+    end
+    throw(
+        ArgumentError(
+            "AeroDyn hub-loss without tip-loss is not representable by the current CCBlade adapter; pass an explicit tip_correction override",
+        ),
+    )
+end
+
+function _aerodyn_hawt_comparison_notes(primary, hub_radius)
+    notes = String[]
+    if primary.axial_induction_drag || primary.tangential_induction_drag
+        push!(
+            notes,
+            "AeroDyn drag-in-induction flags are enabled; confirm the selected CCBlade correction settings before comparing coefficients.",
+        )
+    else
+        push!(
+            notes,
+            "AeroDyn drag-in-induction flags are disabled, while CCBlade's BEM formulation includes drag terms in the induction solve.",
+        )
+    end
+    if primary.hub_loss && hub_radius == 0.0
+        push!(
+            notes,
+            "AeroDyn HubLoss is enabled but hub_radius=0.0 was supplied to CCBlade, so the root-loss effect is not equivalent to a finite hub radius.",
+        )
+    end
+    return notes
+end
+
+"""
+    aeroDynHAWTCCBladeInputs(primary_file; blade_index=1,
+                             base_directory=dirname(primary_file),
+                             root_station_policy=:drop_zero_span,
+                             tip_correction=:from_aerodyn,
+                             hub_radius=0.0)
+
+Build the geometry, airfoil callables, and metadata needed to run OWENSAero's
+CCBlade HAWT adapter from AeroDyn primary, blade, and AirfoilInfo files.
+`root_station_policy=:drop_zero_span` removes the common AeroDyn root station at
+zero span because CCBlade sections require positive radial positions.
+
+The returned named tuple does not run the BEM solve. It keeps the parsed
+AeroDyn primary options, blade data, polar tables, resolved files, station
+indices, selected CCBlade tip correction, and comparison notes visible so
+validation scripts can document any convention mismatch.
+"""
+function aeroDynHAWTCCBladeInputs(
+    primary_file;
+    blade_index = 1,
+    base_directory = dirname(primary_file),
+    root_station_policy = :drop_zero_span,
+    tip_correction = :from_aerodyn,
+    hub_radius = 0.0,
+)
+    primary = readAeroDynPrimaryFile(primary_file)
+    primary.wake_model == 1 ||
+        throw(ArgumentError("Only AeroDyn WakeMod=1 BEM inputs are supported"))
+    primary.airfoil_aero_model == 1 ||
+        throw(ArgumentError("Only AeroDyn AFAeroMod=1 steady airfoil inputs are supported"))
+    primary.airfoil_table_model == 1 ||
+        throw(ArgumentError("Only AeroDyn AFTabMod=1 first-table lookup is supported"))
+    primary.tangential_induction || throw(
+        ArgumentError("AeroDyn TanInd=false cannot be represented by this CCBlade path"),
+    )
+    primary.input_columns == (alpha = 1, cl = 2, cd = 3, cm = 4, cpmin = 0) || throw(
+        ArgumentError(
+            "Only the standard AeroDyn Alpha/Cl/Cd/Cm input-column layout is supported",
+        ),
+    )
+    blade_index isa Integer && 1 <= blade_index <= length(primary.blade_files) ||
+        throw(ArgumentError("blade_index must select one of primary.blade_files"))
+
+    airfoil_files =
+        [_aerodyn_resolve_path(base_directory, file) for file in primary.airfoil_files]
+    airfoil_tables = readAeroDynAirfoilInfo.(airfoil_files)
+    airfoils = aeroDynAirfoilFunction.(airfoil_tables)
+
+    blade_file = _aerodyn_resolve_path(base_directory, primary.blade_files[blade_index])
+    blade = readAeroDynBladeFile(blade_file)
+    maximum(blade.airfoil_ids) <= length(airfoils) || throw(
+        ArgumentError(
+            "AeroDyn blade references airfoil ID $(maximum(blade.airfoil_ids)) but only $(length(airfoils)) airfoil files were parsed",
+        ),
+    )
+
+    station_indices = _aerodyn_hawt_station_indices(blade.span, root_station_policy)
+    station_airfoils = [airfoils[blade.airfoil_ids[i]] for i in station_indices]
+    selected_tip_correction =
+        tip_correction == :from_aerodyn ? _ccblade_tip_correction_from_aerodyn(primary) :
+        tip_correction
+    _validate_hawt_tip_correction(selected_tip_correction)
+
+    return (
+        primary = primary,
+        blade = blade,
+        airfoil_tables = airfoil_tables,
+        airfoil_files = airfoil_files,
+        blade_file = blade_file,
+        station_indices = station_indices,
+        radial_positions = blade.span[station_indices],
+        chord = blade.chord[station_indices],
+        twist = blade.twist_rad[station_indices],
+        airfoils = station_airfoils,
+        num_blades = length(primary.blade_files),
+        tip_radius = maximum(blade.span[station_indices]),
+        tip_correction = selected_tip_correction,
+        root_station_policy = root_station_policy,
+        comparison_notes = _aerodyn_hawt_comparison_notes(primary, hub_radius),
+    )
+end
+
+"""
+    ccbladeHAWTSolveFromAeroDyn(primary_file, rotor_speed, inflow_speed, rho; kwargs...)
+
+Read an AeroDyn steady-BEM HAWT input set and run `ccbladeHAWTSolve` with the
+parsed blade geometry and polar files. Keyword arguments accepted by
+`aeroDynHAWTCCBladeInputs` control file resolution and root-station handling;
+remaining operating keywords are forwarded to `ccbladeHAWTSolve`.
+
+This helper is an input-normalization bridge for validation. It does not make
+CCBlade numerically identical to AeroDyn; use the returned `comparison_notes`
+when deciding which OpenFAST channels can be compared directly.
+"""
+function ccbladeHAWTSolveFromAeroDyn(
+    primary_file,
+    rotor_speed,
+    inflow_speed,
+    rho;
+    blade_index = 1,
+    base_directory = dirname(primary_file),
+    root_station_policy = :drop_zero_span,
+    hub_radius = 0.0,
+    tip_radius = nothing,
+    pitch = 0.0,
+    precone = 0.0,
+    mu = 1.7894e-5,
+    asound = 340.0,
+    npts = 10,
+    tip_correction = :from_aerodyn,
+)
+    inputs = aeroDynHAWTCCBladeInputs(
+        primary_file;
+        blade_index,
+        base_directory,
+        root_station_policy,
+        tip_correction,
+        hub_radius,
+    )
+    solve_tip_radius = tip_radius === nothing ? inputs.tip_radius : tip_radius
+    result = ccbladeHAWTSolve(
+        inputs.radial_positions,
+        inputs.chord,
+        inputs.twist,
+        inputs.airfoils,
+        rotor_speed,
+        inflow_speed,
+        rho;
+        num_blades = inputs.num_blades,
+        hub_radius,
+        tip_radius = solve_tip_radius,
+        pitch,
+        precone,
+        mu,
+        asound,
+        npts,
+        tip_correction = inputs.tip_correction,
+    )
+
+    return (
+        result...,
+        aerodyn_primary = inputs.primary,
+        aerodyn_blade = inputs.blade,
+        aerodyn_airfoil_tables = inputs.airfoil_tables,
+        aerodyn_airfoil_files = inputs.airfoil_files,
+        aerodyn_blade_file = inputs.blade_file,
+        aerodyn_station_indices = inputs.station_indices,
+        root_station_policy = inputs.root_station_policy,
+        comparison_notes = inputs.comparison_notes,
+    )
+end

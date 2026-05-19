@@ -20,6 +20,23 @@ sections = ccbladeHAWTSections(
 )
 ```
 
+For a complete steady CCBlade solve from the same files:
+
+```julia
+result = ccbladeHAWTSolveFromAeroDyn(
+    "ad_primary.dat",
+    rpm * 2pi / 60,
+    inflow_speed,
+    rho;
+    root_station_policy = :drop_zero_span,
+    hub_radius = hub_radius,
+)
+```
+
+Use `aeroDynHAWTCCBladeInputs(...)` when you need to inspect the parsed
+geometry, selected airfoil files, station indices, or comparison notes before
+running the solve.
+
 `readAeroDynPrimaryFile` extracts the steady BEM and airfoil-table controls
 needed for comparison studies: `WakeMod`, `AFAeroMod`, tip and hub loss flags,
 tangential induction, induction-drag flags, table column mapping, airfoil-file

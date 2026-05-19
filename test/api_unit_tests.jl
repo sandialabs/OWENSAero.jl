@@ -22,6 +22,8 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :readAeroDynBladeFile in exported
     @test :readAeroDynAirfoilInfo in exported
     @test :aeroDynAirfoilFunction in exported
+    @test :aeroDynHAWTCCBladeInputs in exported
+    @test :ccbladeHAWTSolveFromAeroDyn in exported
     @test :ccbladeHAWTSections in exported
     @test :ccbladeHAWTOperatingPoints in exported
     @test :ccbladeHAWTSolve in exported
@@ -357,6 +359,176 @@ end
             """,
         )
         @test_throws ArgumentError OWENSAero.readAeroDynAirfoilInfo(bad_airfoil_path)
+
+        solve_airfoil_dir = joinpath(tmpdir, "Airfoils")
+        mkpath(solve_airfoil_dir)
+        solve_polar = """
+                    1   NumTabs
+                 1.00   Re
+                    0   UserProp
+        False         InclUAdata
+                  5     NumAlf
+             -180.00    0.000   0.0600   0.0000
+              -90.00   -1.000   0.0200  -0.0200
+                0.00    0.000   0.0100  -0.0500
+               90.00    1.000   0.0200  -0.0200
+              180.00    0.000   0.0600   0.0000
+        """
+        write(joinpath(solve_airfoil_dir, "af1.dat"), solve_polar)
+        write(joinpath(solve_airfoil_dir, "af2.dat"), solve_polar)
+        write(joinpath(solve_airfoil_dir, "af3.dat"), solve_polar)
+
+        solve_blade_path = joinpath(tmpdir, "solve_blade.dat")
+        write(
+            solve_blade_path,
+            """
+                    4   NumBlNds
+            0.0 0.0 0.0 0.0 12.0 0.50 1
+            2.0 0.0 0.0 0.0 12.0 0.50 1
+            4.0 0.0 0.0 0.0 8.0  0.45 2
+            6.0 0.0 0.0 0.0 3.0  0.35 3
+            """,
+        )
+        solve_primary_path = joinpath(tmpdir, "solve_primary.dat")
+        write(
+            solve_primary_path,
+            """
+                      1   WakeMod
+                      1   AFAeroMod
+                      1   SkewMod
+            True          TipLoss
+            True          HubLoss
+            True          TanInd
+            False         AIDrag
+            False         TIDrag
+            "Default"     IndToler
+                    100   MaxIter
+                      2   DBEMT_Mod
+                      4   tau1_const
+                      3   UAMod
+            True          FLookup
+                      1   AFTabMod
+                      1   InCol_Alfa
+                      2   InCol_Cl
+                      3   InCol_Cd
+                      4   InCol_Cm
+                      0   InCol_Cpmin
+                      3   NumAFfiles
+            "./Airfoils/af1.dat"    AFNames
+            "./Airfoils/af2.dat"
+            "./Airfoils/af3.dat"
+            True          UseBlCm
+            "./solve_blade.dat"    ADBlFile(1)
+            "./solve_blade.dat"    ADBlFile(2)
+            "./solve_blade.dat"    ADBlFile(3)
+            """,
+        )
+
+        inputs = OWENSAero.aeroDynHAWTCCBladeInputs(
+            solve_primary_path;
+            base_directory = tmpdir,
+            hub_radius = 1.0,
+        )
+        @test inputs.primary.source == solve_primary_path
+        @test inputs.blade_file == solve_blade_path
+        @test inputs.airfoil_files == [
+            joinpath(solve_airfoil_dir, "af1.dat"),
+            joinpath(solve_airfoil_dir, "af2.dat"),
+            joinpath(solve_airfoil_dir, "af3.dat"),
+        ]
+        @test inputs.station_indices == [2, 3, 4]
+        @test inputs.radial_positions == [2.0, 4.0, 6.0]
+        @test inputs.chord == [0.5, 0.45, 0.35]
+        @test inputs.twist ≈ deg2rad.([12.0, 8.0, 3.0]) atol=1e-16
+        @test inputs.num_blades == 3
+        @test inputs.tip_radius == 6.0
+        @test inputs.tip_correction isa OWENSAero.CCBlade.PrandtlTipHub
+        @test inputs.root_station_policy == :drop_zero_span
+        @test length(inputs.comparison_notes) == 1
+        @test occursin("drag-in-induction", inputs.comparison_notes[1])
+        @test occursin(
+            "hub_radius=0.0",
+            OWENSAero.aeroDynHAWTCCBladeInputs(
+                solve_primary_path;
+                base_directory = tmpdir,
+            ).comparison_notes[2],
+        )
+
+        strict_blade_path = joinpath(tmpdir, "strict_blade.dat")
+        write(
+            strict_blade_path,
+            """
+                    3   NumBlNds
+            2.0 0.0 0.0 0.0 12.0 0.50 1
+            4.0 0.0 0.0 0.0 8.0  0.45 2
+            6.0 0.0 0.0 0.0 3.0  0.35 3
+            """,
+        )
+        strict_primary_path = joinpath(tmpdir, "strict_primary.dat")
+        write(
+            strict_primary_path,
+            replace(
+                read(solve_primary_path, String),
+                "./solve_blade.dat" => "./strict_blade.dat",
+            ),
+        )
+        strict_inputs = OWENSAero.aeroDynHAWTCCBladeInputs(
+            strict_primary_path;
+            base_directory = tmpdir,
+            root_station_policy = :strict_positive,
+            hub_radius = 1.0,
+        )
+        @test strict_inputs.station_indices == [1, 2, 3]
+
+        solve_result = OWENSAero.ccbladeHAWTSolveFromAeroDyn(
+            solve_primary_path,
+            2.0,
+            8.0,
+            1.225;
+            base_directory = tmpdir,
+            hub_radius = 1.0,
+            tip_radius = 7.0,
+            pitch = deg2rad(1.0),
+            npts = 8,
+        )
+        @test solve_result.aerodyn_station_indices == [2, 3, 4]
+        @test solve_result.aerodyn_primary.airfoil_files == inputs.primary.airfoil_files
+        @test solve_result.root_station_policy == :drop_zero_span
+        @test solve_result.thrust ≈ 146.23764040110723 atol=1e-10
+        @test solve_result.torque ≈ 536.0766995656568 atol=1e-10
+        @test solve_result.power ≈ 1072.1533991313136 atol=1e-10
+        @test solve_result.CP ≈ 0.022209302533387956 atol=1e-15
+        @test solve_result.CT ≈ 0.02423411426065314 atol=1e-15
+        @test solve_result.CQ ≈ 0.012691030019078833 atol=1e-15
+
+        @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
+            solve_primary_path;
+            base_directory = tmpdir,
+            root_station_policy = :strict_positive,
+        )
+        @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
+            solve_primary_path;
+            base_directory = tmpdir,
+            blade_index = 4,
+        )
+        @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
+            solve_primary_path;
+            base_directory = tmpdir,
+            tip_correction = "Prandtl",
+        )
+
+        hub_only_primary_path = joinpath(tmpdir, "hub_only_primary.dat")
+        write(
+            hub_only_primary_path,
+            replace(
+                read(solve_primary_path, String),
+                "True          TipLoss" => "False         TipLoss",
+            ),
+        )
+        @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
+            hub_only_primary_path;
+            base_directory = tmpdir,
+        )
     end
 end
 
