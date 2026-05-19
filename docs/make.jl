@@ -11,6 +11,7 @@ makedocs(;
         "Full Turbine Workflow" => "full_turbine_workflow.md",
         "Dynamic Stall" => "dynamic_stall.md",
         "RM2 Example" => "rm2_example.md",
+        "Rigid HAWT CCBlade Example" => "hawt_ccblade_example.md",
         "Frames, Units, and Outputs" => joinpath("theory", "frames_units.md"),
         "Validation and Testing" => "validation.md",
         "API Reference" => joinpath("reference", "reference.md"),
