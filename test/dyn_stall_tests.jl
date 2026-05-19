@@ -2,6 +2,7 @@ using Test
 import DelimitedFiles
 import HDF5
 import FLOWMath
+import Statistics: mean
 
 import OWENSAero
 # include("../src/OWENSAero.jl")
@@ -27,6 +28,53 @@ function akima_without_duplicate_abscissae(x, y)
         i = j + 1
     end
     return FLOWMath.Akima(unique_x, unique_y)
+end
+
+function interpolate_monotonic(x, y, x_query)
+    idx = searchsortedlast(x, x_query)
+    idx == length(x) && return y[end]
+    idx == 0 && return y[1]
+    fraction = (x_query - x[idx]) / (x[idx+1] - x[idx])
+    return y[idx] + fraction * (y[idx+1] - y[idx])
+end
+
+function branch_validation_metrics(alpha_model_deg, coefficient_model, reference_data; branch)
+    max_alpha_idx = argmax(alpha_model_deg)
+    min_alpha_idx = argmin(alpha_model_deg)
+    reference_max_alpha_idx = argmax(reference_data[:, 1])
+
+    if branch === :upstroke
+        model_alpha = alpha_model_deg[1:max_alpha_idx]
+        model_coefficient = coefficient_model[1:max_alpha_idx]
+        reference_branch = reference_data[1:reference_max_alpha_idx, :]
+    elseif branch === :downstroke
+        model_alpha = reverse(alpha_model_deg[max_alpha_idx:min_alpha_idx])
+        model_coefficient = reverse(coefficient_model[max_alpha_idx:min_alpha_idx])
+        reference_branch = reference_data[reference_max_alpha_idx:end, :]
+    else
+        throw(ArgumentError("branch must be :upstroke or :downstroke"))
+    end
+
+    overlap = findall(
+        alpha -> first(model_alpha) <= alpha <= last(model_alpha),
+        reference_branch[:, 1],
+    )
+    isempty(overlap) && throw(ArgumentError("reference branch does not overlap model branch"))
+
+    reference_alpha = reference_branch[overlap, 1]
+    reference_coefficient = reference_branch[overlap, 2]
+    model_on_reference = [
+        interpolate_monotonic(model_alpha, model_coefficient, alpha)
+        for alpha in reference_alpha
+    ]
+    error = model_on_reference .- reference_coefficient
+    abs_error = abs.(error)
+    return (
+        n = length(reference_alpha),
+        rmse = sqrt(mean(error .^ 2)),
+        mean_bias = mean(error),
+        max_abs_error = maximum(abs_error),
+    )
 end
 
 @testset "NACA 0012 Boeing-Vertol" begin
@@ -117,6 +165,17 @@ end
     CD_BV_old = HDF5.h5read(filename,"CD_BV")
     CM_BV_old = HDF5.h5read(filename,"CM_BV")
 
+    CL_BV_paper = DelimitedFiles.readdlm(
+        "$(path)/data/dynstall/Fig10_BV_CL.txt",
+        ',',
+        Float64,
+    )
+    CM_BV_paper = DelimitedFiles.readdlm(
+        "$(path)/data/dynstall/CM_Fig10_BV_Sadr.txt",
+        ',',
+        Float64,
+    )
+
     # Perform pinned regression comparisons against the checked-in dynamic-stall
     # fixture. These are intentionally direct array checks rather than loose
     # "is real" assertions, because small changes in the dynamic flags or prior
@@ -143,6 +202,36 @@ end
     @test CL_BV[1] ≈ 1.1116093542418823 atol=tol
     @test CD_BV[1] ≈ 0.0184 atol=tol
     @test CM_BV[end] ≈ -0.001917210444783475 atol=tol
+
+    alpha_BV_deg = alpha_BV .* 180 ./ pi
+    cl_upstroke_metrics =
+        branch_validation_metrics(alpha_BV_deg, CL_BV, CL_BV_paper; branch = :upstroke)
+    cl_downstroke_metrics =
+        branch_validation_metrics(alpha_BV_deg, CL_BV, CL_BV_paper; branch = :downstroke)
+    cm_upstroke_metrics =
+        branch_validation_metrics(alpha_BV_deg, CM_BV, CM_BV_paper; branch = :upstroke)
+    cm_downstroke_metrics =
+        branch_validation_metrics(alpha_BV_deg, CM_BV, CM_BV_paper; branch = :downstroke)
+
+    @test cl_upstroke_metrics.n == 15
+    @test cl_upstroke_metrics.rmse ≈ 0.04276727373228908 atol=tol
+    @test cl_upstroke_metrics.mean_bias ≈ -0.018794652588474445 atol=tol
+    @test cl_upstroke_metrics.max_abs_error ≈ 0.09946657595093722 atol=tol
+
+    @test cl_downstroke_metrics.n == 14
+    @test cl_downstroke_metrics.rmse ≈ 0.019404808461011173 atol=tol
+    @test cl_downstroke_metrics.mean_bias ≈ 0.012941709005760067 atol=tol
+    @test cl_downstroke_metrics.max_abs_error ≈ 0.039470874818617885 atol=tol
+
+    @test cm_upstroke_metrics.n == 18
+    @test cm_upstroke_metrics.rmse ≈ 0.070528150967298 atol=tol
+    @test cm_upstroke_metrics.mean_bias ≈ 0.048736483519612094 atol=tol
+    @test cm_upstroke_metrics.max_abs_error ≈ 0.14983040863490035 atol=tol
+
+    @test cm_downstroke_metrics.n == 25
+    @test cm_downstroke_metrics.rmse ≈ 0.0545389720609115 atol=tol
+    @test cm_downstroke_metrics.mean_bias ≈ -0.026397059261107584 atol=tol
+    @test cm_downstroke_metrics.max_abs_error ≈ 0.12274142264021343 atol=tol
 
 end
 
