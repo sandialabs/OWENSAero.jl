@@ -31,6 +31,7 @@ New submodels should include:
 | Tower shadow | Exported helper only. It does not modify DMS/AC induction unless a caller applies the returned velocity. | API tests pin off-by-default behavior, downstream gating, lateral deficit, wake expansion, and invalid inputs. | Add a solver option and validate against tower-shadow or wake-deficit data before changing blade loads. |
 | Lifting struts | Exported helper only. It does not modify DMS/AC induction or OWENS structural channels unless a caller maps it. | API tests pin 2D/3D lift-drag decomposition, oblique directions, zero cases, and invalid inputs. | Couple strut geometry, aero data, postprocessing, and VTK/stress output after validation. |
 | Unsteady wake and RPI | Implemented for single-turbine positive-rotation workflows. Negative mean rotor speed with `RPI=true` fails fast until the clockwise unsteady path is validated. | Examples and tests pin representative unsteady histories, whole-revolution averaging windows, wake-speed floor behavior, positive `tau` validation, and the negative-RPM RPI guard. | Add timestep-sensitivity and aliasing diagnostics; validate clockwise and multi-rotor behavior before expanding support. |
+| HAWT Oye dynamic inflow | Exported helper only. It advances reduced and dynamic induction states for future CCBlade-based HAWT work. | API tests pin Oye time constants, state derivatives, exact constant-input steps, equal-time-constant handling, invalid inputs, and a ForwardDiff derivative. | Add the CCBlade adapter, rigid-rotor HAWT example, and OpenFAST/AeroDyn DBEMT validation before coupling HAWT loads into OWENS. |
 | InflowWind coupling | Available through high-level setup paths when external TurbSim/OpenFAST inputs are supplied. | Existing fixtures cover required file layout and selected setup behavior. | Harden WindIO airfoil usage and secondary-file provenance in validation examples. |
 
 ## Additional Model Work To Triage
@@ -44,8 +45,8 @@ into existing solvers without evidence:
 - polar-format unification and out-of-range interpolation/extrapolation policy;
 - solver-integrated tower shadow, joint drag, and lifting-strut loads;
 - timestep/azimuth-convergence diagnostics for unsteady DMS and AC;
-- HAWT/axial-flow aero path using global rotation-frame bookkeeping and
-  OpenFAST comparison metrics.
+- HAWT/axial-flow aero path using CCBlade, Oye dynamic inflow, global
+  rotation-frame bookkeeping, and OpenFAST comparison metrics.
 
 ## API Reference
 

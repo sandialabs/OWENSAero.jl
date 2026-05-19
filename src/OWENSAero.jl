@@ -11,6 +11,7 @@ export jointDragForce
 export towerShadowVelocity
 export liftingStrutForce
 export prandtlTipLossFactor
+export oyeDynamicInflowTimeConstants, oyeDynamicInflowDerivative, oyeDynamicInflowStep
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -695,6 +696,7 @@ function _airfoil_coefficients(
 end
 
 include("DMS.jl")
+include("DynamicInflow.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")
 include("Unsteady_Step.jl")

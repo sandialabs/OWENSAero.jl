@@ -44,6 +44,17 @@ not automatically applied inside DMS or AC because those VAWT solvers need a
 separate finite-height validation basis before their load baselines should
 change.
 
+## HAWT Dynamic Inflow Scope
+
+`oyeDynamicInflowTimeConstants`, `oyeDynamicInflowDerivative`, and
+`oyeDynamicInflowStep` provide a tested Oye dynamic-inflow primitive for future
+CCBlade-based HAWT work. The helper follows the AeroDyn DBEMT continuous
+state-space form and advances axial or tangential induction states at radial
+stations. It is not a replacement for the current DMS wake-speed filter and is
+not yet coupled into a HAWT solver path; callers must provide the quasi-steady
+induction from a BEM backend such as CCBlade and map the resulting dynamic
+induction into loads explicitly.
+
 ## Dynamic Stall
 
 `DynamicStallModel = "BV"` activates the Boeing-Vertol model used by the current tests and examples. `DynamicStallModel = "none"` bypasses dynamic stall and is the safest choice for gradient-sensitive workflows. The Leishman-Beddoes path is present in historical comments but should not be treated as a production option until it has complete tests and documentation.

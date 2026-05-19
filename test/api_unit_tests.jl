@@ -15,6 +15,9 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :towerShadowVelocity in exported
     @test :liftingStrutForce in exported
     @test :prandtlTipLossFactor in exported
+    @test :oyeDynamicInflowTimeConstants in exported
+    @test :oyeDynamicInflowDerivative in exported
+    @test :oyeDynamicInflowStep in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -380,6 +383,106 @@ end
         10.0,
         pi / 6;
         include_root = 1,
+    )
+end
+
+@testset "Oye dynamic inflow helper" begin
+    tau1, tau2 = OWENSAero.oyeDynamicInflowTimeConstants(
+        50.0,
+        10.0,
+        0.2,
+        [10.0, 25.0, 50.0],
+    )
+    @test tau1 == 7.432432432432433
+    @test tau2 == [2.8213513513513515, 2.415540540540541, 0.9662162162162163]
+
+    reduced = [0.1, -0.2]
+    dynamic = [0.05, -0.1]
+    quasi_steady = [0.4, -0.3]
+    reduced_rate, dynamic_rate = OWENSAero.oyeDynamicInflowDerivative(
+        reduced,
+        dynamic,
+        quasi_steady,
+        2.0,
+        [0.5, 1.5],
+    )
+    @test reduced_rate ≈ [0.030000000000000013, 0.04000000000000001] atol=1e-16
+    @test dynamic_rate == [0.58, -0.18666666666666668]
+
+    next_reduced, next_dynamic = OWENSAero.oyeDynamicInflowStep(
+        reduced,
+        dynamic,
+        quasi_steady,
+        0.25,
+        2.0,
+        [0.5, 1.5],
+    )
+    @test next_reduced == [0.10705018584492429, -0.19059975220676764]
+    @test next_dynamic == [0.16563696967082134, -0.1422285118839512]
+
+    steady_reduced, steady_dynamic =
+        OWENSAero.oyeDynamicInflowStep(0.16, 0.4, 0.4, 0.25, 2.0, 0.5)
+    @test steady_reduced ≈ 0.16000000000000003 atol=1e-16
+    @test steady_dynamic == 0.4
+
+    equal_tau_reduced, equal_tau_dynamic =
+        OWENSAero.oyeDynamicInflowStep(0.1, 0.05, 0.4, 0.25, 1.0, 1.0)
+    @test equal_tau_reduced == 0.11327195301571572
+    @test equal_tau_dynamic == 0.11573771417893719
+
+    zero_dt_reduced, zero_dt_dynamic =
+        OWENSAero.oyeDynamicInflowStep(0.1, 0.05, 0.4, 0.0, 2.0, 0.5)
+    @test zero_dt_reduced == 0.1
+    @test zero_dt_dynamic ≈ 0.05 atol=1e-16
+
+    derivative = ForwardDiff.derivative(
+        q -> OWENSAero.oyeDynamicInflowStep(0.1, 0.05, q, 0.25, 2.0, 0.5)[2],
+        0.4,
+    )
+    @test derivative == 0.2462873440889868
+
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowTimeConstants(
+        0.0,
+        10.0,
+        0.2,
+        5.0,
+    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowTimeConstants(
+        50.0,
+        10.0,
+        0.2,
+        60.0,
+    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowDerivative(
+        [0.1, NaN],
+        dynamic,
+        quasi_steady,
+        2.0,
+        [0.5, 1.5],
+    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowDerivative(
+        reduced,
+        dynamic,
+        quasi_steady,
+        -2.0,
+        [0.5, 1.5],
+    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowStep(
+        reduced,
+        dynamic,
+        quasi_steady,
+        -0.25,
+        2.0,
+        [0.5, 1.5],
+    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowStep(
+        reduced,
+        dynamic,
+        quasi_steady,
+        0.25,
+        2.0,
+        [0.5, 1.5];
+        k = 1.2,
     )
 end
 
