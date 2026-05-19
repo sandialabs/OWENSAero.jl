@@ -38,6 +38,10 @@ update that baseline with tests that show the expected numerical change.
 
 Model option strings are normalized at construction and setup time: `BV`/`boeing-vertol` select Boeing-Vertol, `none`/`noDS`/`NONE` disable dynamic stall, and `DMS`/`AC` select the aerodynamic model case-insensitively. `DynamicStallModel = "LB"` now fails immediately with a not-implemented error instead of falling through to a static airfoil path.
 
+## Parasitic and Lumped Drag Scope
+
+`jointDragForce(rho, velocity, CdA)` provides a pinned lumped bluff-body drag primitive for joints, hardware, or other ancillary bodies. It returns a force vector in the same frame as the supplied relative velocity using `-0.5*rho*CdA*|V|*V`. This helper is intentionally not coupled into DMS or AC induction, and it does not modify blade airfoil loads or turbine base loads unless a caller explicitly maps the returned force into a structural load workflow.
+
 ## Unsteady Method and RPI
 
 `UnsteadyParams` controls the unsteady wake path. `RPI = true` enables reduced-pass interpolation to avoid recalculating every azimuthal point at every unsteady step. The `tau` vector controls wake propagation filtering. Existing tests pin representative unsteady results for both DMS and AC, but new use cases should add explicit baseline values for the selected `tau`, `RPI`, and time-step choices.

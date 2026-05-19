@@ -7,6 +7,7 @@ export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
 export cpValidationMetrics
 export wholeRevolutionIndexRange, wholeRevolutionMean
+export jointDragForce
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -220,6 +221,28 @@ Return the current triangular-section buoyancy area per unit span used by the
 DMS and actuator-cylinder paths.
 """
 buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
+
+"""
+    jointDragForce(rho, velocity, CdA)
+
+Return the lumped bluff-body drag force vector for a joint or other ancillary
+body in the same frame as `velocity`. `CdA` is the drag coefficient times
+reference area in square meters, and the returned force opposes the supplied
+relative velocity. This helper is not coupled into DMS or AC induction.
+"""
+function jointDragForce(rho, velocity, CdA)
+    rho isa Real && isfinite(rho) && rho >= 0 ||
+        throw(ArgumentError("rho must be a finite nonnegative real value"))
+    CdA isa Real && isfinite(CdA) && CdA >= 0 ||
+        throw(ArgumentError("CdA must be a finite nonnegative real value"))
+    velocity isa AbstractVector && length(velocity) in (2, 3) ||
+        throw(ArgumentError("velocity must be a two- or three-component vector"))
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+
+    speed = sqrt(sum(abs2, velocity))
+    return @. -0.5 * rho * CdA * speed * velocity
+end
 
 function _finite_real_vector(values, name)
     values isa AbstractVector || throw(ArgumentError("$(name) must be a vector"))

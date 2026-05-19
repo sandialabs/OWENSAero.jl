@@ -10,6 +10,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     @test :cpValidationMetrics in exported
     @test :wholeRevolutionIndexRange in exported
     @test :wholeRevolutionMean in exported
+    @test :jointDragForce in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -251,6 +252,22 @@ end
     thicknesses = [0.04, 0.08]
     @test OWENSAero.buoyancy_section_area_per_unit_span.(chords, thicknesses) ==
           [0.004, 0.016]
+end
+
+@testset "lumped joint drag helper" begin
+    @test OWENSAero.jointDragForce(2.0, [0.0, 0.0, 0.0], 0.5) == [0.0, 0.0, 0.0]
+    @test OWENSAero.jointDragForce(2.0, [3.0, 4.0, 0.0], 0.0) == [0.0, 0.0, 0.0]
+
+    force = OWENSAero.jointDragForce(2.0, [3.0, 4.0, 0.0], 0.5)
+    @test force == [-7.5, -10.0, -0.0]
+    @test sqrt(sum(abs2, force)) == 0.5 * 2.0 * 0.5 * 5.0^2
+    @test sum(force .* [3.0, 4.0, 0.0]) < 0.0
+
+    @test OWENSAero.jointDragForce(2.0, [-2.0, 1.0], 0.5) == [sqrt(5.0), -sqrt(5.0) / 2]
+    @test_throws ArgumentError OWENSAero.jointDragForce(-1.0, [1.0, 0.0, 0.0], 0.5)
+    @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0, 0.0, 0.0], -0.5)
+    @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0], 0.5)
+    @test_throws ArgumentError OWENSAero.jointDragForce(1.0, [1.0, Inf, 0.0], 0.5)
 end
 
 @testset "DMS added-mass force sign convention" begin
