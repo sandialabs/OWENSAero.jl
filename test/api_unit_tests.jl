@@ -7,6 +7,7 @@ const API_TEST_DIR, _ = splitdir(@__FILE__)
     exported = names(OWENSAero)
     @test :AC in exported
     @test :DMS in exported
+    @test :cpValidationMetrics in exported
     @test :AC_steady ∉ exported
     @test isdefined(OWENSAero, :AC)
     @test !isdefined(OWENSAero, :AC_steady)
@@ -100,6 +101,54 @@ end
     thicknesses = [0.04, 0.08]
     @test OWENSAero.buoyancy_section_area_per_unit_span.(chords, thicknesses) ==
           [0.004, 0.016]
+end
+
+@testset "CP validation metrics" begin
+    metrics = OWENSAero.cpValidationMetrics(
+        [3.0, 1.0, 2.0],
+        [9.0, 1.0, 4.0],
+        [1.0, 1.5, 2.5],
+        [1.25, 2.75, 6.0],
+    )
+
+    @test metrics.n == 3
+    @test metrics.model_cp_on_reference == [1.0, 2.5, 6.5]
+    @test metrics.reference_tsr == [1.0, 1.5, 2.5]
+    @test metrics.reference_cp == [1.25, 2.75, 6.0]
+    @test metrics.rmse ≈ 0.3535533905932738 atol=1e-16
+    @test metrics.mean_bias == 0.0
+    @test metrics.mean_abs_error ≈ 1 / 3 atol=1e-16
+    @test metrics.max_abs_error == 0.5
+    @test metrics.model_peak_tsr == 3.0
+    @test metrics.model_peak_cp == 9.0
+    @test metrics.reference_peak_tsr == 2.5
+    @test metrics.reference_peak_cp == 6.0
+    @test metrics.peak_cp_error == 3.0
+
+    @test_throws ArgumentError OWENSAero.cpValidationMetrics(
+        [1.0],
+        [1.0],
+        [1.0],
+        [1.0],
+    )
+    @test_throws ArgumentError OWENSAero.cpValidationMetrics(
+        [1.0, 1.0],
+        [1.0, 2.0],
+        [1.0],
+        [1.0],
+    )
+    @test_throws ArgumentError OWENSAero.cpValidationMetrics(
+        [1.0, 2.0],
+        [1.0, 2.0],
+        [3.0],
+        [1.0],
+    )
+    @test_throws ArgumentError OWENSAero.cpValidationMetrics(
+        [1.0, 2.0],
+        [1.0, NaN],
+        [1.0],
+        [1.0],
+    )
 end
 
 @testset "AeroDyn airfoil readers" begin

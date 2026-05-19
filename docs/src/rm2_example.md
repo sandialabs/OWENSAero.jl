@@ -22,3 +22,9 @@ points with the checked-in experimental RM2 curve. These scripts are examples,
 not CI validation. A CI-quality RM2 validation should pin scalar error metrics
 against the experimental data for a specific model configuration and runtime
 budget.
+
+`RM2_medium.jl` prints CP validation metrics against the checked-in Re=1.3
+experimental curve for each model configuration. The metrics are calculated
+with `OWENSAero.cpValidationMetrics` by interpolating the modeled CP curve onto
+the overlapping experimental tip-speed-ratio points, then reporting RMSE, mean
+bias, maximum absolute error, and peak-CP error.

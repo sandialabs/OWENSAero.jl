@@ -17,3 +17,8 @@ OWENSAERO_RM2_MODELS=all julia --project=. examples/RM2/RM2_medium.jl
 `PlotQbladeResults.jl` overlays the checked-in RM2 experimental CP curve with
 representative QBlade points and writes the figure under `examples/RM2/figures`,
 which is ignored as generated output.
+
+`RM2_medium.jl` also prints scalar CP validation metrics against the checked-in
+Re=1.3 experimental curve. These include the number of overlapping experimental
+points, RMSE, mean bias, maximum absolute error, and peak-CP error for each
+model configuration in the sweep.

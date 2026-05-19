@@ -1,6 +1,6 @@
 using Plots
 using DelimitedFiles: readdlm
-import OWENSAero: setupTurb, steadyTurb
+import OWENSAero: cpValidationMetrics, setupTurb, steadyTurb
 import FLOWMath: akima
 
 path,_ = splitdir(@__FILE__)
@@ -98,6 +98,18 @@ end
 expdata_path = "$path/exp_data"
 exp_0p9 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_0.9E6.csv"), ',', Float64)
 exp_1p3 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_1.3E6.csv"), ',', Float64)
+
+validation_metrics = Dict{String,NamedTuple}()
+println("RM2 CP validation metrics against Re=1.3 experimental data")
+for (label, result) in sort(collect(results); by = first)
+    metrics = cpValidationMetrics(tsr, result["cₚ"], exp_1p3[:, 1], exp_1p3[:, 2])
+    validation_metrics[label] = metrics
+    println(
+        "  $(label): n=$(metrics.n), RMSE=$(round(metrics.rmse; digits=4)), " *
+        "bias=$(round(metrics.mean_bias; digits=4)), max_abs=$(round(metrics.max_abs_error; digits=4)), " *
+        "peak_cp_error=$(round(metrics.peak_cp_error; digits=4))",
+    )
+end
 
 # Plot
 fig_path = "$path/figures"

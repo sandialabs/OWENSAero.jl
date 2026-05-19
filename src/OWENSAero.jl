@@ -5,6 +5,7 @@ import OWENSOpenFASTWrappers
 # Common
 export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
+export cpValidationMetrics
 
 # Actuator Cylinder
 export AC, radialforce, pInt
@@ -191,6 +192,90 @@ Return the current triangular-section buoyancy area per unit span used by the
 DMS and actuator-cylinder paths.
 """
 buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
+
+function _finite_real_vector(values, name)
+    values isa AbstractVector || throw(ArgumentError("$(name) must be a vector"))
+    isempty(values) && throw(ArgumentError("$(name) must not be empty"))
+    all(x -> x isa Real, values) ||
+        throw(ArgumentError("$(name) must contain only real values"))
+    vector = Float64.(collect(values))
+    all(isfinite, vector) || throw(ArgumentError("$(name) must contain only finite values"))
+    return vector
+end
+
+function _sorted_curve_points(x, y, label; minimum_points = 1)
+    x_vector = _finite_real_vector(x, "$(label)_x")
+    y_vector = _finite_real_vector(y, "$(label)_y")
+    length(x_vector) == length(y_vector) ||
+        throw(ArgumentError("$(label) x and y vectors must have the same length"))
+    length(x_vector) >= minimum_points ||
+        throw(ArgumentError("$(label) must contain at least $(minimum_points) points"))
+
+    order = sortperm(x_vector)
+    x_sorted = x_vector[order]
+    y_sorted = y_vector[order]
+    all(diff(x_sorted) .> 0.0) ||
+        throw(ArgumentError("$(label) x values must be unique"))
+    return x_sorted, y_sorted
+end
+
+function _linear_interpolate_sorted(x, y, x_query)
+    if x_query < first(x) || x_query > last(x)
+        throw(ArgumentError("query point $(x_query) is outside the model curve range"))
+    end
+    idx = searchsortedlast(x, x_query)
+    idx == length(x) && return y[end]
+    idx == 0 && return y[1]
+    x0 = x[idx]
+    x1 = x[idx+1]
+    y0 = y[idx]
+    y1 = y[idx+1]
+    fraction = (x_query - x0) / (x1 - x0)
+    return y0 + fraction * (y1 - y0)
+end
+
+"""
+    cpValidationMetrics(model_tsr, model_cp, reference_tsr, reference_cp)
+
+Compare a modeled CP curve against reference CP data on the overlapping
+reference TSR points. The model curve is linearly interpolated to each
+reference point, and the returned named tuple includes RMSE, bias, mean
+absolute error, maximum absolute error, and peak-CP diagnostics.
+"""
+function cpValidationMetrics(model_tsr, model_cp, reference_tsr, reference_cp)
+    model_x, model_y =
+        _sorted_curve_points(model_tsr, model_cp, "model"; minimum_points = 2)
+    reference_x, reference_y =
+        _sorted_curve_points(reference_tsr, reference_cp, "reference")
+
+    overlap = findall(x -> first(model_x) <= x <= last(model_x), reference_x)
+    isempty(overlap) && throw(ArgumentError("reference curve does not overlap model curve"))
+
+    reference_x_overlap = reference_x[overlap]
+    reference_y_overlap = reference_y[overlap]
+    model_on_reference =
+        [_linear_interpolate_sorted(model_x, model_y, x) for x in reference_x_overlap]
+    error = model_on_reference .- reference_y_overlap
+    abs_error = abs.(error)
+
+    model_peak_idx = argmax(model_y)
+    reference_peak_idx = argmax(reference_y_overlap)
+    return (
+        n = length(reference_x_overlap),
+        rmse = sqrt(mean(error .^ 2)),
+        mean_bias = mean(error),
+        mean_abs_error = mean(abs_error),
+        max_abs_error = maximum(abs_error),
+        model_peak_tsr = model_x[model_peak_idx],
+        model_peak_cp = model_y[model_peak_idx],
+        reference_peak_tsr = reference_x_overlap[reference_peak_idx],
+        reference_peak_cp = reference_y_overlap[reference_peak_idx],
+        peak_cp_error = model_y[model_peak_idx] - reference_y_overlap[reference_peak_idx],
+        model_cp_on_reference = model_on_reference,
+        reference_tsr = reference_x_overlap,
+        reference_cp = reference_y_overlap,
+    )
+end
 
 """
     steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
