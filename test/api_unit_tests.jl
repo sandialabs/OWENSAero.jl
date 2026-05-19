@@ -406,6 +406,174 @@ end
     @test negative[6] ≈ -expected_tp atol=1e-14
 end
 
+@testset "DMS and AC no tip-loss finite-span baseline" begin
+    ntheta = 8
+    theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
+    af(alpha, Re, M) = (2.0 .* alpha, 0.01 .+ alpha .^ 2)
+
+    function dms_at_slice_z(z)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            z,
+            fill(0.2, ntheta),
+            fill(0.1, ntheta),
+            fill(0.05, ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "DMS",
+            zeros(2 * ntheta),
+        )
+        return OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    end
+
+    function ac_at_slice_z(z)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            z,
+            0.2,
+            0.1,
+            zeros(ntheta),
+            zeros(ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            zeros(1),
+            0.0,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "AC",
+            false,
+            false,
+            false,
+            0.0,
+            false,
+            zeros(2 * ntheta),
+            zeros(Int, 1),
+            collect(1:ntheta),
+            fill(1.0, ntheta),
+            zeros(Int, ntheta),
+            zeros(Int, ntheta),
+            zeros(ntheta),
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            [0.0, 0.0, -9.81],
+        )
+        return OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
+    end
+
+    dms_midspan = dms_at_slice_z(0.0)
+    dms_near_tip = dms_at_slice_z(1.0)
+    ac_midspan = ac_at_slice_z(0.0)
+    ac_near_tip = ac_at_slice_z(1.0)
+
+    expected_dms_torque = [
+        0.13216300752723198,
+        4.155328939728862,
+        8.747381434947037,
+        10.518927273475686,
+        11.899127897963252,
+        10.482424731039607,
+        5.94768269035212,
+        0.8606922816284484,
+    ]
+    expected_dms_rp = [
+        1.2736810051148109,
+        6.8359693596987245,
+        6.214005470597589,
+        1.0483645079053878,
+        0.586123014722692,
+        -6.72391144149577,
+        -10.101933047419232,
+        -6.636463965253183,
+    ]
+    expected_dms_tp = [
+        0.08821892236601551,
+        2.7736856779962813,
+        5.838884708767798,
+        7.021393095350895,
+        7.9426782115064585,
+        6.997027616556331,
+        3.970083363983335,
+        0.5745128458760576,
+    ]
+    expected_ac_rp = [
+        2.8550942523884117,
+        8.151470249030385,
+        7.1681706174268305,
+        1.5576140367875473,
+        0.025532492405510754,
+        -5.968263633754219,
+        -8.55357364320575,
+        -4.632716960246749,
+    ]
+    expected_ac_tp = [
+        0.18645250749003425,
+        2.982901860895912,
+        5.971529461303498,
+        5.5744629455065295,
+        5.170198961584717,
+        6.236950412354528,
+        3.903322123278254,
+        0.6539527194413277,
+    ]
+    expected_ac_torque = [
+        0.27967876123505137,
+        4.474352791343868,
+        8.957294191955247,
+        8.361694418259795,
+        7.755298442377075,
+        9.355425618531791,
+        5.854983184917381,
+        0.9809290791619916,
+    ]
+
+    @test dms_midspan[1] ≈ 0.1148162791981763 atol=1e-14
+    @test dms_midspan[3] ≈ expected_dms_torque atol=1e-14
+    @test dms_midspan[4] ≈ expected_dms_rp atol=1e-14
+    @test dms_midspan[5] ≈ expected_dms_tp atol=1e-14
+    @test dms_near_tip[1] ≈ dms_midspan[1] atol=0.0
+    @test dms_near_tip[3] ≈ dms_midspan[3] atol=0.0
+    @test dms_near_tip[4] ≈ dms_midspan[4] atol=0.0
+    @test dms_near_tip[5] ≈ dms_midspan[5] atol=0.0
+
+    @test ac_midspan[4] ≈ 0.09869472822476016 atol=1e-14
+    @test ac_midspan[5] ≈ expected_ac_rp atol=1e-14
+    @test ac_midspan[6] ≈ expected_ac_tp atol=1e-14
+    @test ac_midspan[15] ≈ expected_ac_torque atol=1e-14
+    @test ac_near_tip[4] ≈ ac_midspan[4] atol=0.0
+    @test ac_near_tip[5] ≈ ac_midspan[5] atol=0.0
+    @test ac_near_tip[6] ≈ ac_midspan[6] atol=0.0
+    @test ac_near_tip[15] ≈ ac_midspan[15] atol=0.0
+end
+
 @testset "CP validation metrics" begin
     metrics = OWENSAero.cpValidationMetrics(
         [3.0, 1.0, 2.0],

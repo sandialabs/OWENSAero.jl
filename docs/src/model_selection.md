@@ -23,6 +23,15 @@ Use AC when:
 - multi-turbine or radial-influence behavior is being investigated;
 - the extra cost is acceptable relative to DMS.
 
+## Finite-Span and Tip-Loss Scope
+
+DMS and AC currently operate as stacked two-dimensional slice models. The
+current regression suite pins the no-tip-loss baseline: moving an otherwise
+identical slice from mid-span to a tip-adjacent `z` location does not change the
+computed CP, torque, or distributed loads. Any future finite-span or tip-loss
+correction should introduce an explicit model option and validation data, then
+update that baseline with tests that show the expected numerical change.
+
 ## Dynamic Stall
 
 `DynamicStallModel = "BV"` activates the Boeing-Vertol model used by the current tests and examples. `DynamicStallModel = "none"` bypasses dynamic stall and is the safest choice for gradient-sensitive workflows. The Leishman-Beddoes path is present in historical comments but should not be treated as a production option until it has complete tests and documentation.
