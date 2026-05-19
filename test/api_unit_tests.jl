@@ -351,6 +351,10 @@ end
         0.1,
         [0.0, 1.0],
     ) == [0.0, 0.0]
+    @test OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 0.0, 1.0, 0.1, [0.0, 1.0]) ==
+          [0.0, 0.0]
+    @test OWENSAero.liftingStrutForce(1.2, [0.0, 0.0], 0.5, 2.0, 1.0, 0.1, [0.0, 0.0]) ==
+          [0.0, 0.0]
 
     force = OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, 1.0, 0.1, [0.0, 1.0])
     @test force isa Vector{Float64}
@@ -372,11 +376,48 @@ end
         OWENSAero.liftingStrutForce(2.0, [0.0, 0.0, 5.0], 0.25, 4.0, 0.5, 0.2, [1.0, 0.0, 0.0])
     @test force_3d == [12.5, 0.0, -5.0]
 
+    oblique_2d_velocity = [3.0, 4.0]
+    oblique_2d_lift = [-8.0, 6.0]
+    oblique_2d_force = OWENSAero.liftingStrutForce(
+        2.0,
+        oblique_2d_velocity,
+        0.5,
+        4.0,
+        0.7,
+        0.2,
+        oblique_2d_lift,
+    )
+    oblique_2d_velocity_hat = oblique_2d_velocity ./ 5.0
+    oblique_2d_lift_hat = oblique_2d_lift ./ 10.0
+    @test oblique_2d_force ≈ [-34.0, 13.0] atol=1e-14
+    @test sum(oblique_2d_force .* oblique_2d_velocity_hat) ≈ -10.0 atol=1e-14
+    @test sum(oblique_2d_force .* oblique_2d_lift_hat) ≈ 35.0 atol=1e-14
+
+    oblique_3d_velocity = [1.0, 2.0, 2.0]
+    oblique_3d_lift = [0.0, -1.0, 1.0]
+    oblique_3d_force = OWENSAero.liftingStrutForce(
+        2.0,
+        oblique_3d_velocity,
+        2.0,
+        0.5,
+        0.5,
+        1 / 3,
+        oblique_3d_lift,
+    )
+    oblique_3d_velocity_hat = oblique_3d_velocity ./ 3.0
+    oblique_3d_lift_hat = oblique_3d_lift ./ sqrt(2.0)
+    @test sum(oblique_3d_force .* oblique_3d_velocity_hat) ≈ -3.0 atol=1e-14
+    @test sum(oblique_3d_force .* oblique_3d_lift_hat) ≈ 4.5 atol=1e-14
+    @test oblique_3d_force ≈ 9.0 .* (0.5 .* oblique_3d_lift_hat .- (1 / 3) .* oblique_3d_velocity_hat)
+
     @test_throws ArgumentError OWENSAero.liftingStrutForce(-1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], -1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, -1.0, 0.0, 0.0, [0.0, 1.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, NaN, 0.0, [0.0, 1.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, -0.1, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 0.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, Inf])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0, 0.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [1.0, 0.0])
     @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, Inf], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
 end
