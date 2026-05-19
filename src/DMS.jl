@@ -31,6 +31,7 @@ function streamtube(
     output_all = false,
     Vxwake = nothing,
     solvestep = false,
+    finite_span_factor = 1.0,
 )
 
     # Unpack Vars
@@ -85,6 +86,7 @@ function streamtube(
         # V_delta = env.V_delta[1] # Does not apply since the model calculation is centered around the point of rotation
         # V_sweep = env.V_sweep[1] # Does not apply since the model calculation is centered around the point of rotation
     end
+    finite_span = _finite_span_factor_at(finite_span_factor, idx)
 
     if Vxwake != nothing
         V_xt = Vxwake
@@ -204,16 +206,18 @@ function streamtube(
     # Instantaneous Forces (Unit Height) #Based on this, radial is inward positive and tangential is in direction of rotation positive
     Ab = chord * 1.0 # planform area Assuming unit section height
     q_loc = 0.5 * rho * Ab * Vloc^2 # From Eq. 11
-    M25 = cm_af * q_loc * chord
+    aero_Np = finite_span * cn * q_loc
+    aero_Tp = finite_span * ct * q_loc
+    M25 = finite_span * cm_af * q_loc * chord
 
-    Np = cn .* q_loc + -F_addedmass_Np
+    Np = aero_Np + -F_addedmass_Np
     Rp = Np + F_buoy[2] + f_centrifugal# Ning Eq. 27 # Negate to match cactus frame of reference, note that delta cancels out
     Zp = Np * tan(delta) + F_buoy[3] # Ning Eq. 27 # Negate to match cactus frame of reference
-    Tp = -rotation * (ct .* q_loc + -F_addedmass_Tp) / cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
+    Tp = -rotation * (aero_Tp + -F_addedmass_Tp) / cos(delta) + F_buoy[1] # TODO: verify direction Ning Eq. 27 # Negate to match cactus frame of reference
 
-    Th = q_loc * (ct * cos(theta) + cn * sin(theta) / cos(delta)) # Eq. 11 but with delta correction
+    Th = finite_span * q_loc * (ct * cos(theta) + cn * sin(theta) / cos(delta)) # Eq. 11 but with delta correction
 
-    Q = q_loc * r * -ct # Eq. 12 but with Local radius for local torque, Negate the force for reaction torque, in the power frame of reference?
+    Q = finite_span * q_loc * r * -ct # Eq. 12 but with Local radius for local torque, Negate the force for reaction torque, in the power frame of reference?
 
     Ast = 1.0 * r * dtheta * abs(sin(theta)) # Section 2.0, local radius for local area, however do not allow negative area, so use absolute value
 
@@ -251,9 +255,21 @@ DMS(turbine, env; w=0, idx_RPI=1:turbine.ntheta, solve=true)
 
 see ?steady for detailed i/o description
 
-Double multiple streamtube model
+Double multiple streamtube model.
+
+`finite_span_factor` may be a nonnegative scalar or length-`ntheta` vector. It
+defaults to `1.0` and scales aerodynamic blade loads, torque, thrust, induction
+source terms, and aerodynamic moment without scaling added mass, buoyancy, or
+centrifugal terms.
 """
-function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
+function DMS(
+    turbine,
+    env;
+    w = 0,
+    idx_RPI = 1:turbine.ntheta,
+    solve = true,
+    finite_span_factor = 1.0,
+)
     #TODO: Inputs documentation
     a_in = w
     ntheta = turbine.ntheta
@@ -293,6 +309,7 @@ function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
     # Unpack the rest
 
     dtheta = 2 * pi / (ntheta)
+    finite_span_factor = _validated_finite_span_factor(finite_span_factor, ntheta)
     # thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
     thetavec = collect((dtheta/2):dtheta:(2*pi))
 
@@ -330,8 +347,14 @@ function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
         if idx_RPI[iter_RPI] == i
             iter_RPI += 1
             if solve
-                resid(a) =
-                    streamtube(a, thetavec[i], turbine, env_turbine; solvestep = true) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
+                resid(a) = streamtube(
+                    a,
+                    thetavec[i],
+                    turbine,
+                    env_turbine;
+                    solvestep = true,
+                    finite_span_factor,
+                ) #solvestep makes this independent solve not mess up the dynamic stall variables during the solve
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
 
@@ -353,8 +376,14 @@ function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
             F_addedmass_Tp[i],
             F_buoy[i, :],
             cm_af[i],
-            M25[i] =
-                streamtube(astar[i], thetavec[i], turbine, env_turbine; output_all = true)
+            M25[i] = streamtube(
+                astar[i],
+                thetavec[i],
+                turbine,
+                env_turbine;
+                output_all = true,
+                finite_span_factor,
+            )
         end
     end
 
@@ -381,6 +410,7 @@ function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
                     env_turbine;
                     Vxwake,
                     solvestep = true,
+                    finite_span_factor,
                 ) #Solve wrt negative theta on the back side?
                 astar[i], _ = FLOWMath.brent(resid, 0, 0.999)
             end
@@ -410,6 +440,7 @@ function DMS(turbine, env; w = 0, idx_RPI = 1:turbine.ntheta, solve = true)
                 env_turbine;
                 output_all = true,
                 Vxwake,
+                finite_span_factor,
             )
         end
     end

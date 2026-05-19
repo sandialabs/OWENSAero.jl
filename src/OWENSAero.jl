@@ -1,6 +1,6 @@
 module OWENSAero
 import CCBlade
-import Statistics:mean
+import Statistics: mean
 import Interpolations
 import OWENSOpenFASTWrappers
 # Common
@@ -29,7 +29,7 @@ export Boeing_Vertol
 export Unsteady_Step
 
 # Module Path
-const path,_ = splitdir(@__FILE__)
+const path, _ = splitdir(@__FILE__)
 
 # Common Structs
 
@@ -42,9 +42,17 @@ function _canonical_dynamic_stall_model(model)
     elseif token == "analytic"
         return "analytic"
     elseif token in ("lb", "leishman-beddoes", "leishman_beddoes")
-        throw(ArgumentError("DynamicStallModel = \"LB\" is not implemented; use \"BV\" or \"none\"."))
+        throw(
+            ArgumentError(
+                "DynamicStallModel = \"LB\" is not implemented; use \"BV\" or \"none\".",
+            ),
+        )
     end
-    throw(ArgumentError("DynamicStallModel must be \"BV\", \"none\", or the internal \"analytic\" test mode; got $(repr(model))."))
+    throw(
+        ArgumentError(
+            "DynamicStallModel must be \"BV\", \"none\", or the internal \"analytic\" test mode; got $(repr(model)).",
+        ),
+    )
 end
 
 function _canonical_aero_model(model)
@@ -102,8 +110,42 @@ struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TAF6,TAF7,TFN,TB,TA
     rhoA::TAF7
 end
 
-Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1),zeros(Real,size(R)))
-Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1),zeros(Real,size(R)))
+Turbine(R, r, z, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine(
+    R,
+    r,
+    z,
+    chord,
+    0.18,
+    twist,
+    delta,
+    omega,
+    B,
+    af,
+    ntheta,
+    r_delta_infl,
+    zeros(Real, size(R)),
+    zeros(Real, size(R)),
+    zeros(1),
+    zeros(Real, size(R)),
+)
+Turbine(R, r, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine(
+    R,
+    r,
+    1.0,
+    chord,
+    0.18,
+    twist,
+    delta,
+    omega,
+    B,
+    af,
+    ntheta,
+    r_delta_infl,
+    zeros(Real, size(R)),
+    zeros(Real, size(R)),
+    zeros(1),
+    zeros(Real, size(R)),
+)
 
 """
 Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DynamicStallModel::TS,AeroModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
@@ -162,12 +204,114 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     accel_edge::TAF4
     gravity::TAF5
 end
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) =
-    Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) =
-    Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) =
-    Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,_canonical_dynamic_stall_model(DynamicStallModel),_canonical_aero_model(AeroModel),false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    aw_warm,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    false,
+    false,
+    false,
+    1.0,
+    false,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+)
+Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+)
+Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm) = Environment(
+    rho,
+    mu,
+    V_x,
+    zeros(Real, size(V_x)),
+    zeros(Real, size(V_x)),
+    zeros(Real, size(V_x)),
+    0.0,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    false,
+    false,
+    false,
+    1.0,
+    false,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+)
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)
@@ -200,7 +344,7 @@ struct UnsteadyParams{TB,TF,TAF}
     gustT::TF
 end
 
-UnsteadyParams(RPI,tau,ifw) = UnsteadyParams(RPI,tau,ifw,false,1.0,0.0,1.0,1.0)
+UnsteadyParams(RPI, tau, ifw) = UnsteadyParams(RPI, tau, ifw, false, 1.0, 0.0, 1.0, 1.0)
 
 """
     added_mass_flap_volume_per_unit_span(chord)
@@ -230,6 +374,30 @@ buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
 
 function _prandtl_loss_factor(exponent)
     return (2 / pi) * acos(clamp(exp(exponent), zero(exponent), one(exponent)))
+end
+
+function _validated_finite_span_factor(finite_span_factor, ntheta)
+    if finite_span_factor isa Real
+        isfinite(finite_span_factor) && finite_span_factor >= zero(finite_span_factor) ||
+            throw(ArgumentError("finite_span_factor must be finite and nonnegative"))
+        return finite_span_factor
+    elseif finite_span_factor isa AbstractVector
+        length(finite_span_factor) == ntheta || throw(
+            ArgumentError("finite_span_factor must be a scalar or have length ntheta"),
+        )
+        all(x -> x isa Real && isfinite(x) && x >= zero(x), finite_span_factor) || throw(
+            ArgumentError(
+                "finite_span_factor must contain only finite nonnegative real values",
+            ),
+        )
+        return collect(finite_span_factor)
+    end
+    throw(ArgumentError("finite_span_factor must be a scalar or vector"))
+end
+
+@inline function _finite_span_factor_at(finite_span_factor, idx)
+    return finite_span_factor isa AbstractVector ? finite_span_factor[idx] :
+           finite_span_factor
 end
 
 """
@@ -266,12 +434,18 @@ function prandtlTipLossFactor(
     hub_radius isa Real && isfinite(hub_radius) && hub_radius >= 0 ||
         throw(ArgumentError("hub_radius must be a finite nonnegative real value"))
     include_root isa Bool || throw(ArgumentError("include_root must be a Bool"))
-    zero(radial_position) < radial_position <= rotor_radius ||
-        throw(ArgumentError("radial_position must satisfy 0 < radial_position <= rotor_radius"))
+    zero(radial_position) < radial_position <= rotor_radius || throw(
+        ArgumentError("radial_position must satisfy 0 < radial_position <= rotor_radius"),
+    )
     hub_radius < rotor_radius ||
         throw(ArgumentError("hub_radius must be smaller than rotor_radius"))
-    include_root && radial_position < hub_radius &&
-        throw(ArgumentError("radial_position must be at least hub_radius when include_root=true"))
+    include_root &&
+        radial_position < hub_radius &&
+        throw(
+            ArgumentError(
+                "radial_position must be at least hub_radius when include_root=true",
+            ),
+        )
 
     loss_zero = (radial_position + rotor_radius + inflow_angle + hub_radius) * 0
     radial_position == rotor_radius && return loss_zero
@@ -284,14 +458,12 @@ function prandtlTipLossFactor(
 
     blade_count = float(num_blades)
     tip_exponent =
-        -(blade_count / 2) * (rotor_radius - radial_position) /
-        (radial_position * sin_phi)
+        -(blade_count / 2) * (rotor_radius - radial_position) / (radial_position * sin_phi)
     loss_factor = _prandtl_loss_factor(tip_exponent)
 
     if include_root && hub_radius > 0
         root_exponent =
-            -(blade_count / 2) * (radial_position - hub_radius) /
-            (hub_radius * sin_phi)
+            -(blade_count / 2) * (radial_position - hub_radius) / (hub_radius * sin_phi)
         loss_factor *= _prandtl_loss_factor(root_exponent)
     end
 
@@ -343,8 +515,11 @@ function towerShadowVelocity(
     active isa Bool || throw(ArgumentError("active must be a Bool"))
     velocity isa AbstractVector && relative_position isa AbstractVector ||
         throw(ArgumentError("velocity and relative_position must be vectors"))
-    length(velocity) == length(relative_position) && length(velocity) in (2, 3) ||
-        throw(ArgumentError("velocity and relative_position must both have two or three components"))
+    length(velocity) == length(relative_position) && length(velocity) in (2, 3) || throw(
+        ArgumentError(
+            "velocity and relative_position must both have two or three components",
+        ),
+    )
     all(x -> x isa Real && isfinite(x), velocity) ||
         throw(ArgumentError("velocity must contain only finite real values"))
     all(x -> x isa Real && isfinite(x), relative_position) ||
@@ -353,9 +528,13 @@ function towerShadowVelocity(
         throw(ArgumentError("tower_radius must be a finite nonnegative real value"))
     wake_expansion isa Real && isfinite(wake_expansion) && wake_expansion >= 0 ||
         throw(ArgumentError("wake_expansion must be a finite nonnegative real value"))
-    centerline_deficit isa Real && isfinite(centerline_deficit) &&
-        0 <= centerline_deficit < 1 ||
-        throw(ArgumentError("centerline_deficit must be finite and satisfy 0 <= centerline_deficit < 1"))
+    centerline_deficit isa Real &&
+    isfinite(centerline_deficit) &&
+    0 <= centerline_deficit < 1 || throw(
+        ArgumentError(
+            "centerline_deficit must be finite and satisfy 0 <= centerline_deficit < 1",
+        ),
+    )
 
     active || return collect(velocity)
     tower_radius == 0 && return collect(velocity)
@@ -371,7 +550,8 @@ function towerShadowVelocity(
     lateral = relative_position .- downstream_distance .* wind_direction
     wake_radius = tower_radius + wake_expansion * downstream_distance
     deficit =
-        centerline_deficit * (tower_radius / wake_radius)^2 *
+        centerline_deficit *
+        (tower_radius / wake_radius)^2 *
         exp(-0.5 * sum(abs2, lateral) / wake_radius^2)
     return @. velocity * (1 - deficit)
 end
@@ -392,14 +572,14 @@ function liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
         throw(ArgumentError("chord must be a finite nonnegative real value"))
     span isa Real && isfinite(span) && span >= 0 ||
         throw(ArgumentError("span must be a finite nonnegative real value"))
-    cl isa Real && isfinite(cl) ||
-        throw(ArgumentError("cl must be a finite real value"))
+    cl isa Real && isfinite(cl) || throw(ArgumentError("cl must be a finite real value"))
     cd isa Real && isfinite(cd) && cd >= 0 ||
         throw(ArgumentError("cd must be a finite nonnegative real value"))
     velocity isa AbstractVector && lift_direction isa AbstractVector ||
         throw(ArgumentError("velocity and lift_direction must be vectors"))
-    length(velocity) == length(lift_direction) && length(velocity) in (2, 3) ||
-        throw(ArgumentError("velocity and lift_direction must both have two or three components"))
+    length(velocity) == length(lift_direction) && length(velocity) in (2, 3) || throw(
+        ArgumentError("velocity and lift_direction must both have two or three components"),
+    )
     all(x -> x isa Real && isfinite(x), velocity) ||
         throw(ArgumentError("velocity must contain only finite real values"))
     all(x -> x isa Real && isfinite(x), lift_direction) ||
@@ -408,7 +588,8 @@ function liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
     speed = sqrt(sum(abs2, velocity))
     speed == 0 && return zero.(velocity)
     lift_norm = sqrt(sum(abs2, lift_direction))
-    lift_norm > 0 || throw(ArgumentError("lift_direction must be nonzero when velocity is nonzero"))
+    lift_norm > 0 ||
+        throw(ArgumentError("lift_direction must be nonzero when velocity is nonzero"))
 
     velocity_hat = velocity ./ speed
     lift_hat = lift_direction ./ lift_norm
@@ -440,8 +621,7 @@ function _sorted_curve_points(x, y, label; minimum_points = 1)
     order = sortperm(x_vector)
     x_sorted = x_vector[order]
     y_sorted = y_vector[order]
-    all(diff(x_sorted) .> 0.0) ||
-        throw(ArgumentError("$(label) x values must be unique"))
+    all(diff(x_sorted) .> 0.0) || throw(ArgumentError("$(label) x values must be unique"))
     return x_sorted, y_sorted
 end
 
@@ -617,25 +797,34 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `thetavec`: Azimuthal location of each discretization (rad)
 * `Re`: Reynolds number for each azimuthal position
 """
-function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
+function steady(
+    turbine,
+    env;
+    w = zeros(Real, 2*turbine.ntheta),
+    idx_RPI = 1:(2*turbine.ntheta),
+    solve = true,
+    ifw = false,
+    finite_span_factor = 1.0,
+)
     if env.AeroModel=="DMS"
-        return DMS(turbine, env; w, idx_RPI, solve)
+        return DMS(turbine, env; w, idx_RPI, solve, finite_span_factor)
     elseif env.AeroModel=="AC"
-        turbines = Array{OWENSAero.Turbine}(undef,1)
+        turbines = Array{OWENSAero.Turbine}(undef, 1)
         turbines[1] = turbine
-        return AC(turbines, env; w, idx_RPI, solve, ifw)
+        return AC(turbines, env; w, idx_RPI, solve, ifw, finite_span_factor)
         # return AC_steady(turbines, env)
     else
         error("AeroModel not recognized, choose DMS or AC")
     end
 end
 
-@inline function safeakima(x,y,xpt)
-    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) || maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
+@inline function safeakima(x, y, xpt)
+    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) ||
+       maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
         msg="Extrapolating on akima spline results in undefined solutions minimum(xpt)<minimum(x) $(minimum(xpt))<$(minimum(x)) or maximum(xpt)<maximum(x) $(maximum(xpt))>$(maximum(x))"
         throw(OverflowError(msg))
     end
-    return FLOWMath.akima(x,y,xpt)
+    return FLOWMath.akima(x, y, xpt)
 end
 
 _zero_like(x) = zero(x)
@@ -674,19 +863,7 @@ function _airfoil_coefficients(
     idx = 1,
 )
     coefficients = try
-        af(
-            alpha,
-            Re,
-            mach,
-            env,
-            V_twist,
-            chord,
-            dt,
-            U;
-            solvestep,
-            idx,
-            return_cm = true,
-        )
+        af(alpha, Re, mach, env, V_twist, chord, dt, U; solvestep, idx, return_cm = true)
     catch err
         if err isa MethodError
             af(alpha, Re, mach, env, V_twist, chord, dt, U; solvestep, idx)

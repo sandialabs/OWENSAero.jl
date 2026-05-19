@@ -10,7 +10,7 @@ import Statistics
 applies for both Ay and Rx depending on which function ifunc(x, y, phi)
 is passed in
 """
-function panelIntegration(deltavec,rvec,xvec, yvec, thetavec, ifunc)
+function panelIntegration(deltavec, rvec, xvec, yvec, thetavec, ifunc)
 
     # initialize
     nx = length(xvec)
@@ -20,11 +20,16 @@ function panelIntegration(deltavec,rvec,xvec, yvec, thetavec, ifunc)
 
     for i in eachindex(xvec)
         # redefine function so it has one parameter for use in quadgk
-        integrand(phi) = ifunc(deltavec[i],rvec[i],xvec[i], yvec[i], phi)
+        integrand(phi) = ifunc(deltavec[i], rvec[i], xvec[i], yvec[i], phi)
 
         for j in eachindex(thetavec)
             # an Adaptive Gauss-Kronrod quadrature integration.  Tried trapz but this was faster.
-            A[i, j], error = QuadGK.quadgk(integrand, thetavec[j]-dtheta/2.0, thetavec[j]+dtheta/2.0, atol=1e-10)
+            A[i, j], error = QuadGK.quadgk(
+                integrand,
+                thetavec[j]-dtheta/2.0,
+                thetavec[j]+dtheta/2.0,
+                atol = 1e-10,
+            )
         end
 
     end
@@ -36,7 +41,7 @@ end
 """
 integrand used for computing Dx
 """
-function Dxintegrand(deltan,rn, x, y, phi)
+function Dxintegrand(deltan, rn, x, y, phi)
     v1 = x + rn*sin(phi)
     v2 = y - rn*cos(phi)
     # v1 and v2 should never both be zero b.c. we never integrate self.  RxII handles that case.
@@ -47,7 +52,7 @@ end
 """
 integrand used for computing Ay
 """
-function Ayintegrand(deltan,rn, x, y, phi)
+function Ayintegrand(deltan, rn, x, y, phi)
     v1 = x + rn*sin(phi)
     v2 = y - rn*cos(phi)
     if abs(v1) < 1e-12 && abs(v2) < 1e-12  # occurs when integrating self, function symmetric around singularity, should integrate to zero
@@ -59,15 +64,15 @@ end
 """
 integrand used for computing AIJ
 """
-function AyIJ(deltavec,rvec,xvec, yvec, thetavec)
-    return panelIntegration(deltavec,rvec,xvec, yvec, thetavec, Ayintegrand)
+function AyIJ(deltavec, rvec, xvec, yvec, thetavec)
+    return panelIntegration(deltavec, rvec, xvec, yvec, thetavec, Ayintegrand)
 end
 
 """
 integrand used for computing DxIJ
 """
-function DxIJ(deltavec,rvec,xvec, yvec, thetavec)
-    return panelIntegration(deltavec,rvec,xvec, yvec, thetavec, Dxintegrand)
+function DxIJ(deltavec, rvec, xvec, yvec, thetavec)
+    return panelIntegration(deltavec, rvec, xvec, yvec, thetavec, Dxintegrand)
 end
 
 """
@@ -79,10 +84,13 @@ function WxIJ(xvec, yvec, thetavec)
     nx = length(xvec)
     ntheta = length(thetavec)
     dtheta = thetavec[2] - thetavec[1]  # assumes equally spaced
-    Wx = zeros(Real,nx, ntheta)
+    Wx = zeros(Real, nx, ntheta)
 
     for i in eachindex(xvec)
-        if yvec[i] >= -1.0 && yvec[i] <= 1.0 && xvec[i] >= 0.0 && xvec[i]^2 + yvec[i]^2 >= 1.0
+        if yvec[i] >= -1.0 &&
+           yvec[i] <= 1.0 &&
+           xvec[i] >= 0.0 &&
+           xvec[i]^2 + yvec[i]^2 >= 1.0
             # if yvec[i] >= -1.0 && yvec[i] <= 1.0 && (xvec[i] >= 0.0 || (xvec[i] >= -1 && xvec[i]^2 + yvec[i]^2 <= 1.0))
             thetak = acos(yvec[i])
             k = findfirst(thetavec + dtheta/2 .> thetak)  # index of intersection
@@ -124,7 +132,7 @@ function WxII(thetavec)
     ntheta = length(thetavec)
     Wx = zeros(ntheta, ntheta)
 
-    for i = div(ntheta,2)+1:ntheta
+    for i = (div(ntheta, 2)+1):ntheta
         Wx[i, ntheta+1-i] = -1
     end
 
@@ -134,17 +142,17 @@ end
 """
 Internal, precomputes influence coefficient matricies and saves them as HDF5 files
 """
-function precomputeMatrices(deltavec,rvec,ntheta,file)
+function precomputeMatrices(deltavec, rvec, ntheta, file)
 
     # precompute self influence matrices
 
     # setup discretization (all the same, and uniformly spaced in theta)
     dtheta = 2*pi/ntheta
-    theta = collect(dtheta/2:dtheta:2*pi)
+    theta = collect((dtheta/2):dtheta:(2*pi))
 
     Dxself = DxII(theta)
     Wxself = WxII(theta)
-    Ayself = AyIJ(deltavec,rvec,-sin.(theta), cos.(theta), theta)
+    Ayself = AyIJ(deltavec, rvec, -sin.(theta), cos.(theta), theta)
 
     # write to file
     HDF5.h5open(file, "w") do file
@@ -164,23 +172,23 @@ radii: corresponding array of their radii
 function matrixAssemble(turbine, centerX, centerY, radii, ntheta)
 
     if length(turbine.delta) == 1
-        deltavec = ones(Real,ntheta)*turbine.delta
-        rvec = ones(Real,ntheta)*turbine.r./mean(turbine.r)
+        deltavec = ones(Real, ntheta)*turbine.delta
+        rvec = ones(Real, ntheta)*turbine.r ./ mean(turbine.r)
     else
         deltavec = turbine.delta
-        rvec = turbine.r./mean(turbine.r)
+        rvec = turbine.r ./ mean(turbine.r)
     end
 
     if turbine.r_delta_influence
         file = "theta-r-delta-$ntheta.h5"
     else
         file = "theta-$ntheta.h5"
-        deltavec = zeros(Real,length(deltavec))
-        rvec = ones(Real,length(rvec))
+        deltavec = zeros(Real, length(deltavec))
+        rvec = ones(Real, length(rvec))
     end
 
     if !isfile(file) || turbine.r_delta_influence
-        precomputeMatrices(deltavec,rvec,ntheta,file)
+        precomputeMatrices(deltavec, rvec, ntheta, file)
     end
 
     theta = HDF5.h5read(file, "theta")
@@ -192,17 +200,17 @@ function matrixAssemble(turbine, centerX, centerY, radii, ntheta)
     # end
     # initialize global matrices
     nturbines = length(radii)
-    Dx = zeros(Real,nturbines*ntheta, nturbines*ntheta)
-    Wx = zeros(Real,nturbines*ntheta, nturbines*ntheta)
-    Ay = zeros(Real,nturbines*ntheta, nturbines*ntheta)
+    Dx = zeros(Real, nturbines*ntheta, nturbines*ntheta)
+    Wx = zeros(Real, nturbines*ntheta, nturbines*ntheta)
+    Ay = zeros(Real, nturbines*ntheta, nturbines*ntheta)
 
     # iterate through turbines
     for I in eachindex(radii)
         for J in eachindex(radii)
 
             # find normalized i locations relative to center of turbine J
-            x = (centerX[I].-radii[I]*sin.(theta) .- centerX[J])/radii[J]
-            y = (centerY[I].+radii[I]*cos.(theta) .- centerY[J])/radii[J]
+            x = (centerX[I] .- radii[I]*sin.(theta) .- centerX[J])/radii[J]
+            y = (centerY[I] .+ radii[I]*cos.(theta) .- centerY[J])/radii[J]
 
             # self-influence is precomputed
             if I == J
@@ -214,11 +222,11 @@ function matrixAssemble(turbine, centerX, centerY, radii, ntheta)
             elseif J < I && radii[I] == radii[J]
 
                 # grab cross-diagonal I,J -> J,I matrix
-                Dxsub = Dx[(J-1)*ntheta+1:J*ntheta, (I-1)*ntheta+1:I*ntheta]
-                Aysub = Ay[(J-1)*ntheta+1:J*ntheta, (I-1)*ntheta+1:I*ntheta]
+                Dxsub = Dx[((J-1)*ntheta+1):(J*ntheta), ((I-1)*ntheta+1):(I*ntheta)]
+                Aysub = Ay[((J-1)*ntheta+1):(J*ntheta), ((I-1)*ntheta+1):(I*ntheta)]
 
                 # mapping index for coefficients that are the same
-                idx = [div(ntheta,2)+1:ntheta; 1:div(ntheta,2)]
+                idx = [(div(ntheta, 2)+1):ntheta; 1:div(ntheta, 2)]
 
                 # directly map over
                 Dxsub = Dxsub[idx, idx]
@@ -238,15 +246,15 @@ function matrixAssemble(turbine, centerX, centerY, radii, ntheta)
                 #     Aysub = AyIJFar(xc, yc, theta)
 
             else
-                Dxsub = DxIJ(deltavec,rvec, x, y, theta)
+                Dxsub = DxIJ(deltavec, rvec, x, y, theta)
                 Wxsub = WxIJ(x, y, theta)
-                Aysub = AyIJ(deltavec,rvec, x, y, theta)
+                Aysub = AyIJ(deltavec, rvec, x, y, theta)
             end
 
             # assemble into global matrix
-            Dx[(I-1)*ntheta+1:I*ntheta, (J-1)*ntheta+1:J*ntheta] = Dxsub
-            Wx[(I-1)*ntheta+1:I*ntheta, (J-1)*ntheta+1:J*ntheta] = Wxsub
-            Ay[(I-1)*ntheta+1:I*ntheta, (J-1)*ntheta+1:J*ntheta] = Aysub
+            Dx[((I-1)*ntheta+1):(I*ntheta), ((J-1)*ntheta+1):(J*ntheta)] = Dxsub
+            Wx[((I-1)*ntheta+1):(I*ntheta), ((J-1)*ntheta+1):(J*ntheta)] = Wxsub
+            Ay[((I-1)*ntheta+1):(I*ntheta), ((J-1)*ntheta+1):(J*ntheta)] = Aysub
 
         end
     end
@@ -259,11 +267,16 @@ end
 # ------- Force Coefficients ---------
 """
 Internal, calculates the radial force used in the residual function as well as the turbine performance when converged
+
+`finite_span_factor` may be a nonnegative scalar or length-`ntheta` vector. It
+defaults to `1.0` and scales aerodynamic source/load/moment terms without
+scaling added mass, buoyancy, or centrifugal terms.
 """
-function radialforce(uvec, vvec, thetavec, turbine, env)
+function radialforce(uvec, vvec, thetavec, turbine, env; finite_span_factor = 1.0)
 
     # unpack
     ntheta = turbine.ntheta
+    finite_span_factor = _validated_finite_span_factor(finite_span_factor, ntheta)
     R = turbine.R #reference radius
     r = turbine.r #deformed (potentially) radius at each azimuthal location
     chord = turbine.chord#[1]
@@ -277,7 +290,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     mu = env.mu
     V_x = env.V_x
     V_y = env.V_y
-    V_wind = sqrt.(V_x.^2 + V_y.^2)
+    V_wind = sqrt.(V_x .^ 2 + V_y .^ 2)
     V_z = env.V_z
     V_twist = env.V_twist # in rad/s
     # V_delta = env.V_delta # Does not apply since the model calculation is centered around the point of rotation
@@ -287,25 +300,30 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     rotation = sign(mean(Omega))
 
     # velocity components and angles
-    Vn = (V_x.*(1.0 .+ uvec).*sin.(thetavec) .- V_x.*vvec.*cos.(thetavec) .-
-        V_y.*(1.0 .+ vvec).*cos.(thetavec) .+ V_y.*(vvec).*sin.(thetavec)
-        ).*cos.(delta) .+ V_z.*sin.(delta) #multiply by slope to get 3D to 2D transformation normal to radial
-    Vt = (V_x.*(1.0 .+ uvec).*cos.(thetavec) .+ V_x.*vvec.*sin.(thetavec) .+
-        V_y.*(1.0 .+ vvec).*sin.(thetavec) .+ V_y.*uvec.*cos.(thetavec)) .+ abs.(Omega).*r
-    W = sqrt.(Vn.^2 + Vt.^2)
+    Vn =
+        (
+            V_x .* (1.0 .+ uvec) .* sin.(thetavec) .- V_x .* vvec .* cos.(thetavec) .-
+            V_y .* (1.0 .+ vvec) .* cos.(thetavec) .+ V_y .* (vvec) .* sin.(thetavec)
+        ) .* cos.(delta) .+ V_z .* sin.(delta) #multiply by slope to get 3D to 2D transformation normal to radial
+    Vt =
+        (
+            V_x .* (1.0 .+ uvec) .* cos.(thetavec) .+ V_x .* vvec .* sin.(thetavec) .+
+            V_y .* (1.0 .+ vvec) .* sin.(thetavec) .+ V_y .* uvec .* cos.(thetavec)
+        ) .+ abs.(Omega) .* r
+    W = sqrt.(Vn .^ 2 + Vt .^ 2)
     phi = atan.(Vn, Vt)
     alpha = phi .- twist
     Re = rho*W*chord/mu  # currently no Re dependence
 
     # airfoil
     dtheta = 2*pi/ntheta
-    dt = dtheta./abs.(Omega)
+    dt = dtheta ./ abs.(Omega)
     v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
     mach = W/v_sound
     if env.DynamicStallModel == "BV"
-        cl = zeros(Real,length(alpha))
-        cd = zeros(Real,length(alpha))
-        cm = zeros(Real,length(alpha))
+        cl = zeros(Real, length(alpha))
+        cd = zeros(Real, length(alpha))
+        cm = zeros(Real, length(alpha))
         for ii = 1:length(alpha)
             cl[ii], cd[ii], cm[ii] = OWENSAero._airfoil_coefficients(
                 turbine.af,
@@ -326,12 +344,14 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     end
 
     # rotate force coefficients
-    cn = cl.*cos.(phi) + cd.*sin.(phi)
-    ct = cl.*sin.(phi) - cd.*cos.(phi)
+    cn = cl .* cos.(phi) + cd .* sin.(phi)
+    ct = cl .* sin.(phi) - cd .* cos.(phi)
+    aero_cn = finite_span_factor .* cn
+    aero_ct = finite_span_factor .* ct
 
     # radial force
-    sigma = B*chord./r
-    q = sigma./(4*pi).*cn./cos.(delta).*(W./V_wind).^2 #divide by slope to get 3D to 2D transformation normal to radial
+    sigma = B*chord ./ r
+    q = sigma ./ (4*pi) .* aero_cn ./ cos.(delta) .* (W ./ V_wind) .^ 2 #divide by slope to get 3D to 2D transformation normal to radial
 
     # Added Mass
     if env.Aero_AddedMass_Active
@@ -401,15 +421,17 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     end
 
     # instantaneous forces #Based on this, radial is inward and tangential is in direction of rotation
-    qdyn = 0.5*rho*W.^2
-    M25 = cm .* qdyn .* chord.^2
-    Rp = cn.*qdyn*chord - F_addedmass_Np .+ F_buoy[2, :] # TODO CM: correct?
-    Tp = (rotation*ct.*qdyn.*chord + F_addedmass_Tp)./cos.(delta)  .+ F_buoy[1, :] # TODO CM: correct?
-    Zp = (cn.*qdyn.*chord - F_addedmass_Np).*tan.(delta)  .+ F_buoy[3, :] # TODO CM: correct?
+    qdyn = 0.5*rho*W .^ 2
+    M25 = finite_span_factor .* cm .* qdyn .* chord .^ 2
+    Rp = aero_cn .* qdyn*chord - F_addedmass_Np .+ F_buoy[2, :] # TODO CM: correct?
+    Tp = (rotation*aero_ct .* qdyn .* chord + F_addedmass_Tp) ./ cos.(delta) .+ F_buoy[1, :] # TODO CM: correct?
+    Zp = (aero_cn .* qdyn .* chord - F_addedmass_Np) .* tan.(delta) .+ F_buoy[3, :] # TODO CM: correct?
 
     # nonlinear correction factor
-    integrand = (W./V_wind).^2 .* (cn.*sin.(thetavec) - rotation*ct.*cos.(thetavec)./cos.(delta))
-    CT = mean(sigma./(4*pi) .* pInt(thetavec, integrand))
+    integrand =
+        (W ./ V_wind) .^ 2 .*
+        (aero_cn .* sin.(thetavec) - rotation*aero_ct .* cos.(thetavec) ./ cos.(delta))
+    CT = mean(sigma ./ (4*pi) .* pInt(thetavec, integrand))
     if CT > 2.0
         a = 0.5*(1.0 + sqrt(1.0 + CT))
         ka = 1.0 / (a-1)
@@ -426,11 +448,32 @@ function radialforce(uvec, vvec, thetavec, turbine, env)
     # power coefficient
     H = 1.0  # per unit height
     Sref = 2*R*H
-    Q = r.*Tp*rotation
+    Q = r .* Tp*rotation
     P = abs(mean(Omega))*B/(2*pi)*pInt(thetavec, Q)
-    CP = P / (0.5*rho*mean(V_wind)^3 * Sref)
+    CP = P / (0.5 * rho * mean(V_wind)^3 * Sref)
 
-    return q, ka, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy', cm, M25
+    return q,
+    ka,
+    CT,
+    CP,
+    Rp,
+    Tp,
+    Zp,
+    a,
+    alpha,
+    cl,
+    cd,
+    Vn,
+    Vt,
+    Re,
+    Q,
+    M_addedmass_Np,
+    M_addedmass_Tp,
+    F_addedmass_Np,
+    F_addedmass_Tp,
+    F_buoy',
+    cm,
+    M25
 end
 
 # -----------------------------------------
@@ -439,23 +482,34 @@ end
 """
 Internal, sets up the residual function
 """
-function residual(w, A, theta, k, turbines, env;w_RPI=zeros(Real,1),idx_RPI=idx_RPI=1:2*turbines[1].ntheta)
+function residual(
+    w,
+    A,
+    theta,
+    k,
+    turbines,
+    env;
+    w_RPI = zeros(Real, 1),
+    idx_RPI =  idx_RPI = 1:(2*turbines[1].ntheta) ,
+    finite_span_factor = 1.0,
+)
     if length(w_RPI)>1
         w[idx_RPI] = w_RPI
     end
     # setup
     ntheta = length(theta)
     nturbines = Int(length(w)/2/ntheta)
-    q = zeros(Real,ntheta*nturbines)
+    q = zeros(Real, ntheta*nturbines)
     ka = 0.0
 
     for i = 1:nturbines
-        idx = collect((i-1)*ntheta+1:i*ntheta)
+        idx = collect(((i-1)*ntheta+1):(i*ntheta))
 
         u = w[idx]
         v = w[ntheta*nturbines .+ idx]
 
-        q[idx], ka, _, _, _, _, _, _, _, cl, cd, Vn, Vt, Re = radialforce(u, v, theta, turbines[i], env)
+        q[idx], ka, _, _, _, _, _, _, _, cl, cd, Vn, Vt, Re =
+            radialforce(u, v, theta, turbines[i], env; finite_span_factor)
     end
 
     if nturbines == 1  # if only one turbine use the k from the analysis
@@ -463,10 +517,10 @@ function residual(w, A, theta, k, turbines, env;w_RPI=zeros(Real,1),idx_RPI=idx_
     end  # otherwise, use k that was input to this function
 
     # reformat to multiply in correct locations
-    kmult = repeat(k, inner=[ntheta])
+    kmult = repeat(k, inner = [ntheta])
     kmult = [kmult; kmult]
 
-    output = (A*q).*kmult - w
+    output = (A*q) .* kmult - w
 
     return output[:]
 end
@@ -476,11 +530,21 @@ AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbine.ntheta
 
 see ?steady for detailed i/o description
 
-Double multiple streamtube model
+Actuator-cylinder model. `finite_span_factor` is an off-by-default caller hook
+for finite-span studies and follows the same load-scaling contract as
+`radialforce`.
 """
-function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbines[1].ntheta,solve=true,ifw=false)
+function AC(
+    turbines,
+    env;
+    w = zeros(Real, 2*turbines[1].ntheta),
+    idx_RPI = 1:(2*turbines[1].ntheta),
+    solve = true,
+    ifw = false,
+    finite_span_factor = 1.0,
+)
     #TODO: make these modifications work for more than one turbine!
-    if w==zeros(Real,2*turbines[1].ntheta)
+    if w==zeros(Real, 2*turbines[1].ntheta)
         w[:].=0.0
     end
     if length(turbines) != 1
@@ -501,47 +565,84 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
     # ntheta = length(theta)
     nturbines = length(turbines)
     tol = 1e-6
-    CT = zeros(Real,nturbines)
-    CP = zeros(Real,nturbines)
-    Rp = zeros(Real,ntheta, nturbines)
-    Tp = zeros(Real,ntheta, nturbines)
-    Zp = zeros(Real,ntheta, nturbines)
+    CT = zeros(Real, nturbines)
+    CP = zeros(Real, nturbines)
+    Rp = zeros(Real, ntheta, nturbines)
+    Tp = zeros(Real, ntheta, nturbines)
+    Zp = zeros(Real, ntheta, nturbines)
 
-    q = zeros(Real,ntheta)
+    q = zeros(Real, ntheta)
 
     # compute nonlinear correction factors (each turbine individaully)
-    k = zeros(Real,nturbines)
+    k = zeros(Real, nturbines)
 
     # for i = 1:length(turbines)
     i = 1
     if solve
         w0 = w[idx_RPI]
 
-        idx = collect((i-1)*ntheta+1:i*ntheta)
+        idx = collect(((i-1)*ntheta+1):(i*ntheta))
 
         if length(idx_RPI)<ntheta*2
-            resid_RPI(x) = residual(w,[Ax[idx, idx]; Ay[idx, idx]], theta, [1.0], turbines, env;w_RPI=x,idx_RPI)
+            resid_RPI(x) = residual(
+                w,
+                [Ax[idx, idx]; Ay[idx, idx]],
+                theta,
+                [1.0],
+                turbines,
+                env;
+                w_RPI = x,
+                idx_RPI,
+                finite_span_factor,
+            )
             if ifw
                 autodiff=:central
             else
                 autodiff=:central #TODO: this runs most of the time, but sometimes not
             end
-            result = LsqFit.lmfit(resid_RPI, Float64.(w0), Float64[];min_step_quality=1e-5,autodiff=autodiff) #TODO: figure out real vectors/how to do this solve in the midst of automatic gradient calcs
+            result = LsqFit.lmfit(
+                resid_RPI,
+                Float64.(w0),
+                Float64[];
+                min_step_quality = 1e-5,
+                autodiff = autodiff,
+            ) #TODO: figure out real vectors/how to do this solve in the midst of automatic gradient calcs
             w_RPI = result.param
             if !result.converged
-                println("LMFIT terminated prematurely. Max Residual = ", maximum(abs.(result.resid)))
+                println(
+                    "LMFIT terminated prematurely. Max Residual = ",
+                    maximum(abs.(result.resid)),
+                )
             end
         else
-            resid_ALL(x) = residual(x,[Ax[idx, idx]; Ay[idx, idx]], theta, [1.0], turbines, env)
+            resid_ALL(x) = residual(
+                x,
+                [Ax[idx, idx]; Ay[idx, idx]],
+                theta,
+                [1.0],
+                turbines,
+                env;
+                finite_span_factor,
+            )
             if minimum(abs.(turbines[1].delta))<pi/4 || ifw
                 autodiff=:central
             else #Weird error, haven't been able to figure out the type issue; when I debug it goes away... and... if I run it through the lmfit solver it isn't an issue
                 autodiff=:central
             end
-            result = NLsolve.nlsolve(resid_ALL, Float64.(w0), ftol=1e-3,xtol=1e-3,iterations=10,autodiff=autodiff)
+            result = NLsolve.nlsolve(
+                resid_ALL,
+                Float64.(w0),
+                ftol = 1e-3,
+                xtol = 1e-3,
+                iterations = 10,
+                autodiff = autodiff,
+            )
             w_RPI = result.zero
             if !NLsolve.converged(result)
-                println("NLsolve terminated prematurely. Residual Norm = ", result.residual_norm)
+                println(
+                    "NLsolve terminated prematurely. Residual Norm = ",
+                    result.residual_norm,
+                )
             end
         end
 
@@ -551,9 +652,52 @@ function AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbi
     idx = collect(1:ntheta)
     u = w[idx]
     v = w[ntheta .+ idx]
-    q, k, CT, CP, Rp, Tp, Zp, a, alpha, cl, cd, Vn, Vt, Re, Q, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm, M25 = radialforce(u, v, theta, turbines[i], env)
+    q,
+    k,
+    CT,
+    CP,
+    Rp,
+    Tp,
+    Zp,
+    a,
+    alpha,
+    cl,
+    cd,
+    Vn,
+    Vt,
+    Re,
+    Q,
+    M_addedmass_Np,
+    M_addedmass_Tp,
+    F_addedmass_Np,
+    F_addedmass_Tp,
+    F_buoy,
+    cm,
+    M25 = radialforce(u, v, theta, turbines[i], env; finite_span_factor)
 
-    return CP, q ,Q, Rp, Tp, Zp, sqrt.(Vn.^2 .+ Vt.^2), CT, CT, a, w, alpha, cl, cd, theta, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm, M25
+    return CP,
+    q,
+    Q,
+    Rp,
+    Tp,
+    Zp,
+    sqrt.(Vn .^ 2 .+ Vt .^ 2),
+    CT,
+    CT,
+    a,
+    w,
+    alpha,
+    cl,
+    cd,
+    theta,
+    Re,
+    M_addedmass_Np,
+    M_addedmass_Tp,
+    F_addedmass_Np,
+    F_addedmass_Tp,
+    F_buoy,
+    cm,
+    M25
 
 end
 # TODO: keep this as it shows how to handle multiple turbines, might also look at original code
@@ -656,7 +800,7 @@ Internal, trapezoidal integration of y w.r.t. x
 function trapz(x, y)  # integrate y w.r.t. x
 
     integral = 0.0
-    for i = 1:length(x)-1
+    for i = 1:(length(x)-1)
         integral += (x[i+1]-x[i])*0.5*(y[i] + y[i+1])
     end
     return integral
@@ -671,7 +815,7 @@ function pInt(theta, f)
 
     # add end points
     dtheta = 2*theta[1]  # assumes equally spaced, starts at 0
-    integral += dtheta * 0.5*(f[1] + f[end])
+    integral += dtheta * 0.5 * (f[1] + f[end])
 
     return integral
 end

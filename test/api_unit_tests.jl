@@ -158,7 +158,8 @@ end
     )
     @test OWENSAero.envslices[1].DynamicStallModel == "none"
     @test OWENSAero.envslices[1].AeroModel == "DMS"
-    @test OWENSAero.turbslices[1].af(0.0, 1.0e5, 0.0; return_cm = true) isa Tuple{Float64,Float64,Float64}
+    @test OWENSAero.turbslices[1].af(0.0, 1.0e5, 0.0; return_cm = true) isa
+          Tuple{Float64,Float64,Float64}
 
     @test_throws ArgumentError OWENSAero.setupTurb(
         blade_x,
@@ -198,10 +199,8 @@ end
     @test OWENSAero._helical_azimuth_offset_bins(shape_x, shape_y, 8) == [0, 1, 0, -1]
     @test OWENSAero._helical_azimuth_offset_bins([0.0, 1.0], [1.0, 1.0], 12) == [0, 2]
 
-    @test [OWENSAero._helical_blade_index(1, 1, ibld, 2, 8) for ibld = 1:2] ==
-          [2, 6]
-    @test [OWENSAero._helical_blade_index(1, -1, ibld, 2, 8) for ibld = 1:2] ==
-          [8, 4]
+    @test [OWENSAero._helical_blade_index(1, 1, ibld, 2, 8) for ibld = 1:2] == [2, 6]
+    @test [OWENSAero._helical_blade_index(1, -1, ibld, 2, 8) for ibld = 1:2] == [8, 4]
     @test OWENSAero._helical_blade_index(9, 1, 1, 2, 8) == 2
 
     @test_throws ArgumentError OWENSAero._helical_azimuth_offset_bins([1.0], [0.0, 1.0], 8)
@@ -318,12 +317,9 @@ end
 end
 
 @testset "Prandtl finite-blade loss helper" begin
-    @test OWENSAero.prandtlTipLossFactor(3, 9.0, 10.0, pi / 6) ≈
-          0.4914573713022735 atol=1e-15
-    @test OWENSAero.prandtlTipLossFactor(3, 5.0, 10.0, pi / 6) ≈
-          0.9682914590545574 atol=1e-15
-    @test OWENSAero.prandtlTipLossFactor(2, 8.0, 10.0, pi / 4) ≈
-          0.504412749448464 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(3, 9.0, 10.0, pi / 6) ≈ 0.4914573713022735 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(3, 5.0, 10.0, pi / 6) ≈ 0.9682914590545574 atol=1e-15
+    @test OWENSAero.prandtlTipLossFactor(2, 8.0, 10.0, pi / 4) ≈ 0.504412749448464 atol=1e-15
     @test OWENSAero.prandtlTipLossFactor(3, 10.0, 10.0, pi / 6) == 0.0
     @test OWENSAero.prandtlTipLossFactor(3, 10.0, 10.0, 1e-16) == 0.0
     @test OWENSAero.prandtlTipLossFactor(3, 5.0, 10.0, 1e-16) == 1.0
@@ -390,12 +386,8 @@ end
 end
 
 @testset "Oye dynamic inflow helper" begin
-    tau1, tau2 = OWENSAero.oyeDynamicInflowTimeConstants(
-        50.0,
-        10.0,
-        0.2,
-        [10.0, 25.0, 50.0],
-    )
+    tau1, tau2 =
+        OWENSAero.oyeDynamicInflowTimeConstants(50.0, 10.0, 0.2, [10.0, 25.0, 50.0])
     @test tau1 == 7.432432432432433
     @test tau2 == [2.8213513513513515, 2.415540540540541, 0.9662162162162163]
 
@@ -444,12 +436,7 @@ end
     )
     @test derivative == 0.2462873440889868
 
-    @test_throws ArgumentError OWENSAero.oyeDynamicInflowTimeConstants(
-        0.0,
-        10.0,
-        0.2,
-        5.0,
-    )
+    @test_throws ArgumentError OWENSAero.oyeDynamicInflowTimeConstants(0.0, 10.0, 0.2, 5.0)
     @test_throws ArgumentError OWENSAero.oyeDynamicInflowTimeConstants(
         50.0,
         10.0,
@@ -500,8 +487,7 @@ end
     @test sections[1].r == 2.0
     @test sections[2].chord == 0.45
     @test sections[3].theta == 0.05235987755982989
-    @test sections[1].af(0.1, 1.0e6, 0.05) ==
-          (0.6283185307179586, 0.0102)
+    @test sections[1].af(0.1, 1.0e6, 0.05) == (0.6283185307179586, 0.0102)
 
     station_airfoils = [
         (alpha, Re, M) -> (alpha, 0.01),
@@ -512,8 +498,7 @@ end
         OWENSAero.ccbladeHAWTSections(radial_positions, chord, twist, station_airfoils)
     @test station_sections[1].af(0.1, 1.0e6, 0.05) == (0.1, 0.01)
     @test station_sections[2].af(0.1, 1.0e6, 0.05) == (0.2, 0.02)
-    @test station_sections[3].af(0.1, 1.0e6, 0.05) ==
-          (0.30000000000000004, 0.03)
+    @test station_sections[3].af(0.1, 1.0e6, 0.05) == (0.30000000000000004, 0.03)
 
     operating_points = OWENSAero.ccbladeHAWTOperatingPoints(
         [2.0, 4.0],
@@ -601,24 +586,9 @@ end
         [0.1, 0.0],
         [af],
     )
-    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
-        [2.0],
-        -8.0,
-        2.0,
-        1.225,
-    )
-    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
-        [2.0],
-        8.0,
-        0.0,
-        1.225,
-    )
-    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints(
-        [2.0],
-        8.0,
-        2.0,
-        0.0,
-    )
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints([2.0], -8.0, 2.0, 1.225)
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints([2.0], 8.0, 0.0, 1.225)
+    @test_throws ArgumentError OWENSAero.ccbladeHAWTOperatingPoints([2.0], 8.0, 2.0, 0.0)
     @test_throws ArgumentError OWENSAero.ccbladeHAWTSolve(
         radial_positions,
         chord,
@@ -732,32 +702,34 @@ end
     @test expanded == [0.0, 12.0 * (1 - expected_deficit), 0.0]
 
     @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0], [1.0]; active = true)
-    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; active = "yes")
-    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; tower_radius = -1.0)
-    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; wake_expansion = -0.1)
-    @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, 0.0], [1.0, 0.0]; centerline_deficit = 1.0)
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity(
+        [1.0, 0.0],
+        [1.0, 0.0];
+        active = "yes",
+    )
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity(
+        [1.0, 0.0],
+        [1.0, 0.0];
+        tower_radius = -1.0,
+    )
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity(
+        [1.0, 0.0],
+        [1.0, 0.0];
+        wake_expansion = -0.1,
+    )
+    @test_throws ArgumentError OWENSAero.towerShadowVelocity(
+        [1.0, 0.0],
+        [1.0, 0.0];
+        centerline_deficit = 1.0,
+    )
     @test_throws ArgumentError OWENSAero.towerShadowVelocity([1.0, NaN], [1.0, 0.0])
 end
 
 @testset "lifting strut force helper" begin
-    @test OWENSAero.liftingStrutForce(
-        1.2,
-        [0.0, 0.0],
-        0.5,
-        2.0,
-        1.0,
-        0.1,
-        [0.0, 1.0],
-    ) == [0.0, 0.0]
-    @test OWENSAero.liftingStrutForce(
-        1.2,
-        [10.0, 0.0],
-        0.0,
-        2.0,
-        1.0,
-        0.1,
-        [0.0, 1.0],
-    ) == [0.0, 0.0]
+    @test OWENSAero.liftingStrutForce(1.2, [0.0, 0.0], 0.5, 2.0, 1.0, 0.1, [0.0, 1.0]) ==
+          [0.0, 0.0]
+    @test OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.0, 2.0, 1.0, 0.1, [0.0, 1.0]) ==
+          [0.0, 0.0]
     @test OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 0.0, 1.0, 0.1, [0.0, 1.0]) ==
           [0.0, 0.0]
     @test OWENSAero.liftingStrutForce(1.2, [0.0, 0.0], 0.5, 2.0, 1.0, 0.1, [0.0, 0.0]) ==
@@ -779,8 +751,15 @@ end
         OWENSAero.liftingStrutForce(1.2, [10.0, 0.0], 0.5, 2.0, -1.0, 0.1, [0.0, 1.0])
     @test negative_lift == [-6.0, -60.0]
 
-    force_3d =
-        OWENSAero.liftingStrutForce(2.0, [0.0, 0.0, 5.0], 0.25, 4.0, 0.5, 0.2, [1.0, 0.0, 0.0])
+    force_3d = OWENSAero.liftingStrutForce(
+        2.0,
+        [0.0, 0.0, 5.0],
+        0.25,
+        4.0,
+        0.5,
+        0.2,
+        [1.0, 0.0, 0.0],
+    )
     @test force_3d == [12.5, 0.0, -5.0]
 
     oblique_2d_velocity = [3.0, 4.0]
@@ -815,18 +794,99 @@ end
     oblique_3d_lift_hat = oblique_3d_lift ./ sqrt(2.0)
     @test sum(oblique_3d_force .* oblique_3d_velocity_hat) ≈ -3.0 atol=1e-14
     @test sum(oblique_3d_force .* oblique_3d_lift_hat) ≈ 4.5 atol=1e-14
-    @test oblique_3d_force ≈ 9.0 .* (0.5 .* oblique_3d_lift_hat .- (1 / 3) .* oblique_3d_velocity_hat)
+    @test oblique_3d_force ≈
+          9.0 .* (0.5 .* oblique_3d_lift_hat .- (1 / 3) .* oblique_3d_velocity_hat)
 
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(-1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], -1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, -1.0, 0.0, 0.0, [0.0, 1.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, NaN, 0.0, [0.0, 1.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, -0.1, [0.0, 1.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 0.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, Inf])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0, 0.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, 0.0], 1.0, 1.0, 0.0, 0.0, [1.0, 0.0])
-    @test_throws ArgumentError OWENSAero.liftingStrutForce(1.0, [1.0, Inf], 1.0, 1.0, 0.0, 0.0, [0.0, 1.0])
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        -1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, 1.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        -1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, 1.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        -1.0,
+        0.0,
+        0.0,
+        [0.0, 1.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        NaN,
+        0.0,
+        [0.0, 1.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        -0.1,
+        [0.0, 1.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, 0.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, Inf],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, 1.0, 0.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, 0.0],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [1.0, 0.0],
+    )
+    @test_throws ArgumentError OWENSAero.liftingStrutForce(
+        1.0,
+        [1.0, Inf],
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        [0.0, 1.0],
+    )
 end
 
 @testset "DMS added-mass force sign convention" begin
@@ -1083,7 +1143,7 @@ end
     theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
     af(alpha, Re, M) = (2.0 .* alpha, 0.01 .+ alpha .^ 2)
 
-    function dms_at_slice_z(z)
+    function dms_at_slice_z(z; finite_span_factor = 1.0)
         turbine = OWENSAero.Turbine(
             1.5,
             fill(1.5, ntheta),
@@ -1109,10 +1169,16 @@ end
             "DMS",
             zeros(2 * ntheta),
         )
-        return OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+        return OWENSAero.DMS(
+            turbine,
+            env;
+            w = zeros(2 * ntheta),
+            solve = false,
+            finite_span_factor,
+        )
     end
 
-    function ac_at_slice_z(z)
+    function ac_at_slice_z(z; finite_span_factor = 1.0)
         turbine = OWENSAero.Turbine(
             1.5,
             fill(1.5, ntheta),
@@ -1158,13 +1224,24 @@ end
             zeros(ntheta),
             [0.0, 0.0, -9.81],
         )
-        return OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
+        return OWENSAero.radialforce(
+            zeros(ntheta),
+            zeros(ntheta),
+            theta,
+            turbine,
+            env;
+            finite_span_factor,
+        )
     end
 
     dms_midspan = dms_at_slice_z(0.0)
     dms_near_tip = dms_at_slice_z(1.0)
+    dms_explicit_default = dms_at_slice_z(0.0; finite_span_factor = 1.0)
+    dms_half_loads = dms_at_slice_z(0.0; finite_span_factor = 0.5)
     ac_midspan = ac_at_slice_z(0.0)
     ac_near_tip = ac_at_slice_z(1.0)
+    ac_explicit_default = ac_at_slice_z(0.0; finite_span_factor = 1.0)
+    ac_half_loads = ac_at_slice_z(0.0; finite_span_factor = 0.5)
 
     expected_dms_torque = [
         0.13216300752723198,
@@ -1175,6 +1252,26 @@ end
         10.482424731039607,
         5.94768269035212,
         0.8606922816284484,
+    ]
+    expected_dms_thrust = [
+        0.40662472644560455,
+        5.26339789583504,
+        7.979828160464401,
+        6.880508148791279,
+        7.104326912566498,
+        8.894157545020441,
+        7.827261139749379,
+        2.012725378364189,
+    ]
+    expected_dms_ct = [
+        0.014579596887281238,
+        0.07817038471734218,
+        0.1185139808212845,
+        0.2467017588081918,
+        0.2547268176386683,
+        0.1320933227527911,
+        0.11624810183198955,
+        0.07216660166699422,
     ]
     expected_dms_rp = [
         1.2736810051148109,
@@ -1226,24 +1323,226 @@ end
         5.854983184917381,
         0.9809290791619916,
     ]
+    expected_ac_source = [
+        0.019587627971102584,
+        0.055923886408285426,
+        0.04917787185837681,
+        0.010686149590206643,
+        0.00017516793429701088,
+        -0.040945803310571286,
+        -0.05868255249590612,
+        -0.031783166610636154,
+    ]
 
     @test dms_midspan[1] ≈ 0.1148162791981763 atol=1e-14
+    @test dms_midspan[2] ≈ expected_dms_thrust atol=1e-14
     @test dms_midspan[3] ≈ expected_dms_torque atol=1e-14
     @test dms_midspan[4] ≈ expected_dms_rp atol=1e-14
     @test dms_midspan[5] ≈ expected_dms_tp atol=1e-14
+    @test dms_midspan[9] ≈ expected_dms_ct atol=1e-14
+    @test dms_explicit_default[1] ≈ dms_midspan[1] atol=0.0
+    @test dms_explicit_default[2] ≈ dms_midspan[2] atol=0.0
+    @test dms_explicit_default[3] ≈ dms_midspan[3] atol=0.0
+    @test dms_half_loads[1] ≈ 0.05740813959908815 atol=1e-14
+    @test dms_half_loads[2] ≈ expected_dms_thrust .* 0.5 atol=1e-14
+    @test dms_half_loads[3] ≈ expected_dms_torque .* 0.5 atol=1e-14
+    @test dms_half_loads[4] ≈ expected_dms_rp .* 0.5 atol=1e-14
+    @test dms_half_loads[5] ≈ expected_dms_tp .* 0.5 atol=1e-14
+    @test dms_half_loads[9] ≈ expected_dms_ct .* 0.5 atol=1e-14
+    @test dms_half_loads[12] ≈ dms_midspan[12] atol=0.0
+    @test dms_half_loads[13] ≈ dms_midspan[13] atol=0.0
+    @test dms_half_loads[14] ≈ dms_midspan[14] atol=0.0
+    @test dms_half_loads[16] ≈ dms_midspan[16] atol=0.0
     @test dms_near_tip[1] ≈ dms_midspan[1] atol=0.0
     @test dms_near_tip[3] ≈ dms_midspan[3] atol=0.0
     @test dms_near_tip[4] ≈ dms_midspan[4] atol=0.0
     @test dms_near_tip[5] ≈ dms_midspan[5] atol=0.0
 
     @test ac_midspan[4] ≈ 0.09869472822476016 atol=1e-14
+    @test ac_midspan[1] ≈ expected_ac_source atol=1e-14
+    @test ac_midspan[3] ≈ 0.2274332785325375 atol=1e-14
     @test ac_midspan[5] ≈ expected_ac_rp atol=1e-14
     @test ac_midspan[6] ≈ expected_ac_tp atol=1e-14
     @test ac_midspan[15] ≈ expected_ac_torque atol=1e-14
+    @test ac_explicit_default[1] ≈ ac_midspan[1] atol=0.0
+    @test ac_explicit_default[4] ≈ ac_midspan[4] atol=0.0
+    @test ac_explicit_default[15] ≈ ac_midspan[15] atol=0.0
+    @test ac_half_loads[1] ≈ expected_ac_source .* 0.5 atol=1e-14
+    @test ac_half_loads[3] ≈ 0.11371663926626875 atol=1e-14
+    @test ac_half_loads[4] ≈ 0.04934736411238008 atol=1e-14
+    @test ac_half_loads[5] ≈ expected_ac_rp .* 0.5 atol=1e-14
+    @test ac_half_loads[6] ≈ expected_ac_tp .* 0.5 atol=1e-14
+    @test ac_half_loads[15] ≈ expected_ac_torque .* 0.5 atol=1e-14
+    @test ac_half_loads[9] ≈ ac_midspan[9] atol=0.0
+    @test ac_half_loads[10] ≈ ac_midspan[10] atol=0.0
+    @test ac_half_loads[11] ≈ ac_midspan[11] atol=0.0
+    @test ac_half_loads[14] ≈ ac_midspan[14] atol=0.0
     @test ac_near_tip[4] ≈ ac_midspan[4] atol=0.0
     @test ac_near_tip[5] ≈ ac_midspan[5] atol=0.0
     @test ac_near_tip[6] ≈ ac_midspan[6] atol=0.0
     @test ac_near_tip[15] ≈ ac_midspan[15] atol=0.0
+
+    vector_factor = fill(0.5, ntheta)
+    @test dms_at_slice_z(0.0; finite_span_factor = vector_factor)[3] ≈ dms_half_loads[3] atol=0.0
+    @test ac_at_slice_z(0.0; finite_span_factor = vector_factor)[15] ≈ ac_half_loads[15] atol=0.0
+
+    @test_throws ArgumentError dms_at_slice_z(0.0; finite_span_factor = -0.1)
+    @test_throws ArgumentError dms_at_slice_z(0.0; finite_span_factor = NaN)
+    @test_throws ArgumentError dms_at_slice_z(
+        0.0;
+        finite_span_factor = fill(1.0, ntheta - 1),
+    )
+    @test_throws ArgumentError ac_at_slice_z(0.0; finite_span_factor = -0.1)
+    @test_throws ArgumentError ac_at_slice_z(0.0; finite_span_factor = [1.0, Inf])
+
+    function dms_with_auxiliary_loads(finite_span_factor)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            0.0,
+            fill(0.2, ntheta),
+            fill(0.1, ntheta),
+            fill(0.1, ntheta),
+            fill(0.05, ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            zeros(1),
+            0.08,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "DMS",
+            true,
+            false,
+            true,
+            1.0,
+            true,
+            zeros(2 * ntheta),
+            zeros(Int, 1),
+            collect(1:ntheta),
+            fill(1.0, ntheta),
+            zeros(Int, ntheta),
+            zeros(Int, ntheta),
+            zeros(ntheta),
+            false,
+            fill(0.3, ntheta),
+            fill(-0.2, ntheta),
+            [0.0, 0.0, -9.81],
+        )
+        return OWENSAero.DMS(
+            turbine,
+            env;
+            w = zeros(2 * ntheta),
+            solve = false,
+            finite_span_factor,
+        )
+    end
+
+    function ac_with_auxiliary_loads(finite_span_factor)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            0.0,
+            0.2,
+            0.1,
+            zeros(ntheta),
+            zeros(ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            zeros(1),
+            0.08,
+        )
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(5.0, ntheta),
+            fill(0.5, ntheta),
+            zeros(ntheta),
+            zeros(ntheta),
+            0.0,
+            "none",
+            "AC",
+            true,
+            false,
+            true,
+            1.0,
+            true,
+            zeros(2 * ntheta),
+            zeros(Int, 1),
+            collect(1:ntheta),
+            fill(1.0, ntheta),
+            zeros(Int, ntheta),
+            zeros(Int, ntheta),
+            zeros(ntheta),
+            false,
+            fill(0.3, ntheta),
+            fill(-0.2, ntheta),
+            [0.0, 0.0, -9.81],
+        )
+        return OWENSAero.radialforce(
+            zeros(ntheta),
+            zeros(ntheta),
+            theta,
+            turbine,
+            env;
+            finite_span_factor,
+        )
+    end
+
+    dms_auxiliary_full = dms_with_auxiliary_loads(1.0)
+    dms_auxiliary_half = dms_with_auxiliary_loads(0.5)
+    @test dms_auxiliary_full[17] ≈ fill(0.03830185285543128, ntheta) atol=1e-16
+    @test dms_auxiliary_full[18] ≈ fill(-0.003746309502537627, ntheta) atol=1e-18
+    @test dms_auxiliary_full[19] ≈ fill(0.24129687043906464, ntheta) atol=1e-16
+    @test dms_auxiliary_full[20] ≈ fill(-0.023649615175680958, ntheta) atol=1e-18
+    @test dms_auxiliary_half[17] ≈ dms_auxiliary_full[17] atol=0.0
+    @test dms_auxiliary_half[19] ≈ dms_auxiliary_full[19] atol=0.0
+    @test dms_auxiliary_half[4] ≈ [
+        0.8755436321183407,
+        3.6566878094102977,
+        3.3457058648597298,
+        0.7628853835136292,
+        0.5317646369222814,
+        -3.1232525911869495,
+        -4.812263394148681,
+        -3.079528853065656,
+    ] atol=1e-14
+
+    ac_auxiliary_full = ac_with_auxiliary_loads(1.0)
+    ac_auxiliary_half = ac_with_auxiliary_loads(0.5)
+    @test ac_auxiliary_full[16] ≈ fill(0.03848451000647497, ntheta) atol=1e-16
+    @test ac_auxiliary_full[17] ≈ fill(9.621127501618743e-5, ntheta) atol=1e-20
+    @test ac_auxiliary_full[18] ≈ fill(0.24245241304079232, ntheta) atol=1e-16
+    @test ac_auxiliary_full[19] ≈ fill(0.000558025395093887, ntheta) atol=1e-18
+    @test ac_auxiliary_half[16] ≈ ac_auxiliary_full[16] atol=0.0
+    @test ac_auxiliary_half[18] ≈ ac_auxiliary_full[18] atol=0.0
+    @test ac_auxiliary_half[5] ≈ [
+        1.1850947131534135,
+        3.8332827114744004,
+        3.341632895672623,
+        0.5363546053529813,
+        -0.22968616683803694,
+        -3.226584229917902,
+        -4.519239234643667,
+        -2.558810893164167,
+    ] atol=1e-14
 end
 
 @testset "CP validation metrics" begin
@@ -1309,7 +1608,10 @@ end
     @test cl_new ≈ 0.55 atol=1e-14
     @test cd_new ≈ 0.0114 atol=1e-14
     @test cm_new == 0.0
-    @test_throws ArgumentError OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "LB")
+    @test_throws ArgumentError OWENSAero.readaerodyn_BV_NEW(
+        filename;
+        DynamicStallModel = "LB",
+    )
 
     af_bv = OWENSAero.readaerodyn_BV(filename)
     env = OWENSAero.Environment(

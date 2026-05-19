@@ -33,16 +33,22 @@ and validated.
 DMS and AC currently operate as stacked two-dimensional slice models. The
 current regression suite pins the no-tip-loss baseline: moving an otherwise
 identical slice from mid-span to a tip-adjacent `z` location does not change the
-computed CP, torque, or distributed loads. Any future finite-span or tip-loss
-correction should introduce an explicit model option and validation data, then
-update that baseline with tests that show the expected numerical change.
+computed CP, torque, or distributed loads.
+
+For caller-side studies or validation development, `DMS`, `AC`, `radialforce`,
+and `steady` accept `finite_span_factor = 1.0`. The factor may be a scalar or a
+length-`ntheta` vector. Values must be finite and nonnegative. When active, the
+factor scales aerodynamic blade loads, induction source terms, torque, thrust,
+and the quarter-chord aerodynamic moment, while leaving added mass, buoyancy,
+and centrifugal loads unchanged. This is a plumbing hook for explicit
+finite-height studies; it is not a validated VAWT tip-loss model by itself.
 
 `prandtlTipLossFactor(num_blades, radial_position, rotor_radius, inflow_angle;
 hub_radius=0.0, include_root=false)` provides a pinned Prandtl finite-blade
 loss primitive for caller-side axial-flow studies and future HAWT work. It is
-not automatically applied inside DMS or AC because those VAWT solvers need a
-separate finite-height validation basis before their load baselines should
-change.
+not automatically applied inside DMS or AC because those VAWT solvers still
+need a separate finite-height validation basis before their default load
+baselines should change.
 
 ## HAWT CCBlade and Dynamic Inflow Scope
 
