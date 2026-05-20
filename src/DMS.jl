@@ -132,8 +132,7 @@ function streamtube(
 
     Re = rho * Vloc * chord / mu
     dt = dtheta / abs.(omega)
-    v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
-    mach = Vloc / v_sound
+    mach = Vloc / env.speed_of_sound
     if env.DynamicStallModel == "BV"
         cl, cd_af, cm_af = OWENSAero._airfoil_coefficients(
             af,
@@ -304,6 +303,7 @@ function DMS(
         env.accel_flap,
         env.accel_edge,
         env.gravity,
+        env.speed_of_sound,
     )
 
     # Unpack the rest

@@ -12,6 +12,7 @@ OWENSAero uses SI units. Angles are radians unless a field or helper name explic
 | `omega` | Rotor angular velocity in radians per second. |
 | `windangle` | Mean inflow angle in radians. |
 | `V_x`, `V_y`, `V_z` | Velocity components in meters per second. |
+| `Environment.speed_of_sound` | Sound speed in meters per second used to pass Mach number to DMS/AC airfoil callbacks. Defaults to 343.0 m/s. |
 
 For simple runs, `V_x` is the incoming freestream velocity. `V_y` and `V_z` are zero unless cross-flow, vertical flow, or coupled motion terms are active.
 
@@ -36,7 +37,7 @@ DMS computes `CP` from the signed torque history `Q`, not `abs(Q)`. Negative tor
 
 ## Airfoil Data
 
-Airfoil reader functions expect angle-of-attack and coefficient tables compatible with the selected model. Tables may include a fourth `Cm25` column. The readers keep the older `cl, cd = af(alpha, Re, Mach)` call pattern intact, and `af(alpha, Re, Mach; return_cm=true)` returns `cl`, `cd`, and `Cm25`.
+Airfoil reader functions expect angle-of-attack and coefficient tables compatible with the selected model. Tables may include a fourth `Cm25` column. The readers keep the older `cl, cd = af(alpha, Re, Mach)` call pattern intact, and `af(alpha, Re, Mach; return_cm=true)` returns `cl`, `cd`, and `Cm25`. For DMS and AC, `Mach` is computed from the local relative speed divided by `Environment.speed_of_sound`; set this keyword when constructing `Environment` for water, temperature-sensitive air cases, or validation data with a specified sound speed.
 
 DMS and AC convert `Cm25` to a distributed section moment with `M25 = Cm25 * q * chord^2`, where `q = 0.5 * rho * Vloc^2`. That moment is returned with the aerodynamic loads for coupled OWENS runs. If a user-supplied airfoil function only returns `cl, cd`, OWENSAero uses `Cm25 = 0.0`.
 

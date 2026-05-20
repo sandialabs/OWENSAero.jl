@@ -176,6 +176,8 @@ Contains specications for turbine slice environment/operating conditions as well
 * `BV_DynamicFlagD::TAI`: Boeing-vertol dynamic stall drag flag
 * `alpha_last::TAF2`: Boeing-vertol dynamic stall prior step's angle of attack
 * `suction::TB`: DMS flag for alternate induction model
+* `speed_of_sound::TF`: sound speed used to form Mach number for DMS and AC
+  airfoil polar callbacks (m/s)
 
 # Outputs:
 * `none`:
@@ -207,7 +209,19 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     accel_flap::TAF4
     accel_edge::TAF4
     gravity::TAF5
+    speed_of_sound::TF
 end
+
+function _validated_speed_of_sound(speed_of_sound)
+    speed_of_sound isa Real && !(speed_of_sound isa Bool) ||
+        throw(ArgumentError("speed_of_sound must be a finite positive real value"))
+    isfinite(speed_of_sound) ||
+        throw(ArgumentError("speed_of_sound must be finite; got $(repr(speed_of_sound))"))
+    speed_of_sound > zero(speed_of_sound) ||
+        throw(ArgumentError("speed_of_sound must be greater than zero; got $(repr(speed_of_sound))"))
+    return speed_of_sound
+end
+
 Environment(
     rho,
     mu,
@@ -219,6 +233,8 @@ Environment(
     DynamicStallModel,
     AeroModel,
     aw_warm,
+;
+    speed_of_sound = 343.0,
 ) = Environment(
     rho,
     mu,
@@ -245,6 +261,7 @@ Environment(
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
     [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
 )
 Environment(
     rho,
@@ -262,6 +279,8 @@ Environment(
     AddedMass_Coeff_Ca,
     centrifugal_force_flag,
     aw_warm,
+;
+    speed_of_sound = 343.0,
 ) = Environment(
     rho,
     mu,
@@ -288,8 +307,17 @@ Environment(
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
     [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
 )
-Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm) = Environment(
+Environment(
+    rho,
+    mu,
+    V_x,
+    DynamicStallModel,
+    AeroModel,
+    aw_warm;
+    speed_of_sound = 343.0,
+) = Environment(
     rho,
     mu,
     V_x,
@@ -315,6 +343,7 @@ Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm) = Environment(
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
     [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
 )
 
 """

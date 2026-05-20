@@ -717,6 +717,7 @@ end
     @test env.AeroModel == "DMS"
     @test env.V_wake_old == fill(5.0, ntheta)
     @test env.gravity == [0.0, 0.0, -9.81]
+    @test env.speed_of_sound == 343.0
 
     env_mixed_strings = OWENSAero.Environment(
         1.225,
@@ -760,6 +761,45 @@ end
         zeros(2 * ntheta),
     )
     @test env_analytic.DynamicStallModel == "analytic"
+
+    env_custom_sound = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta);
+        speed_of_sound = 1482.0,
+    )
+    @test env_custom_sound.speed_of_sound == 1482.0
+
+    @test_throws ArgumentError OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta);
+        speed_of_sound = 0.0,
+    )
+    @test_throws ArgumentError OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta);
+        speed_of_sound = Inf,
+    )
+    @test_throws ArgumentError OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta);
+        speed_of_sound = true,
+    )
 
     @test_throws ArgumentError OWENSAero.Environment(
         1.225,
@@ -937,6 +977,68 @@ end
         OWENSAero.UnsteadyParams(true, [0.3, 3.0], false),
         1,
     )
+end
+
+@testset "environment speed of sound controls DMS and AC Mach" begin
+    ntheta = 6
+    speed_of_sound = 100.0
+    rho = 1.225
+    chord = 0.2
+
+    function mach_airfoil(alpha, Re, mach; return_cm = false)
+        cl = mach .+ zero.(alpha)
+        cd = 0.01 .+ zero.(mach)
+        cm = zero.(mach)
+        return return_cm ? (cl, cd, cm) : (cl, cd)
+    end
+
+    env = OWENSAero.Environment(
+        rho,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "none",
+        "DMS",
+        zeros(2 * ntheta);
+        speed_of_sound,
+    )
+
+    turbine_dms = OWENSAero.Turbine(
+        2.0,
+        fill(2.0, ntheta),
+        fill(chord, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(3.0, ntheta),
+        3,
+        mach_airfoil,
+        ntheta,
+        false,
+    )
+    streamtube_result =
+        OWENSAero.streamtube(0.0, pi / ntheta, turbine_dms, env; output_all = true)
+    dms_vloc = streamtube_result[6]
+    dms_cl = streamtube_result[10]
+    @test dms_cl ≈ dms_vloc / speed_of_sound atol=1e-14
+
+    turbine_ac = OWENSAero.Turbine(
+        2.0,
+        fill(2.0, ntheta),
+        chord,
+        zeros(ntheta),
+        zeros(ntheta),
+        fill(3.0, ntheta),
+        3,
+        mach_airfoil,
+        ntheta,
+        false,
+    )
+    theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
+    radialforce_result =
+        OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine_ac, env)
+    ac_cl = radialforce_result[10]
+    ac_vn = radialforce_result[12]
+    ac_vt = radialforce_result[13]
+    @test ac_cl ≈ sqrt.(ac_vn .^ 2 .+ ac_vt .^ 2) ./ speed_of_sound atol=1e-14
 end
 
 @testset "pInt periodic integration" begin
@@ -1660,6 +1762,7 @@ end
         fill(accel_flap, ntheta),
         fill(accel_edge, ntheta),
         [0.0, 0.0, -9.81],
+        343.0,
     )
 
     result = OWENSAero.streamtube(0.0, pi / 2, turbine, env; output_all = true)
@@ -1742,6 +1845,7 @@ end
         fill(accel_flap, ntheta),
         fill(accel_edge, ntheta),
         [0.0, 0.0, -9.81],
+        343.0,
     )
 
     result = OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
@@ -1819,6 +1923,7 @@ end
             zeros(ntheta),
             zeros(ntheta),
             [0.0, 0.0, -9.81],
+            343.0,
         )
 
         return OWENSAero.radialforce(zeros(ntheta), zeros(ntheta), theta, turbine, env)
@@ -1956,6 +2061,7 @@ end
             zeros(ntheta),
             zeros(ntheta),
             [0.0, 0.0, -9.81],
+            343.0,
         )
         return turbine, env
     end
@@ -2217,6 +2323,7 @@ end
             fill(0.3, ntheta),
             fill(-0.2, ntheta),
             [0.0, 0.0, -9.81],
+            343.0,
         )
         return OWENSAero.DMS(
             turbine,
@@ -2272,6 +2379,7 @@ end
             fill(0.3, ntheta),
             fill(-0.2, ntheta),
             [0.0, 0.0, -9.81],
+            343.0,
         )
         return OWENSAero.radialforce(
             zeros(ntheta),

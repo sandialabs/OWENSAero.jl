@@ -318,8 +318,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env; finite_span_factor = 1.
     # airfoil
     dtheta = 2*pi/ntheta
     dt = dtheta ./ abs.(Omega)
-    v_sound = 343.0 #m/s #TODO: calculate this using Atmosphere.jl
-    mach = W/v_sound
+    mach = W ./ env.speed_of_sound
     if env.DynamicStallModel == "BV"
         cl = zeros(Real, length(alpha))
         cd = zeros(Real, length(alpha))
