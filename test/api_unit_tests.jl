@@ -1975,6 +1975,86 @@ end
     @test negative[6] ≈ -expected_tp atol=1e-14
 end
 
+@testset "AC wind-angle rotation invariance" begin
+    ntheta = 8
+    af(alpha, Re, M) = (2.0 .* alpha, 0.01 .+ alpha .^ 2)
+
+    function run_ac(windangle)
+        turbine = OWENSAero.Turbine(
+            1.5,
+            fill(1.5, ntheta),
+            0.0,
+            0.2,
+            0.1,
+            zeros(ntheta),
+            zeros(ntheta),
+            fill(2.0, ntheta),
+            2,
+            af,
+            ntheta,
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            zeros(1),
+            0.0,
+        )
+        turbine_frame_vx = 5.0
+        turbine_frame_vy = 0.5
+        env = OWENSAero.Environment(
+            1.225,
+            1.7894e-5,
+            fill(
+                turbine_frame_vx * cos(windangle) - turbine_frame_vy * sin(windangle),
+                ntheta,
+            ),
+            fill(
+                turbine_frame_vx * sin(windangle) + turbine_frame_vy * cos(windangle),
+                ntheta,
+            ),
+            zeros(ntheta),
+            zeros(ntheta),
+            windangle,
+            "none",
+            "AC",
+            false,
+            false,
+            false,
+            0.0,
+            false,
+            zeros(2 * ntheta),
+            zeros(Int, 1),
+            collect(1:ntheta),
+            fill(1.0, ntheta),
+            zeros(Int, ntheta),
+            zeros(Int, ntheta),
+            zeros(ntheta),
+            false,
+            zeros(ntheta),
+            zeros(ntheta),
+            [0.0, 0.0, -9.81],
+            343.0,
+        )
+        return OWENSAero.AC([turbine], env; w = zeros(2 * ntheta), solve = false)
+    end
+
+    baseline = run_ac(0.0)
+    rotated = run_ac(pi / 6)
+
+    @test baseline[1] ≈ 0.09869472822476016 atol=1e-14
+    @test baseline[4][1] ≈ 2.8550942523884117 atol=1e-14
+    @test baseline[5][1] ≈ 0.18645250749003425 atol=1e-14
+    @test baseline[7][1] ≈ 7.944459470123431 atol=1e-14
+    @test baseline[12][1] ≈ 0.18373513274863604 atol=1e-14
+    @test baseline[15][1] ≈ pi / 8 atol=1e-14
+
+    @test rotated[1] ≈ baseline[1] atol=1e-14
+    @test rotated[4] ≈ baseline[4] atol=1e-14
+    @test rotated[5] ≈ baseline[5] atol=1e-14
+    @test rotated[7] ≈ baseline[7] atol=1e-14
+    @test rotated[12] ≈ baseline[12] atol=1e-14
+    @test rotated[15] ≈ baseline[15] .- pi / 6 atol=1e-14
+end
+
 @testset "DMS and AC no tip-loss finite-span baseline" begin
     ntheta = 8
     theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))
