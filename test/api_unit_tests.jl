@@ -843,9 +843,11 @@ end
         Nslices = 1,
         ntheta = 4,
         RPI = false,
+        speed_of_sound = 1482.0,
     )
     @test OWENSAero.envslices[1].DynamicStallModel == "none"
     @test OWENSAero.envslices[1].AeroModel == "DMS"
+    @test OWENSAero.envslices[1].speed_of_sound == 1482.0
     @test OWENSAero.turbslices[1].af(0.0, 1.0e5, 0.0; return_cm = true) isa
           Tuple{Float64,Float64,Float64}
 
@@ -872,6 +874,19 @@ end
         AeroModel = "BEM",
         Nslices = 1,
         ntheta = 4,
+    )
+    @test_throws ArgumentError OWENSAero.setupTurb(
+        blade_x,
+        blade_z,
+        2,
+        [0.2],
+        2.0,
+        5.0;
+        DynamicStallModel = "none",
+        AeroModel = "DMS",
+        Nslices = 1,
+        ntheta = 4,
+        speed_of_sound = 0.0,
     )
 end
 

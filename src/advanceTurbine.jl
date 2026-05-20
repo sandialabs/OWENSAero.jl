@@ -87,6 +87,7 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     twist = 0.0, #or array{Float,Nslices}
     rho = 1.225,
     mu = 1.7894e-5,
+    speed_of_sound = 343.0,
     RPI = true,
     tau = [0.3,3.0],
     ntheta = 30,
@@ -118,6 +119,8 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `twist`: 0.0, #or array{Float,Nslices}
 * `rho`: working fluid density (kg/m^3)
 * `mu`:  working fluid dynamic viscosity (Pa*s)
+* `speed_of_sound`: sound speed used to form Mach numbers for airfoil callbacks
+  (m/s)
 * `RPI`: RPI method flag
 * `tau`: Unsteady wake propogation time constants [0.3,3.0],
 * `ntheta`: Number of azimuthal discretizations
@@ -147,6 +150,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     twist = 0.0,
     rho = 1.225,
     mu = 1.7894e-5,
+    speed_of_sound = 343.0,
     RPI = true,
     tau = [0.3,3.0],
     ntheta = 30,
@@ -259,7 +263,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
         turbslices[islice] = OWENSAero.Turbine(Radius,r,[z3D[islice]],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2); speed_of_sound)
     end
 end
 

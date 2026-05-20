@@ -70,6 +70,7 @@ OWENSAero.setupTurb(shapeX, shapeZ, B, chord, omega, Vinf;
     ntheta = 30,
     DynamicStallModel = "none",
     AeroModel = "DMS",
+    speed_of_sound = 343.0,
 )
 
 result = OWENSAero.steadyTurb(; omega, Vinf)
