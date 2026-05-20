@@ -126,7 +126,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `ntheta`: Number of azimuthal discretizations
 * `Nslices`: Number of vertical slices of the turbine
 * `ifw`: flag for inflow wind
-* `DynamicStallModel`:  Dynamic stall model "BV" or "none" or "LB" when we get it working
+* `DynamicStallModel`:  Dynamic stall model "BV", "LB", or "none"
 * `AeroModel`:  Aerodynamic model "DMS" or "AC"
 * `windangle_D`:  Inflow wind angle (degrees)
 * `afname`: airfoil path and name e.g. "examples/airfoils/NACA_0015_RE3E5.dat"
@@ -251,8 +251,11 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
 
     for islice = 1:Nslices
 
-        if DynamicStallModel=="BV"
-            af = OWENSAero.readaerodyn_BV_NEW(afname[islice])
+        if DynamicStallModel=="BV" || DynamicStallModel=="LB"
+            af = OWENSAero.readaerodyn_BV_NEW(
+                afname[islice];
+                DynamicStallModel = DynamicStallModel,
+            )
         elseif DynamicStallModel=="none" #Dyn stall is not gradient safe
             af = OWENSAero.readaerodyn_BV_NEW(afname[islice],DynamicStallModel="none")
         else

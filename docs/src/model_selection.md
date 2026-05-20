@@ -79,9 +79,9 @@ solver.
 
 ## Dynamic Stall
 
-`DynamicStallModel = "BV"` activates the Boeing-Vertol model used by the current tests and examples. `DynamicStallModel = "none"` bypasses dynamic stall and is the safest choice for gradient-sensitive workflows. The Leishman-Beddoes path is present in historical comments but should not be treated as a production option until it has complete tests and documentation.
+`DynamicStallModel = "BV"` activates the Boeing-Vertol model used by the current tests and examples. `DynamicStallModel = "LB"` activates the Leishman-Beddoes model, including per-azimuth lagged pressure, trailing-edge separation, leading-edge vortex, and leading-edge separation-state histories. `DynamicStallModel = "none"` bypasses dynamic stall and is the safest choice for gradient-sensitive workflows.
 
-Model option strings are normalized at construction and setup time: `BV`/`boeing-vertol` select Boeing-Vertol, `none`/`noDS`/`NONE` disable dynamic stall, and `DMS`/`AC` select the aerodynamic model case-insensitively. `DynamicStallModel = "LB"` now fails immediately with a not-implemented error instead of falling through to a static airfoil path.
+Model option strings are normalized at construction and setup time: `BV`/`boeing-vertol` select Boeing-Vertol, `LB`/`leishman-beddoes` select Leishman-Beddoes, `none`/`noDS`/`NONE` disable dynamic stall, and `DMS`/`AC` select the aerodynamic model case-insensitively.
 
 ## Parasitic and Lumped Drag Scope
 

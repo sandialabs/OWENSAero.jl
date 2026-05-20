@@ -15,7 +15,7 @@ These functions are intentionally stateful. A new call to `setupTurb` is require
 
 `setupTurb` expects blade centerline coordinates by slice, blade count, chord, rotation rate, and inflow. The examples use `shapeX` for radius-like positions and `shapeZ` for vertical station positions. Chord can be scalar or station-dependent depending on the call path.
 
-Airfoils are supplied with `afname`. The Boeing-Vertol reader is used when `DynamicStallModel = "BV"` and the simpler reader is used when dynamic stall is disabled. For single-Reynolds-table reads, the BV reader uses the stall-angle, zero-lift-angle, and thickness metadata in the polar header. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
+Airfoils are supplied with `afname`. The dynamic-stall reader is used when `DynamicStallModel = "BV"` or `DynamicStallModel = "LB"` and the simpler reader is used when dynamic stall is disabled. For single-Reynolds-table reads, the dynamic reader uses the stall-angle, zero-lift-angle, thickness, and Leishman-Beddoes critical-lift metadata in the polar header. Polar files with a `Cm25` column propagate that coefficient into the returned `cm_af` diagnostics and the `M25` distributed pitching-moment array.
 
 `setupTurb` passes `speed_of_sound` into each slice `Environment`, where DMS and AC use it to form the Mach number passed to airfoil callbacks. The default is `343.0` m/s for legacy air cases; water and temperature-specific validation cases should set it explicitly.
 

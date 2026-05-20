@@ -133,7 +133,7 @@ function streamtube(
     Re = rho * Vloc * chord / mu
     dt = dtheta / abs.(omega)
     mach = Vloc / env.speed_of_sound
-    if env.DynamicStallModel == "BV"
+    if env.DynamicStallModel == "BV" || env.DynamicStallModel == "LB"
         cl, cd_af, cm_af = OWENSAero._airfoil_coefficients(
             af,
             alpha,
@@ -147,8 +147,6 @@ function streamtube(
             solvestep,
             idx,
         )
-    elseif env.DynamicStallModel == "LB"
-        error("LB Dynamic Stall Model Not Implemented Yet")
     else
         cl, cd_af, cm_af = OWENSAero._airfoil_coefficients(af, alpha, Re, mach)
     end
@@ -299,6 +297,7 @@ function DMS(
         env.BV_DynamicFlagL,
         env.BV_DynamicFlagD,
         env.alpha_last,
+        env.lb_state,
         env.suction,
         env.accel_flap,
         env.accel_edge,

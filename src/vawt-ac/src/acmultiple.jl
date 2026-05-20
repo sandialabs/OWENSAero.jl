@@ -319,7 +319,7 @@ function radialforce(uvec, vvec, thetavec, turbine, env; finite_span_factor = 1.
     dtheta = 2*pi/ntheta
     dt = dtheta ./ abs.(Omega)
     mach = W ./ env.speed_of_sound
-    if env.DynamicStallModel == "BV"
+    if env.DynamicStallModel == "BV" || env.DynamicStallModel == "LB"
         cl = zeros(Real, length(alpha))
         cd = zeros(Real, length(alpha))
         cm = zeros(Real, length(alpha))
@@ -336,8 +336,6 @@ function radialforce(uvec, vvec, thetavec, turbine, env; finite_span_factor = 1.
                 W[ii],
             )
         end
-    elseif env.DynamicStallModel == "LB"
-        error("LB Dynamic Stall Model Not Coupled Yet")
     else
         cl, cd, cm = OWENSAero._airfoil_coefficients(turbine.af, alpha, Re, mach)
     end
@@ -550,6 +548,7 @@ function _ac_turbine_frame_environment(env)
         env.BV_DynamicFlagL,
         env.BV_DynamicFlagD,
         env.alpha_last,
+        env.lb_state,
         env.suction,
         env.accel_flap,
         env.accel_edge,
