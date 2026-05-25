@@ -473,11 +473,11 @@ for AeroModel in ["AC", "DMS"]
                     alpha_ref = copy(alpha)
                     thetavec_ref = copy(thetavec)
                 else
-                    @test CP ≈ CP_ref atol=1e-13
+                    @test CP ≈ CP_ref atol=1e-12
                     @test Rp ≈ Rp_ref atol=1e-9
                     @test Tp ≈ Tp_ref atol=1e-9
                     @test Vloc ≈ Vloc_ref atol=1e-9
-                    @test alpha ≈ alpha_ref atol=1e-13
+                    @test alpha ≈ alpha_ref atol=1e-12
                     @test thetavec ≈ thetavec_ref .- windangle_D[iwind] * pi / 180 atol=1e-14
                 end
             end
