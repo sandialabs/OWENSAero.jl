@@ -278,3 +278,65 @@ end
         OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false),
     )
 end
+
+@testset "DMS tower-shadow hook" begin
+    ntheta = 8
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
+    turbine = OWENSAero.Turbine(
+        1.5,
+        fill(1.5, ntheta),
+        1.0,
+        fill(0.2, ntheta),
+        fill(0.1, ntheta),
+        fill(0.05, ntheta),
+        fill(2.0, ntheta),
+        2,
+        af,
+        ntheta,
+        false,
+    )
+    env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        0.0,
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+
+    baseline = OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false)
+    shadowed = OWENSAero.DMS(
+        turbine,
+        env;
+        w = zeros(2 * ntheta),
+        solve = false,
+        tower_shadow = (tower_radius = 2.0, wake_expansion = 0.0, centerline_deficit = 0.5),
+    )
+
+    @test env.V_x == fill(5.0, ntheta)
+    @test env.V_y == zeros(ntheta)
+    @test shadowed[7][1] < baseline[7][1]
+    @test shadowed[7][2] < baseline[7][2]
+    @test shadowed[7][4] ≈ baseline[7][4] atol=1e-14
+    @test shadowed[7][5] ≈ baseline[7][5] atol=1e-14
+    @test shadowed[1] != baseline[1]
+
+    @test_throws ArgumentError OWENSAero.DMS(
+        turbine,
+        env;
+        w = zeros(2 * ntheta),
+        solve = false,
+        tower_shadow = (tower_radius = -1.0, centerline_deficit = 0.5),
+    )
+    @test_throws ArgumentError OWENSAero.DMS(
+        turbine,
+        env;
+        w = zeros(2 * ntheta),
+        solve = false,
+        tower_shadow = true,
+    )
+end

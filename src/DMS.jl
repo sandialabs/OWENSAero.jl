@@ -51,6 +51,41 @@ function _warn_if_large_dms_windangle(windangle)
     return nothing
 end
 
+_dms_radius_at(turbine, idx) = length(turbine.r) > 1 ? turbine.r[idx] : turbine.r
+
+function _apply_dms_tower_shadow(V_x, V_y, thetavec, turbine, tower_shadow)
+    tower_shadow === nothing && return V_x, V_y
+    tower_shadow isa NamedTuple || throw(
+        ArgumentError(
+            "tower_shadow must be nothing or a NamedTuple of towerShadowVelocity keyword arguments",
+        ),
+    )
+
+    active = get(tower_shadow, :active, true)
+    tower_radius = get(tower_shadow, :tower_radius, 0.0)
+    wake_expansion = get(tower_shadow, :wake_expansion, 0.0)
+    centerline_deficit = get(tower_shadow, :centerline_deficit, 0.0)
+
+    shadowed_V_x = similar(V_x)
+    shadowed_V_y = similar(V_y)
+    for idx in eachindex(thetavec)
+        radius = _dms_radius_at(turbine, idx)
+        relative_position = [radius * cos(thetavec[idx]), radius * sin(thetavec[idx])]
+        velocity = towerShadowVelocity(
+            [V_x[idx], V_y[idx]],
+            relative_position;
+            active,
+            tower_radius,
+            wake_expansion,
+            centerline_deficit,
+        )
+        shadowed_V_x[idx] = velocity[1]
+        shadowed_V_y[idx] = velocity[2]
+    end
+
+    return shadowed_V_x, shadowed_V_y
+end
+
 """
 INTERNAL streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solvestep=false)
 
@@ -301,7 +336,10 @@ Double multiple streamtube model.
 `finite_span_factor` may be a nonnegative scalar or length-`ntheta` vector. It
 defaults to `1.0` and scales aerodynamic blade loads, torque, thrust, induction
 source terms, and aerodynamic moment without scaling added mass, buoyancy, or
-centrifugal terms.
+centrifugal terms. `tower_shadow` may be `nothing` or a named tuple of
+`towerShadowVelocity` keyword arguments; when present, DMS applies the
+off-by-default tower-shadow velocity primitive in the turbine frame before the
+streamtube solve.
 """
 function DMS(
     turbine,
@@ -310,16 +348,23 @@ function DMS(
     idx_RPI = 1:turbine.ntheta,
     solve = true,
     finite_span_factor = 1.0,
+    tower_shadow = nothing,
 )
     #TODO: Inputs documentation
     a_in = w
     ntheta = turbine.ntheta
+    dtheta = 2 * pi / (ntheta)
+    # thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
+    thetavec = collect((dtheta/2):dtheta:(2*pi))
+
     #Convert global F.O.R. winds to turbine frame
     windangle = env.windangle
     _warn_if_large_dms_windangle(windangle)
 
     V_xtemp = env.V_x .* cos(windangle) + env.V_y .* sin(windangle) # Vinf is V_x, t is for turbine direction f.o.r.
     V_ytemp = -env.V_x .* sin(windangle) + env.V_y .* cos(windangle)
+    V_xtemp, V_ytemp =
+        _apply_dms_tower_shadow(V_xtemp, V_ytemp, thetavec, turbine, tower_shadow)
     env_turbine = Environment(
         env.rho,
         env.mu,
@@ -352,10 +397,7 @@ function DMS(
 
     # Unpack the rest
 
-    dtheta = 2 * pi / (ntheta)
     finite_span_factor = _validated_finite_span_factor(finite_span_factor, ntheta)
-    # thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
-    thetavec = collect((dtheta/2):dtheta:(2*pi))
 
     astar = zeros(Real, ntheta * 2)#env.aw_warm[1:ntheta] #zeros(ntheta)
 

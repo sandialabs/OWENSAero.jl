@@ -312,8 +312,11 @@ function _validated_speed_of_sound(speed_of_sound)
         throw(ArgumentError("speed_of_sound must be a finite positive real value"))
     isfinite(speed_of_sound) ||
         throw(ArgumentError("speed_of_sound must be finite; got $(repr(speed_of_sound))"))
-    speed_of_sound > zero(speed_of_sound) ||
-        throw(ArgumentError("speed_of_sound must be greater than zero; got $(repr(speed_of_sound))"))
+    speed_of_sound > zero(speed_of_sound) || throw(
+        ArgumentError(
+            "speed_of_sound must be greater than zero; got $(repr(speed_of_sound))",
+        ),
+    )
     return speed_of_sound
 end
 
@@ -328,7 +331,7 @@ Environment(
     DynamicStallModel,
     AeroModel,
     aw_warm,
-;
+    ;
     speed_of_sound = 343.0,
 ) = Environment(
     rho,
@@ -375,7 +378,7 @@ Environment(
     AddedMass_Coeff_Ca,
     centrifugal_force_flag,
     aw_warm,
-;
+    ;
     speed_of_sound = 343.0,
 ) = Environment(
     rho,
@@ -406,47 +409,40 @@ Environment(
     [0.0, 0.0, -9.81],
     _validated_speed_of_sound(speed_of_sound),
 )
-Environment(
-    rho,
-    mu,
-    V_x,
-    DynamicStallModel,
-    AeroModel,
-    aw_warm;
-    speed_of_sound = 343.0,
-) = Environment(
-    rho,
-    mu,
-    V_x,
-    zeros(Real, size(V_x)),
-    zeros(Real, size(V_x)),
-    zeros(Real, size(V_x)),
-    0.0,
-    _canonical_dynamic_stall_model(DynamicStallModel),
-    _canonical_aero_model(AeroModel),
-    false,
-    false,
-    false,
-    1.0,
-    false,
-    aw_warm,
-    zeros(Int, 1),
-    zeros(Int, length(V_x)),
-    deepcopy(V_x),
-    zeros(Int, length(V_x)),
-    zeros(Int, length(V_x)),
-    zeros(Real, length(V_x)),
-    LeishmanBeddoesState(length(V_x)),
-    false,
-    zeros(Real, length(V_x)),
-    zeros(Real, length(V_x)),
-    [0.0, 0.0, -9.81],
-    _validated_speed_of_sound(speed_of_sound),
-)
+Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm; speed_of_sound = 343.0) =
+    Environment(
+        rho,
+        mu,
+        V_x,
+        zeros(Real, size(V_x)),
+        zeros(Real, size(V_x)),
+        zeros(Real, size(V_x)),
+        0.0,
+        _canonical_dynamic_stall_model(DynamicStallModel),
+        _canonical_aero_model(AeroModel),
+        false,
+        false,
+        false,
+        1.0,
+        false,
+        aw_warm,
+        zeros(Int, 1),
+        zeros(Int, length(V_x)),
+        deepcopy(V_x),
+        zeros(Int, length(V_x)),
+        zeros(Int, length(V_x)),
+        zeros(Real, length(V_x)),
+        LeishmanBeddoesState(length(V_x)),
+        false,
+        zeros(Real, length(V_x)),
+        zeros(Real, length(V_x)),
+        [0.0, 0.0, -9.81],
+        _validated_speed_of_sound(speed_of_sound),
+    )
 
 # TODO: This is a silly hack that should be removed once `envslices` isn't a global variable
 # anymore but instead instantiated with the correct types from the start.
-function prepare_for_duals(::Type{DT}) where DT
+function prepare_for_duals(::Type{DT}) where {DT}
     global envslices
     function convert_env(env)
         env′ = Environment(
@@ -474,7 +470,7 @@ function prepare_for_duals(::Type{DT}) where DT
             env.suction,
             env.accel_flap,
             env.accel_edge,
-            env.gravity
+            env.gravity,
         )
         return env′
     end
@@ -947,6 +943,7 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `solve::Bool`: Optional, False is used when you want the model outputs for a given set of induction factors without resolving them.
 * `ifw::Bool`: Optional, used to tell the Vinf lookup to attempt to use the dynamic inflow wind library, requires preprocessing as is shown in the test cases.
 * `finite_span_factor::Union{Real,AbstractVector}`: Optional caller-supplied finite-span scaling factor. It must be a finite nonnegative scalar or length-`ntheta` vector and scales aerodynamic blade loads, induction source terms, torque, thrust, and pitching moment without scaling added mass, buoyancy, or centrifugal terms.
+* `tower_shadow::Union{Nothing,NamedTuple}`: Optional DMS-only tower-shadow velocity hook. Pass a named tuple of `towerShadowVelocity` keyword arguments to apply the tower-shadow primitive before solving streamtubes.
 
 
 # Outputs:
@@ -975,10 +972,16 @@ function steady(
     solve = true,
     ifw = false,
     finite_span_factor = 1.0,
+    tower_shadow = nothing,
 )
     if env.AeroModel=="DMS"
-        return DMS(turbine, env; w, idx_RPI, solve, finite_span_factor)
+        return DMS(turbine, env; w, idx_RPI, solve, finite_span_factor, tower_shadow)
     elseif env.AeroModel=="AC"
+        tower_shadow === nothing || throw(
+            ArgumentError(
+                "tower_shadow is currently implemented for the DMS steady path only",
+            ),
+        )
         turbines = Array{OWENSAero.Turbine}(undef, 1)
         turbines[1] = turbine
         return AC(turbines, env; w, idx_RPI, solve, ifw, finite_span_factor)
