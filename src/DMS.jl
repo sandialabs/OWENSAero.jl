@@ -7,6 +7,31 @@ import FLOWMath
 import Statistics
 import Statistics: mean
 
+_dms_number_type(x::Number) = typeof(x)
+_dms_number_type(x::AbstractArray) = isempty(x) ? eltype(x) : mapreduce(typeof, promote_type, x)
+_dms_number_type(x) = typeof(x)
+
+function _dms_output_type(turbine, env, a_in)
+    return promote_type(
+        _dms_number_type(turbine.R),
+        _dms_number_type(turbine.r),
+        _dms_number_type(turbine.twist),
+        _dms_number_type(turbine.delta),
+        _dms_number_type(turbine.omega),
+        _dms_number_type(env.rho),
+        _dms_number_type(env.mu),
+        _dms_number_type(env.V_x),
+        _dms_number_type(env.V_y),
+        _dms_number_type(env.V_z),
+        _dms_number_type(env.V_twist),
+        _dms_number_type(env.accel_flap),
+        _dms_number_type(env.accel_edge),
+        _dms_number_type(env.gravity),
+        _dms_number_type(env.speed_of_sound),
+        _dms_number_type(a_in),
+    )
+end
+
 """
 INTERNAL streamtube(a,theta,turbine,env;output_all=false,Vxwake=nothing,solvestep=false)
 
@@ -319,25 +344,26 @@ function DMS(
     else
         astar[1:ntheta] = a_in[1:ntheta]
     end
-    Th = zeros(Real, ntheta)
-    Q = zeros(Real, ntheta)
-    Rp = zeros(Real, ntheta)
-    Tp = zeros(Real, ntheta)
-    Zp = zeros(Real, ntheta)
-    Vloc = zeros(Real, ntheta)
-    CD = zeros(Real, ntheta)
-    CT = zeros(Real, ntheta)
-    alpha = zeros(Real, ntheta)
-    cl = zeros(Real, ntheta)
-    cd_af = zeros(Real, ntheta)
-    cm_af = zeros(Real, ntheta)
-    M25 = zeros(Real, ntheta)
-    Re = zeros(Real, ntheta)
-    M_addedmass_Np = zeros(Real, ntheta)
-    M_addedmass_Tp = zeros(Real, ntheta)
-    F_addedmass_Np = zeros(Real, ntheta)
-    F_addedmass_Tp = zeros(Real, ntheta)
-    F_buoy = zeros(Real, ntheta, 3)
+    T = _dms_output_type(turbine, env, a_in)
+    Th = zeros(T, ntheta)
+    Q = zeros(T, ntheta)
+    Rp = zeros(T, ntheta)
+    Tp = zeros(T, ntheta)
+    Zp = zeros(T, ntheta)
+    Vloc = zeros(T, ntheta)
+    CD = zeros(T, ntheta)
+    CT = zeros(T, ntheta)
+    alpha = zeros(T, ntheta)
+    cl = zeros(T, ntheta)
+    cd_af = zeros(T, ntheta)
+    cm_af = zeros(T, ntheta)
+    M25 = zeros(T, ntheta)
+    Re = zeros(T, ntheta)
+    M_addedmass_Np = zeros(T, ntheta)
+    M_addedmass_Tp = zeros(T, ntheta)
+    F_addedmass_Np = zeros(T, ntheta)
+    F_addedmass_Tp = zeros(T, ntheta)
+    F_buoy = zeros(T, ntheta, 3)
 
     # For All Upper
     iter_RPI = 1
