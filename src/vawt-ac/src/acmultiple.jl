@@ -524,6 +524,40 @@ function residual(
     return output[:]
 end
 
+function _ac_turbine_frame_environment(env)
+    windangle = env.windangle
+    V_xtemp = env.V_x .* cos(windangle) + env.V_y .* sin(windangle)
+    V_ytemp = -env.V_x .* sin(windangle) + env.V_y .* cos(windangle)
+    return Environment(
+        env.rho,
+        env.mu,
+        V_xtemp,
+        V_ytemp,
+        env.V_z,
+        env.V_twist,
+        zero(windangle),
+        env.DynamicStallModel,
+        env.AeroModel,
+        env.Aero_AddedMass_Active,
+        env.Aero_Buoyancy_Active,
+        env.Aero_RotAccel_Active,
+        env.AddedMass_Coeff_Ca,
+        env.centrifugal_force_flag,
+        env.aw_warm,
+        env.steplast,
+        env.idx_RPI,
+        env.V_wake_old,
+        env.BV_DynamicFlagL,
+        env.BV_DynamicFlagD,
+        env.alpha_last,
+        env.suction,
+        env.accel_flap,
+        env.accel_edge,
+        env.gravity,
+        env.speed_of_sound,
+    )
+end
+
 """
 AC(turbines, env; w=zeros(Real,2*turbines[1].ntheta), idx_RPI=1:2*turbine.ntheta, solve=true, ifw=false)
 
@@ -556,6 +590,7 @@ function AC(
     radii = [turbine.R for turbine in turbines]
 
     ntheta = turbines[1].ntheta
+    env_turbine = _ac_turbine_frame_environment(env)
 
     # assemble global matrices
     Ax, Ay, theta = matrixAssemble(turbines[1], centerX, centerY, radii, ntheta)
@@ -589,7 +624,7 @@ function AC(
                 theta,
                 [1.0],
                 turbines,
-                env;
+                env_turbine;
                 w_RPI = x,
                 idx_RPI,
                 finite_span_factor,
@@ -620,7 +655,7 @@ function AC(
                 theta,
                 [1.0],
                 turbines,
-                env;
+                env_turbine;
                 finite_span_factor,
             )
             if minimum(abs.(turbines[1].delta))<pi/4 || ifw
@@ -672,7 +707,7 @@ function AC(
     F_addedmass_Tp,
     F_buoy,
     cm,
-    M25 = radialforce(u, v, theta, turbines[i], env; finite_span_factor)
+    M25 = radialforce(u, v, theta, turbines[i], env_turbine; finite_span_factor)
 
     return CP,
     q,
@@ -688,7 +723,7 @@ function AC(
     alpha,
     cl,
     cd,
-    theta,
+    theta .- env.windangle,
     Re,
     M_addedmass_Np,
     M_addedmass_Tp,

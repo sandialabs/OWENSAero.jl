@@ -430,7 +430,14 @@ for AeroModel in ["AC", "DMS"]
             end
             # PyPlot.legend()
         else
-            for windangle_D in (0.0, 30.0, 60.0)
+            windangle_D = collect(0.0:30.0:90.0)
+            CP_ref = nothing
+            Rp_ref = nothing
+            Tp_ref = nothing
+            Vloc_ref = nothing
+            alpha_ref = nothing
+            thetavec_ref = nothing
+            for iwind = 1:length(windangle_D)
                 local CP,
                 Th,
                 Q,
@@ -446,17 +453,34 @@ for AeroModel in ["AC", "DMS"]
                 cl_af,
                 cd_af,
                 thetavec,
-                Re = aerowrapper(xin; AeroModel, returnall = true, windangle_D)
+                Re = aerowrapper(
+                    xin;
+                    AeroModel,
+                    returnall = true,
+                    windangle_D = windangle_D[iwind],
+                )
                 @test isfinite(CP)
                 @test CP > 0
                 @test all(isfinite, Float64.(Rp))
                 @test all(isfinite, Float64.(Tp))
                 @test all(isfinite, Float64.(Vloc))
                 @test minimum(Float64.(Vloc)) > 0
-                @test thetavec[1] ≈ pi / ntheta atol=1e-14
-                @test thetavec[end] ≈ 2 * pi - pi / ntheta atol=1e-14
+                if iwind == 1
+                    CP_ref = CP
+                    Rp_ref = copy(Rp)
+                    Tp_ref = copy(Tp)
+                    Vloc_ref = copy(Vloc)
+                    alpha_ref = copy(alpha)
+                    thetavec_ref = copy(thetavec)
+                else
+                    @test CP ≈ CP_ref atol=1e-12
+                    @test Rp ≈ Rp_ref atol=1e-9
+                    @test Tp ≈ Tp_ref atol=1e-9
+                    @test Vloc ≈ Vloc_ref atol=1e-9
+                    @test alpha ≈ alpha_ref atol=1e-12
+                    @test thetavec ≈ thetavec_ref .- windangle_D[iwind] * pi / 180 atol=1e-14
+                end
             end
-            @test_skip "AC wind-angle frame invariance is not implemented yet"
         end
     end
     ################################

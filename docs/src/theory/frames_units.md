@@ -16,7 +16,7 @@ OWENSAero uses SI units. Angles are radians unless a field or helper name explic
 
 For simple runs, `V_x` is the incoming freestream velocity. `V_y` and `V_z` are zero unless cross-flow, vertical flow, or coupled motion terms are active.
 
-For DMS, `windangle` rotates the supplied `V_x`/`V_y` components into the turbine inflow frame before solving. The returned `thetavec` is shifted back by `windangle`, while the local force, velocity, and angle-of-attack histories are expected to be invariant for equivalent rotated freestream inputs.
+For DMS and the public single-turbine AC path, `windangle` rotates the supplied `V_x`/`V_y` components into the turbine inflow frame before solving. The returned `thetavec` is shifted back by `windangle`, while the local force, velocity, and angle-of-attack histories are expected to be invariant for equivalent rotated freestream inputs.
 
 ## Load Components
 
