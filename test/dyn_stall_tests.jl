@@ -235,157 +235,182 @@ end
 
 end
 
-# @testset "NACA 0012 Leishman-Beddoes" begin
-#
-#     # Data taken from https://doi.org/10.1007/s40430-019-1907-4 figure 10
-#     function runme2()
-#         k = 0.048 # k = omega*c/(2*U)
-#         Re = 3.8e6 # Re = rho * l * V / mu
-#         rho = 1.225
-#         mu = 1.7894e-5
-#         M = 0.3
-#         v_sound = 343.0 #m/s
-#         U = M * v_sound
-#         c = Re * mu / (rho * U)
-#         w = k*2*U/c
-#         a_amp = 10.0*pi/180
-#         a_mean = 10.0*pi/180
-#         dt = 0.002
-#         tmax = 3.0
-#         CLCritP = 13.25 * pi/180 # stall angle
-#         CLCritN = -13.25 * pi/180 # stall angle
-#         cv_Last = 0.0
-#         CLa = 2.0*pi
-#         AOA0 = 0.0
-#         tc = 0.12
-#         ds = 2.0*U*dt/c
-#         CLRefLE_Last = 0.0
-#         CLRef_Last = 0.0
-#         Fstat_Last = 0.0
-#         cv_Last = 0.0
-#         dp = 0.0
-#         dF = 0.0
-#         dCNv = 0.0
-#         LESepState = 0
-#         sLEv = 0.0
-#         n_samples = round(Int,tmax/dt)+1
-#         alpha_LB = zeros(n_samples)
-#         CL_LB = zeros(n_samples)
-#         CD_LB = zeros(n_samples)
-#         CM_LB = zeros(n_samples)
-#
-#         # Load Airfoil Data
-#         af_re3_6e6 = DelimitedFiles.readdlm("$(path)/data/dynstall/NACA_0012.dat", ' ',Float64,skipstart = 13)
-#         # Data taken from https://doi.org/10.1007/s40430-019-1907-4 figure 1: The airfoil data used significantly changes the stall characteristics, must use same airfoil data as article for 1:1 comparison.
-#         cl_sadr = DelimitedFiles.readdlm("$(path)/data/dynstall/CL_NACA0012_Sadr.txt", ',',Float64,skipstart = 0)
-#         full_alpha_cl = [-reverse(cl_sadr[2:end,1]);cl_sadr[:,1]]
-#         full_cl = [-reverse(cl_sadr[2:end,2]);cl_sadr[:,2]]
-#
-#         cm_sadr = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_NACA0012_Sadr.txt", ',',Float64,skipstart = 0)
-#
-#         full_alpha_cm = [-reverse(cm_sadr[2:end,1]);cm_sadr[:,1]]
-#         full_cm = [-reverse(cm_sadr[2:end,2]);cm_sadr[:,2]]
-#
-#         afcl = Spline1D(full_alpha_cl*pi/180, full_cl, s=0.1)
-#         afcm = Spline1D(full_alpha_cm*pi/180, full_cm, s=0.1)
-#         afcd = Spline1D(af_re3_6e6[:,1]*pi/180, af_re3_6e6[:,3], s=0.01)
-#
-#         function af(alpha,Re,mach,family_factor)
-#
-#             cl = evaluate(afcl, alpha)
-#             cm = evaluate(afcm, alpha)
-#             cd = evaluate(afcd, alpha)
-#
-#             return cl, cd, cm
-#         end
-#
-#         # Run the LB Model
-#         i = 1
-#         for t = 0:dt:tmax
-#             alpha_LB[i] = a_mean+a_amp*sin(w*t)
-#             # Juno.@enter OWENSAero.Leishman_Beddoes!(af,alpha_LB[i],alpha_LB[i],ds,M,Re,CLa,AOA0,CLCritP,CLCritN,CLRefLE_Last, CLRef_Last,Fstat_Last, cv_Last, dp, dF, dCNv, LESepState, Tp=1.7, family_factor = 0.0)
-#             CL_LB[i], CD_LB[i], CM_LB[i], CLRefLE_Last,CLRef_Last,Fstat_Last,cv_Last, dp, dF, dCNv, LESepState, sLEv = OWENSAero.Leishman_Beddoes(af,alpha_LB[i],alpha_LB[i],ds,M,Re,CLa,AOA0,CLCritP,CLCritN,CLRefLE_Last, CLRef_Last,Fstat_Last, cv_Last, dp, dF, dCNv, LESepState, sLEv, Tp=1.7, family_factor = 0.0)
-#             i += 1
-#         end
-#         return af_re3_6e6,full_alpha_cl,full_cl,full_alpha_cm,full_cm, alpha_LB, CL_LB, CD_LB, CM_LB
-#     end
-#
-#     af_re3_6e6,full_alpha_cl,full_cl,full_alpha_cm,full_cm, alpha_LB, CL_LB, CD_LB, CM_LB = runme2()
-#
-#     # Load the Experimental and Comparative BV Results
-#     CL_exp = DelimitedFiles.readdlm("$(path)/data/dynstall/Fig10_Exp_CL.txt", ',',skipstart = 1)
-#     CL_LB_paper = DelimitedFiles.readdlm("$(path)/data/dynstall/Fig10_LB_CL.txt", ',',skipstart = 1)
-#
-#     CM_exp = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_Fig10_EXP_Sadr.txt", ',',skipstart = 0)
-#     CM_LB_paper = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_Fig10_LB_Sadr.txt", ',',skipstart = 0)
-#
-#     #Unit Data
-#     filename = "$path/data/dynstall/LB_unit_data.h5"
-#     # HDF5.h5open(filename, "w") do file
-#     #     HDF5.write(file,"alpha_LB",alpha_LB)
-#     #     HDF5.write(file,"CL_LB",CL_LB)
-#     #     HDF5.write(file,"CD_LB",CD_LB)
-#     #     HDF5.write(file,"CM_LB",CM_LB)
-#     # end
-#
-#     alpha_LB_old = HDF5.h5read(filename,"alpha_LB")
-#     CL_LB_old = HDF5.h5read(filename,"CL_LB")
-#     CD_LB_old = HDF5.h5read(filename,"CD_LB")
-#     CM_LB_old = HDF5.h5read(filename,"CM_LB")
-#
-#     # Perform Testing Comparisons
-#     @test isapprox(alpha_LB_old,alpha_LB,atol=tol)
-#     @test isapprox(CL_LB_old,CL_LB,atol=tol)
-#     @test isapprox(CD_LB_old,CD_LB,atol=tol)
-#     @test isapprox(CM_LB_old,CM_LB,atol=tol)
-#
-#     # Plot
-#     plots = true
-#     if plots
-#         # import PyPlot
-#         PyPlot.rc("figure", figsize=(4, 3))
-#         PyPlot.rc("font", size=10.0)
-#         PyPlot.rc("lines", linewidth=1.5)
-#         PyPlot.rc("lines", markersize=3.0)
-#         PyPlot.rc("legend", frameon=false)
-#         PyPlot.rc("axes.spines", right=false, top=false)
-#         PyPlot.rc("figure.subplot", left=.18, bottom=.17, top=0.9, right=.9)
-#         # rc("axes", color_cycle=["348ABD", "A60628", "009E73", "7A68A6", "D55E00", "CC79A7"])
-#         plot_cycle=["#348ABD", "#A60628", "#009E73", "#7A68A6", "#D55E00", "#CC79A7"]
-#
-#         PyPlot.figure()
-#         PyPlot.plot(full_alpha_cl,full_cl,"k.-")
-#         PyPlot.plot(CL_exp[:,1],CL_exp[:,2],".-",color = plot_cycle[1])
-#         PyPlot.plot(CL_LB_paper[:,1],CL_LB_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_LB[100:end]*180/pi, CL_LB[100:end],".-",color = plot_cycle[3])
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Lift Coefficient")
-#         PyPlot.xlim([-22,22])
-#         PyPlot.legend(["Static","Exp Dynamic","Sadr LB","CACTUS LB"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CL_Fig10_LB.pdf",transparent = true)
-#
-#         PyPlot.figure()
-#         PyPlot.plot(full_alpha_cm,full_cm,"k.-")
-#         PyPlot.plot(CM_exp[:,1],CM_exp[:,2],".-",color = plot_cycle[1])
-#         PyPlot.plot(CM_LB_paper[:,1],CM_LB_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_LB[100:end]*180/pi, CM_LB[100:end],".-",color = plot_cycle[3])
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Moment Coefficient")
-#         PyPlot.xlim([0,22])
-#         PyPlot.legend(["Static","Exp Dynamic","Sadr LB","CACTUS LB"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CM_Fig10_LB.pdf",transparent = true)
-#
-#         PyPlot.figure()
-#         PyPlot.plot(af_re3_6e6[:,1],af_re3_6e6[:,3],"k.-")
-#         # PyPlot.plot(CD_exp[:,1],CD_exp[:,2],".-",color = plot_cycle[1])
-#         # PyPlot.plot(CD_LB_paper[:,1],CD_LB_paper[:,2],".-",color = plot_cycle[2])
-#         PyPlot.plot(alpha_LB[100:end]*180/pi, CD_LB[100:end],".-",color = plot_cycle[3])
-#         PyPlot.xlabel("Angle of Attack (deg)")
-#         PyPlot.ylabel("Drag Coefficient")
-#         PyPlot.xlim([0,22])
-#         PyPlot.ylim([0,0.4])
-#         PyPlot.legend(["Static Xfoil","CACTUS LB"])
-#         PyPlot.savefig("$(path)/../doc/paper/analyses/figs/dynstall/CD_Fig10_LB.pdf",transparent = true)
-#     end
-#
-# end
+@testset "NACA 0012 Leishman-Beddoes" begin
+
+    # Data taken from https://doi.org/10.1007/s40430-019-1907-4 figure 10.
+    function runme2()
+        k = 0.048 # k = omega*c/(2*U)
+        Re = 3.8e6 # Re = rho * l * V / mu
+        rho = 1.225
+        mu = 1.7894e-5
+        M = 0.3
+        v_sound = 343.0 #m/s
+        U = M * v_sound
+        c = Re * mu / (rho * U)
+        w = k*2*U/c
+        a_amp = 10.0*pi/180
+        a_mean = 10.0*pi/180
+        dt = 0.002
+        tmax = 3.0
+        CLCritP = 1.0
+        CLCritN = -1.0
+        CLa = 2.0*pi
+        AOA0 = 0.0
+        ds = 2.0*U*dt/c
+        CLRefLE_Last = 0.0
+        CLRef_Last = 0.0
+        Fstat_Last = 0.0
+        cv_Last = 0.0
+        dp = 0.0
+        dF = 0.0
+        dCNv = 0.0
+        LESepState = 0
+        sLEv = 0.0
+        n_samples = round(Int,tmax/dt)+1
+        alpha_LB = zeros(n_samples)
+        CL_LB = zeros(n_samples)
+        CD_LB = zeros(n_samples)
+        CM_LB = zeros(n_samples)
+        LESepState_LB = zeros(Int, n_samples)
+        sLEv_LB = zeros(n_samples)
+
+        # Load Airfoil Data
+        af_re3_6e6 = DelimitedFiles.readdlm("$(path)/data/dynstall/NACA_0012.dat", ' ',Float64,skipstart = 13)
+        # Data taken from https://doi.org/10.1007/s40430-019-1907-4 figure 1: The airfoil data used significantly changes the stall characteristics, must use same airfoil data as article for 1:1 comparison.
+        cl_sadr = DelimitedFiles.readdlm("$(path)/data/dynstall/CL_NACA0012_Sadr.txt", ',',Float64,skipstart = 0)
+        full_alpha_cl = [-reverse(cl_sadr[2:end,1]);cl_sadr[:,1]]
+        full_cl = [-reverse(cl_sadr[2:end,2]);cl_sadr[:,2]]
+
+        cm_sadr = DelimitedFiles.readdlm("$(path)/data/dynstall/CM_NACA0012_Sadr.txt", ',',Float64,skipstart = 0)
+        full_alpha_cm = [-reverse(cm_sadr[2:end,1]);cm_sadr[:,1]]
+        full_cm = [-reverse(cm_sadr[2:end,2]);cm_sadr[:,2]]
+
+        afcl = akima_without_duplicate_abscissae(full_alpha_cl*pi/180, full_cl)
+        afcm = akima_without_duplicate_abscissae(full_alpha_cm*pi/180, full_cm)
+        afcd = akima_without_duplicate_abscissae(af_re3_6e6[:,1]*pi/180, af_re3_6e6[:,3])
+
+        function af(alpha,Re,mach,family_factor)
+            cl = afcl(alpha)
+            cm = afcm(alpha)
+            cd = afcd(alpha)
+
+            return cl, cd, cm
+        end
+
+        # Run the LB Model
+        i = 1
+        for t = 0:dt:tmax
+            alpha_LB[i] = a_mean+a_amp*sin(w*t)
+            CL_LB[i], CD_LB[i], CM_LB[i], CLRefLE_Last,CLRef_Last,Fstat_Last,
+            cv_Last, dp, dF, dCNv, LESepState, sLEv = OWENSAero.Leishman_Beddoes(
+                af,
+                alpha_LB[i],
+                alpha_LB[i],
+                ds,
+                M,
+                Re,
+                CLa,
+                AOA0,
+                CLCritP,
+                CLCritN,
+                CLRefLE_Last,
+                CLRef_Last,
+                Fstat_Last,
+                cv_Last,
+                dp,
+                dF,
+                dCNv,
+                LESepState,
+                sLEv,
+                Tp=1.7,
+                family_factor = 0.0,
+            )
+            LESepState_LB[i] = LESepState
+            sLEv_LB[i] = sLEv
+            i += 1
+        end
+        return af_re3_6e6,full_alpha_cl,full_cl,full_alpha_cm,full_cm,
+        alpha_LB, CL_LB, CD_LB, CM_LB, LESepState_LB, sLEv_LB
+    end
+
+    af_re3_6e6,full_alpha_cl,full_cl,full_alpha_cm,full_cm, alpha_LB, CL_LB,
+    CD_LB, CM_LB, LESepState_LB, sLEv_LB = runme2()
+
+    filename = "$path/data/dynstall/LB_unit_data.h5"
+    alpha_LB_old = HDF5.h5read(filename,"alpha_LB")
+    CL_LB_old = HDF5.h5read(filename,"CL_LB")
+    CD_LB_old = HDF5.h5read(filename,"CD_LB")
+    CM_LB_old = HDF5.h5read(filename,"CM_LB")
+    LESepState_LB_old = HDF5.h5read(filename,"LESepState_LB")
+    sLEv_LB_old = HDF5.h5read(filename,"sLEv_LB")
+
+    @test alpha_LB isa Vector{Float64}
+    @test CL_LB isa Vector{Float64}
+    @test CD_LB isa Vector{Float64}
+    @test CM_LB isa Vector{Float64}
+    @test LESepState_LB isa Vector{Int}
+    @test sLEv_LB isa Vector{Float64}
+    @test length(alpha_LB) == 1501
+    @test length(CL_LB) == 1501
+    @test length(CD_LB) == 1501
+    @test length(CM_LB) == 1501
+    @test all(isfinite, CL_LB)
+    @test all(isfinite, CD_LB)
+    @test all(isfinite, CM_LB)
+    @test isapprox(alpha_LB_old, alpha_LB; atol=tol, rtol=0)
+    @test isapprox(CL_LB_old, CL_LB; atol=tol, rtol=0)
+    @test isapprox(CD_LB_old, CD_LB; atol=tol, rtol=0)
+    @test isapprox(CM_LB_old, CM_LB; atol=tol, rtol=0)
+    @test LESepState_LB_old == LESepState_LB
+    @test isapprox(sLEv_LB_old, sLEv_LB; atol=tol, rtol=0)
+    @test maximum(LESepState_LB) == 1
+    @test sum(LESepState_LB) == 812
+    @test maximum(sLEv_LB) ≈ 69.4348005359045 atol=tol
+    @test maximum(CL_LB) ≈ 1.648581675176007 atol=tol
+    @test minimum(CL_LB) ≈ 0.0028272445153878782 atol=tol
+    @test maximum(CD_LB) ≈ 0.3987473145866656 atol=tol
+    @test minimum(CM_LB) ≈ -0.10383870862362879 atol=tol
+    @test CL_LB[1] ≈ 1.1116093542418823 atol=tol
+    @test CD_LB[1] ≈ 0.0184 atol=tol
+    @test CM_LB[end] ≈ -0.0017977670866415232 atol=tol
+
+    alpha_LB_deg = alpha_LB .* 180 ./ pi
+    CL_LB_paper = DelimitedFiles.readdlm(
+        "$(path)/data/dynstall/Fig10_LB_CL.txt",
+        ',',
+        Float64,
+    )
+    CM_LB_paper = DelimitedFiles.readdlm(
+        "$(path)/data/dynstall/CM_Fig10_LB_Sadr.txt",
+        ',',
+        Float64,
+    )
+    cl_upstroke_metrics =
+        branch_validation_metrics(alpha_LB_deg, CL_LB, CL_LB_paper; branch = :upstroke)
+    cl_downstroke_metrics =
+        branch_validation_metrics(alpha_LB_deg, CL_LB, CL_LB_paper; branch = :downstroke)
+    cm_upstroke_metrics =
+        branch_validation_metrics(alpha_LB_deg, CM_LB, CM_LB_paper; branch = :upstroke)
+    cm_downstroke_metrics =
+        branch_validation_metrics(alpha_LB_deg, CM_LB, CM_LB_paper; branch = :downstroke)
+
+    @test cl_upstroke_metrics.n == 10
+    @test cl_upstroke_metrics.rmse ≈ 0.1594729906749264 atol=tol
+    @test cl_upstroke_metrics.mean_bias ≈ 0.1198661433692556 atol=tol
+    @test cl_upstroke_metrics.max_abs_error ≈ 0.27204279264447984 atol=tol
+
+    @test cl_downstroke_metrics.n == 24
+    @test cl_downstroke_metrics.rmse ≈ 0.14813422809695784 atol=tol
+    @test cl_downstroke_metrics.mean_bias ≈ 0.09566468397945065 atol=tol
+    @test cl_downstroke_metrics.max_abs_error ≈ 0.3146159343979056 atol=tol
+
+    @test cm_upstroke_metrics.n == 23
+    @test cm_upstroke_metrics.rmse ≈ 0.04521091561148734 atol=tol
+    @test cm_upstroke_metrics.mean_bias ≈ 0.002647082152991717 atol=tol
+    @test cm_upstroke_metrics.max_abs_error ≈ 0.07769526908861958 atol=tol
+
+    @test cm_downstroke_metrics.n == 23
+    @test cm_downstroke_metrics.rmse ≈ 0.019805209319088943 atol=tol
+    @test cm_downstroke_metrics.mean_bias ≈ -0.0068077601245385274 atol=tol
+    @test cm_downstroke_metrics.max_abs_error ≈ 0.040351535428796555 atol=tol
+end

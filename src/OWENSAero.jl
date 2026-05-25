@@ -27,7 +27,7 @@ export DMS, streamtube, readaerodyn, readaerodyn_BV
 
 # Dynamic Stall
 export Boeing_Vertol
-# export Leishman_Beddoes
+export Leishman_Beddoes, LeishmanBeddoesState, leishmanBeddoesInitialState
 
 # Unsteady Method
 export Unsteady_Step
@@ -46,15 +46,11 @@ function _canonical_dynamic_stall_model(model)
     elseif token == "analytic"
         return "analytic"
     elseif token in ("lb", "leishman-beddoes", "leishman_beddoes")
-        throw(
-            ArgumentError(
-                "DynamicStallModel = \"LB\" is not implemented; use \"BV\" or \"none\".",
-            ),
-        )
+        return "LB"
     end
     throw(
         ArgumentError(
-            "DynamicStallModel must be \"BV\", \"none\", or the internal \"analytic\" test mode; got $(repr(model)).",
+            "DynamicStallModel must be \"BV\", \"LB\", \"none\", or the internal \"analytic\" test mode; got $(repr(model)).",
         ),
     )
 end
@@ -68,6 +64,45 @@ function _canonical_aero_model(model)
     end
     throw(ArgumentError("AeroModel must be \"DMS\" or \"AC\"; got $(repr(model))."))
 end
+
+"""
+    LeishmanBeddoesState(nsections)
+
+Mutable per-azimuth state storage for the Leishman-Beddoes dynamic-stall model.
+Each vector has length `nsections`, normally the turbine slice's `ntheta`.
+Solver residual evaluations read this state without mutating it; accepted
+section evaluations write the updated state at the current azimuth index.
+"""
+mutable struct LeishmanBeddoesState{TV<:AbstractVector,TI<:AbstractVector}
+    cl_ref_le_last::TV
+    cl_ref_last::TV
+    fstat_last::TV
+    cv_last::TV
+    dp::TV
+    df::TV
+    dcnv::TV
+    le_separation_state::TI
+    s_lev::TV
+end
+
+function LeishmanBeddoesState(nsections::Integer; value_type = Float64)
+    nsections > 0 || throw(ArgumentError("nsections must be positive"))
+    z = zeros(value_type, nsections)
+    return LeishmanBeddoesState(
+        copy(z),
+        copy(z),
+        copy(z),
+        copy(z),
+        copy(z),
+        copy(z),
+        copy(z),
+        zeros(Int, nsections),
+        copy(z),
+    )
+end
+
+leishmanBeddoesInitialState(nsections::Integer; value_type = Float64) =
+    LeishmanBeddoesState(nsections; value_type)
 
 """
     Turbine(R::TF,r::TAF,z::TF,chord::TAF3,twist::TAF5,delta::TAF,omega::TAF4,B::TI,af::TFN,ntheta::TI,r_delta_influence::TB,centerX::TAF2,centerY::TAF2)
@@ -166,7 +201,7 @@ Contains specications for turbine slice environment/operating conditions as well
 * `V_z::TAF`: z input velocity (m/s), array corresponding to each azimuthal position
 * `V_twist::TAF`: rotational velocity from active twist (rad/s), array corresponding to each azimuthal position
 * `windangle::TF`: angle of mean oncoming wind (rad)
-* `DynamicStallModel::TS`: dynamic stall model ("BV" or "none" or "LB" - once it is finished)
+* `DynamicStallModel::TS`: dynamic stall model ("BV", "LB", or "none")
 * `AeroModel::TS`: aero model used ("DMS" or "AC")
 * `aw_warm::TVF`: warm start induction factor array, first half corresponding to u, second half to v
 * `steplast::TAI`: prior simulation step index, used for unsteady wake propogation
@@ -175,6 +210,7 @@ Contains specications for turbine slice environment/operating conditions as well
 * `BV_DynamicFlagL::TAI`: Boeing-vertol dynamic stall lift flag
 * `BV_DynamicFlagD::TAI`: Boeing-vertol dynamic stall drag flag
 * `alpha_last::TAF2`: Boeing-vertol dynamic stall prior step's angle of attack
+* `lb_state`: Leishman-Beddoes per-azimuth dynamic state
 * `suction::TB`: DMS flag for alternate induction model
 * `speed_of_sound::TF`: sound speed used to form Mach number for DMS and AC
   airfoil polar callbacks (m/s)
@@ -183,7 +219,7 @@ Contains specications for turbine slice environment/operating conditions as well
 * `none`:
 
 """
-struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
+struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5,TLB}
     rho::TF
     mu::TF
     V_x::TAFx #Vinf is Vx
@@ -205,12 +241,70 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     BV_DynamicFlagL::TAI
     BV_DynamicFlagD::TAI
     alpha_last::TAF2
+    lb_state::TLB
     suction::TB
     accel_flap::TAF4
     accel_edge::TAF4
     gravity::TAF5
     speed_of_sound::TF
 end
+
+Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+    steplast,
+    idx_RPI,
+    V_wake_old,
+    BV_DynamicFlagL,
+    BV_DynamicFlagD,
+    alpha_last,
+    suction,
+    accel_flap,
+    accel_edge,
+    gravity,
+    speed_of_sound,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+    steplast,
+    idx_RPI,
+    V_wake_old,
+    BV_DynamicFlagL,
+    BV_DynamicFlagD,
+    alpha_last,
+    LeishmanBeddoesState(length(V_x)),
+    suction,
+    accel_flap,
+    accel_edge,
+    gravity,
+    speed_of_sound,
+)
 
 function _validated_speed_of_sound(speed_of_sound)
     speed_of_sound isa Real && !(speed_of_sound isa Bool) ||
@@ -257,6 +351,7 @@ Environment(
     zeros(Int, length(V_x)),
     zeros(Int, length(V_x)),
     zeros(Real, length(V_x)),
+    LeishmanBeddoesState(length(V_x)),
     false,
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
@@ -303,6 +398,7 @@ Environment(
     zeros(Int, length(V_x)),
     zeros(Int, length(V_x)),
     zeros(Real, length(V_x)),
+    LeishmanBeddoesState(length(V_x)),
     false,
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
@@ -339,6 +435,7 @@ Environment(
     zeros(Int, length(V_x)),
     zeros(Int, length(V_x)),
     zeros(Real, length(V_x)),
+    LeishmanBeddoesState(length(V_x)),
     false,
     zeros(Real, length(V_x)),
     zeros(Real, length(V_x)),
@@ -916,6 +1013,7 @@ include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil re
 include("./vawt-ac/src/acmultiple.jl")
 include("Unsteady_Step.jl")
 include("Boeing_Vertol.jl")
+include("Leishman_Beddoes.jl")
 include("advanceTurbine.jl")
 
 end #module

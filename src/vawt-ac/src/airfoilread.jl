@@ -185,7 +185,7 @@ for a file with multiple reynolds numbers create airfoil lookup function with bo
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
-* `DynamicStallModel::string`: "BV" or "none"
+* `DynamicStallModel::string`: "BV", "LB", or "none"
 
 # Outputs:
 * `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop. Use `return_cm=true` to also return Cm25.
@@ -198,7 +198,7 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
     nRe = 0
     open(filename) do f
         for line in eachline(f)
-            if occursin(line, "Reynolds")
+            if startswith(strip(line), "Reynolds Number")
                 nRe += 1
             end
         end
@@ -246,7 +246,7 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
                 line = readline(f) #skip cl cd header
 
                 line = readline(f) #this should have the data
-                while !isempty(line)
+                while !isempty(strip(line)) && strip(line) != "EOT"
                     parts = split(line)
                     push!(alphaOrig, parse(Float64,parts[1]))
                     push!(clOrig, parse(Float64,parts[2]))
@@ -280,6 +280,9 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         cmspl = (alpha, Re) -> cm_alpha(alpha)
         aoaStallPosspl = Re -> aoaStallPosVec[1]
         aoaStallNegspl = Re -> aoaStallNegVec[1]
+        clalphaspl = Re -> clalphaVec[1]
+        clcritposspl = Re -> clcritposVec[1]
+        clcritnegspl = Re -> clcritnegVec[1]
     else
         # clspl = Dierckx.Spline2D(alphas, REs, cls)
         # cdspl = Dierckx.Spline2D(alphas, REs, cds)
@@ -295,6 +298,9 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
 
         aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
         aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+        clalphaspl = FLOWMath.Akima(REs, clalphaVec)
+        clcritposspl = FLOWMath.Akima(REs, clcritposVec)
+        clcritnegspl = FLOWMath.Akima(REs, clcritnegVec)
     end
 
     # Create the base airfoil wrapper function
@@ -345,8 +351,64 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         return return_cm ? (CL_BV, CD_BV, CM_BV) : (CL_BV, CD_BV)
     end
 
+    function af_LB2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
+        idxmin1 = idx == 1 ? length(env.lb_state.cl_ref_last) : idx - 1
+        U_safe = FLOWMath.ksmax([U, 0.001])
+        ds = 2.0 * U_safe * dt / c
+        alpha75 = alpha
+        alpha50 = alpha
+        state = env.lb_state
+        CL_LB,
+        CD_LB,
+        CM_LB,
+        cl_ref_le_last,
+        cl_ref_last,
+        fstat_last,
+        cv_last,
+        dp,
+        df,
+        dcnv,
+        le_separation_state,
+        s_lev = OWENSAero.Leishman_Beddoes(
+            af2_with_cm,
+            alpha75,
+            alpha50,
+            ds,
+            M,
+            Re,
+            clalphaspl(Re),
+            AOA0,
+            clcritposspl(Re),
+            clcritnegspl(Re),
+            state.cl_ref_le_last[idxmin1],
+            state.cl_ref_last[idxmin1],
+            state.fstat_last[idxmin1],
+            state.cv_last[idxmin1],
+            state.dp[idxmin1],
+            state.df[idxmin1],
+            state.dcnv[idxmin1],
+            state.le_separation_state[idxmin1],
+            state.s_lev[idxmin1],
+            family_factor = 0.0,
+        )
+        if !solvestep
+            state.cl_ref_le_last[idx] = cl_ref_le_last
+            state.cl_ref_last[idx] = cl_ref_last
+            state.fstat_last[idx] = fstat_last
+            state.cv_last[idx] = cv_last
+            state.dp[idx] = dp
+            state.df[idx] = df
+            state.dcnv[idx] = dcnv
+            state.le_separation_state[idx] = le_separation_state
+            state.s_lev[idx] = s_lev
+        end
+        return return_cm ? (CL_LB, CD_LB, CM_LB) : (CL_LB, CD_LB)
+    end
+
     if DynamicStallModel == "BV"
         return af_BV2 #, alpha*pi/180, cl, cd
+    elseif DynamicStallModel == "LB"
+        return af_LB2
     else
         return af2
     end

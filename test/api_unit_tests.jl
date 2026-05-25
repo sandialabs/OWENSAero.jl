@@ -752,6 +752,19 @@ end
     @test env_bv.DynamicStallModel == "BV"
     @test env_bv.AeroModel == "DMS"
 
+    env_lb = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, ntheta),
+        "leishman-beddoes",
+        "dms",
+        zeros(2 * ntheta),
+    )
+    @test env_lb.DynamicStallModel == "LB"
+    @test env_lb.lb_state isa OWENSAero.LeishmanBeddoesState
+    @test env_lb.lb_state.cl_ref_last == zeros(ntheta)
+    @test env_lb.lb_state.le_separation_state == zeros(Int, ntheta)
+
     env_analytic = OWENSAero.Environment(
         1.225,
         1.7894e-5,
@@ -805,14 +818,6 @@ end
         1.225,
         1.7894e-5,
         fill(5.0, ntheta),
-        "LB",
-        "DMS",
-        zeros(2 * ntheta),
-    )
-    @test_throws ArgumentError OWENSAero.Environment(
-        1.225,
-        1.7894e-5,
-        fill(5.0, ntheta),
         "none",
         "BEM",
         zeros(2 * ntheta),
@@ -851,7 +856,7 @@ end
     @test OWENSAero.turbslices[1].af(0.0, 1.0e5, 0.0; return_cm = true) isa
           Tuple{Float64,Float64,Float64}
 
-    @test_throws ArgumentError OWENSAero.setupTurb(
+    OWENSAero.setupTurb(
         blade_x,
         blade_z,
         2,
@@ -863,6 +868,24 @@ end
         Nslices = 1,
         ntheta = 4,
     )
+    @test OWENSAero.envslices[1].DynamicStallModel == "LB"
+    @test OWENSAero.envslices[1].lb_state isa OWENSAero.LeishmanBeddoesState
+    @test OWENSAero.turbslices[1].af(
+        0.0,
+        1.0e5,
+        0.0,
+        OWENSAero.envslices[1],
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        return_cm = true,
+    ) isa Tuple{Float64,Float64,Float64}
+    lb_steady = OWENSAero.steadyTurb()
+    @test lb_steady[1] == zeros(Real, 1, 4)
+    @test OWENSAero.envslices[1].lb_state.cl_ref_last ≈
+          [3.5487757556312367, -7.370220560086004, 7.477405825416165, -3.4779789619140185] atol=1e-12
+    @test OWENSAero.envslices[1].lb_state.le_separation_state == ones(Int, 4)
     @test_throws ArgumentError OWENSAero.setupTurb(
         blade_x,
         blade_z,
@@ -2588,10 +2611,56 @@ end
     @test cl_new ≈ 0.55 atol=1e-14
     @test cd_new ≈ 0.0114 atol=1e-14
     @test cm_new == 0.0
-    @test_throws ArgumentError OWENSAero.readaerodyn_BV_NEW(
-        filename;
-        DynamicStallModel = "LB",
+
+    af_lb = OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "LB")
+    env_lb = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, 4),
+        zeros(4),
+        zeros(4),
+        zeros(4),
+        0.0,
+        "LB",
+        "DMS",
+        zeros(8),
     )
+    cl_lb, cd_lb, cm_lb = af_lb(
+        5 * pi / 180,
+        3.0e5,
+        0.0,
+        env_lb,
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        solvestep = true,
+        idx = 2,
+        return_cm = true,
+    )
+    @test cl_lb ≈ 0.55 atol=1e-14
+    @test cd_lb ≈ 0.0114 atol=1e-14
+    @test cm_lb == 0.0
+    @test env_lb.lb_state.cl_ref_last[2] == 0.0
+
+    cl_lb_update, cd_lb_update, cm_lb_update = af_lb(
+        5 * pi / 180,
+        3.0e5,
+        0.0,
+        env_lb,
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        idx = 2,
+        return_cm = true,
+    )
+    @test cl_lb_update ≈ 0.55 atol=1e-14
+    @test cd_lb_update ≈ 0.0114 atol=1e-14
+    @test cm_lb_update == 0.0
+    @test env_lb.lb_state.cl_ref_last[2] ≈ 0.5500405137660123 atol=1e-14
+    @test env_lb.lb_state.cl_ref_le_last[2] ≈ 0.5500405137660123 atol=1e-14
+    @test env_lb.lb_state.le_separation_state[2] == 0
 
     af_bv = OWENSAero.readaerodyn_BV(filename)
     env = OWENSAero.Environment(
