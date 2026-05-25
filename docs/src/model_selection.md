@@ -13,6 +13,13 @@ Use DMS when:
 - the turbine is represented as stacked independent vertical slices;
 - the requested fidelity is consistent with streamtube assumptions.
 
+DMS emits a diagnostic warning when `windangle` approaches cross-flow. The
+solver rotates the freestream into the turbine frame, but downstream streamtube
+pairing for near-90-degree direction changes is not yet physically validated.
+For large direction-change load studies, rotate the input frame into the
+dominant wind direction or use a higher-fidelity model with a matching
+validation basis.
+
 ## Actuator Cylinder
 
 Set `AeroModel = "AC"` for the actuator-cylinder path. The implementation is based on the BYU FLOW Lab VAWT AC method and has been adapted for OWENS slice and turbine workflows.

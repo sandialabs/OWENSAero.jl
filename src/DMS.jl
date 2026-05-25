@@ -8,7 +8,8 @@ import Statistics
 import Statistics: mean
 
 _dms_number_type(x::Number) = typeof(x)
-_dms_number_type(x::AbstractArray) = isempty(x) ? eltype(x) : mapreduce(typeof, promote_type, x)
+_dms_number_type(x::AbstractArray) =
+    isempty(x) ? eltype(x) : mapreduce(typeof, promote_type, x)
 _dms_number_type(x) = typeof(x)
 
 function _dms_output_type(turbine, env, a_in)
@@ -30,6 +31,24 @@ function _dms_output_type(turbine, env, a_in)
         _dms_number_type(env.speed_of_sound),
         _dms_number_type(a_in),
     )
+end
+
+const DMS_WINDANGLE_DIAGNOSTIC_LIMIT_RAD = 75.0 * pi / 180.0
+
+function _warn_if_large_dms_windangle(windangle)
+    angle = try
+        Float64(windangle)
+    catch
+        return nothing
+    end
+    isfinite(angle) || return nothing
+
+    if abs(sin(angle)) >= sin(DMS_WINDANGLE_DIAGNOSTIC_LIMIT_RAD)
+        @warn "DMS windangle is near cross-flow; downstream streamtube pairing is not validated for this condition. Consider rotating the input frame or using AC/OLAF for large direction-change studies." windangle_degrees =
+            angle * 180 / pi maxlog = 1
+    end
+
+    return nothing
 end
 
 """
@@ -297,6 +316,7 @@ function DMS(
     ntheta = turbine.ntheta
     #Convert global F.O.R. winds to turbine frame
     windangle = env.windangle
+    _warn_if_large_dms_windangle(windangle)
 
     V_xtemp = env.V_x .* cos(windangle) + env.V_y .* sin(windangle) # Vinf is V_x, t is for turbine direction f.o.r.
     V_ytemp = -env.V_x .* sin(windangle) + env.V_y .* cos(windangle)
