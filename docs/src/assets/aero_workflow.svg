@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="280" viewBox="0 0 980 280" role="img" aria-labelledby="title desc">
+  <title id="title">OWENSAero workflow</title>
+  <desc id="desc">Diagram showing geometry and airfoil inputs flowing through DMS or actuator cylinder models, optional unsteady and inflow handling, and aerodynamic loads returned to OWENS.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 z" fill="#314056"/>
+    </marker>
+    <style>
+      .box{fill:#f7f9fb;stroke:#314056;stroke-width:2;rx:7}
+      .model{fill:#edf6f2;stroke:#24735f;stroke-width:2;rx:7}
+      .state{fill:#fff7e8;stroke:#9a6700;stroke-width:2;rx:7}
+      .text{font-family:Arial,Helvetica,sans-serif;font-size:18px;fill:#1d2733}
+      .small{font-size:14px;fill:#4a5563}
+      .arrow{stroke:#314056;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="980" height="280" fill="#ffffff"/>
+  <rect class="box" x="28" y="60" width="170" height="110"/>
+  <text class="text" x="52" y="98">Blade slices</text>
+  <text class="small" x="52" y="126">shape, chord, twist</text>
+  <text class="small" x="52" y="148">airfoil polars</text>
+  <path class="arrow" d="M198 115 H270"/>
+  <rect class="model" x="270" y="36" width="180" height="88"/>
+  <text class="text" x="305" y="72">DMS</text>
+  <text class="small" x="305" y="99">streamtube solve</text>
+  <rect class="model" x="270" y="156" width="180" height="88"/>
+  <text class="text" x="305" y="192">AC</text>
+  <text class="small" x="305" y="219">actuator cylinder</text>
+  <path class="arrow" d="M450 80 H540"/>
+  <path class="arrow" d="M450 200 H540"/>
+  <rect class="state" x="540" y="60" width="195" height="110"/>
+  <text class="text" x="575" y="98">Unsteady state</text>
+  <text class="small" x="575" y="126">RPI, wake memory</text>
+  <text class="small" x="575" y="148">dynamic stall, IFW</text>
+  <path class="arrow" d="M735 115 H810"/>
+  <rect class="box" x="810" y="60" width="140" height="110"/>
+  <text class="text" x="837" y="98">Loads</text>
+  <text class="small" x="837" y="126">normal/tangent</text>
+  <text class="small" x="837" y="148">power, torque</text>
+</svg>

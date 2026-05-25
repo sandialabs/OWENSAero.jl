@@ -6,44 +6,84 @@
 import FLOWMath
 import Interpolations
 
+_parse_airfoil_header_number(line) = parse(Float64, split(strip(line))[end])
+
+function _read_first_reynolds_airfoil_table(filename)
+    alpha = Float64[]
+    cl = Float64[]
+    cd = Float64[]
+    cm = Float64[]
+
+    thickness_to_chord = 0.0
+    zero_lift_aoa = 0.0
+    positive_stall_aoa = 10 * pi / 180
+    negative_stall_aoa = -10 * pi / 180
+    in_table = false
+
+    open(filename) do f
+        for line in eachline(f)
+            stripped = strip(line)
+            isempty(stripped) && continue
+
+            if startswith(stripped, "Thickness to Chord Ratio")
+                thickness_to_chord = _parse_airfoil_header_number(stripped)
+            elseif startswith(stripped, "Zero Lift AOA")
+                zero_lift_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "BV Dyn. Stall Model - Positive Stall AOA")
+                positive_stall_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "BV Dyn. Stall Model - Negative Stall AOA")
+                negative_stall_aoa = _parse_airfoil_header_number(stripped) * pi / 180
+            elseif startswith(stripped, "AOA")
+                in_table = true
+            elseif stripped == "EOT" || startswith(stripped, "Reynolds Number")
+                if in_table && !isempty(alpha)
+                    break
+                end
+            elseif in_table
+                parts = split(stripped)
+                length(parts) >= 3 ||
+                    throw(ArgumentError("airfoil data row in $(filename) has fewer than 3 columns"))
+                push!(alpha, parse(Float64, parts[1]))
+                push!(cl, parse(Float64, parts[2]))
+                push!(cd, parse(Float64, parts[3]))
+                push!(cm, length(parts) >= 4 ? parse(Float64, parts[4]) : 0.0)
+            end
+        end
+    end
+
+    isempty(alpha) && throw(ArgumentError("no airfoil data rows found in $(filename)"))
+    return (
+        alpha = alpha,
+        cl = cl,
+        cd = cd,
+        cm = cm,
+        thickness_to_chord = thickness_to_chord,
+        zero_lift_aoa = zero_lift_aoa,
+        positive_stall_aoa = positive_stall_aoa,
+        negative_stall_aoa = negative_stall_aoa,
+    )
+end
+
 """
     readaerodyn(filename)
 
-create airfoil lookup for a file with only one reynolds number
+create airfoil lookup for the first Reynolds-number table in an OWENSAero
+airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
 
 # Outputs:
-* `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad
+* `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad. Use
+  `af(alpha,re,mach; return_cm=true)` to also return Cm25.
 
 """
 function readaerodyn(filename)
-    """currently only reads one Reynolds number if multiple exist"""
-
-    alpha = Float64[]
-    cl = Float64[]
-    cd = Float64[]
-
-    open(filename) do f
-
-        # skip header
-        for i = 1:13
-            readline(f)
-        end
-
-        # read until EOT
-        while true
-            line = readline(f)
-            if occursin(line, "EOT")
-                break
-            end
-            parts = split(line)
-            push!(alpha, parse(Float64,parts[1]))
-            push!(cl, parse(Float64,parts[2]))
-            push!(cd, parse(Float64,parts[3]))
-        end
-    end
+    table = _read_first_reynolds_airfoil_table(filename)
+    alpha = table.alpha
+    cl = table.cl
+    cd = table.cd
+    cm = table.cm
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -54,15 +94,17 @@ function readaerodyn(filename)
 
     afcl = FLOWMath.Akima(alpha*pi/180, cl)
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
+    afcm = FLOWMath.Akima(alpha*pi/180, cm)
 
-    function af(alphain,re,mach)
+    function af(alphain,re,mach; return_cm=false)
         # if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
         #     @error "aoa is greater or less than what is defined"
         # end
             cl = afcl(alphain)
             cd = afcd(alphain)
+            cm = afcm(alphain)
 
-        return cl, cd
+        return return_cm ? (cl, cd, cm) : (cl, cd)
     end
 
     return af#, alpha*pi/180, cl, cd
@@ -71,41 +113,22 @@ end
 """
     readaerodyn_BV(filename)
 
-create airfoil lookup function with boeing vertol dynamic stall model for a file with only one reynolds number
+create airfoil lookup function with Boeing-Vertol dynamic stall metadata from
+the first Reynolds-number table in an OWENSAero airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
 
 # Outputs:
-* `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop
+* `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop. Use `return_cm=true` to also return Cm25.
 
 """
 function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
-    """currently only reads one Reynolds number if multiple exist"""
-
-    alpha = Float64[]
-    cl = Float64[]
-    cd = Float64[]
-
-    open(filename) do f
-
-        # skip header
-        for i = 1:13
-            readline(f)
-        end
-
-        # read until EOT
-        while true
-            line = readline(f)
-            if occursin(line, "EOT")
-                break
-            end
-            parts = split(line)
-            push!(alpha, parse(Float64,parts[1]))
-            push!(cl, parse(Float64,parts[2]))
-            push!(cd, parse(Float64,parts[3]))
-        end
-    end
+    table = _read_first_reynolds_airfoil_table(filename)
+    alpha = table.alpha
+    cl = table.cl
+    cd = table.cd
+    cm = table.cm
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -116,6 +139,7 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
 
     afcl = FLOWMath.Akima(alpha*pi/180, cl)
     afcd = FLOWMath.Akima(alpha*pi/180, cd)
+    afcm = FLOWMath.Akima(alpha*pi/180, cm)
     cl=0.0
     function af(alphain,Re,umach,family_factor)
         if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
@@ -124,17 +148,17 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
 
         cl = afcl(alphain)
         cd = afcd(alphain)
+        cm = afcm(alphain)
 
-        return cl, cd, 0.0
+        return cl, cd, cm
     end
 
-    #TODO: Get these from the airfoil data
-    aoaStallPos = 10*pi/180
-    aoaStallNeg = -10*pi/180
-    AOA0 = 0.0
-    tc = 0.12
+    aoaStallPos = table.positive_stall_aoa
+    aoaStallNeg = table.negative_stall_aoa
+    AOA0 = table.zero_lift_aoa
+    tc = table.thickness_to_chord
 
-    function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
+    function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
         if idx==1
             idxmin1 = length(env.alpha_last)
         else
@@ -148,7 +172,7 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
             env.BV_DynamicFlagL[idx] = env.BV_DynamicFlagL[idxmin1]
             env.BV_DynamicFlagD[idx] = env.BV_DynamicFlagD[idxmin1]
         end
-        return CL_BV, CD_BV #TODO: add CM
+        return return_cm ? (CL_BV, CD_BV, CM_BV) : (CL_BV, CD_BV)
     end
 
     return af_BV #, alpha*pi/180, cl, cd
@@ -164,10 +188,12 @@ for a file with multiple reynolds numbers create airfoil lookup function with bo
 * `DynamicStallModel::string`: "BV" or "none"
 
 # Outputs:
-* `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop
-* `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad
+* `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop. Use `return_cm=true` to also return Cm25.
+* `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad. Use `return_cm=true` to also return Cm25.
 """
 function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple dispatch to simplify this
+    DynamicStallModel = _canonical_dynamic_stall_model(DynamicStallModel)
+
     # Loop through the file and determine how many Reynolds numbers there are
     nRe = 0
     open(filename) do f
@@ -182,7 +208,7 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
     alphas = [collect(-180:1:-21);collect(-20:0.5:20);collect(21:1:180)].*pi/180
     cls = zeros(length(alphas),nRe)
     cds = zeros(length(alphas),nRe)
-    #TODO: cms
+    cms = zeros(length(alphas),nRe)
     REs = zeros(nRe)
     aoaStallPosVec = zeros(nRe)
     aoaStallNegVec = zeros(nRe)
@@ -209,6 +235,7 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
                 alphaOrig = Float64[]
                 clOrig = Float64[]
                 cdOrig = Float64[]
+                cmOrig = Float64[]
                 iRe += 1
                 REs[iRe] = parse(Float64, split(line)[end])
                 aoaStallPosVec[iRe] = parse(Float64, split(readline(f))[end])
@@ -224,37 +251,61 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
                     push!(alphaOrig, parse(Float64,parts[1]))
                     push!(clOrig, parse(Float64,parts[2]))
                     push!(cdOrig, parse(Float64,parts[3]))
+                    push!(cmOrig, length(parts) >= 4 ? parse(Float64,parts[4]) : 0.0)
                     line = readline(f) # reload line until it hits the next blank spot, then break
                 end
 
                 # Interpolate to a uniform aoa array and store
                 cls[:,iRe] = safeakima(alphaOrig*pi/180,clOrig,alphas)
                 cds[:,iRe] = safeakima(alphaOrig*pi/180,cdOrig,alphas)
+                cms[:,iRe] = safeakima(alphaOrig*pi/180,cmOrig,alphas)
             end
         end
     end
 
-    # clspl = Dierckx.Spline2D(alphas, REs, cls)
-    # cdspl = Dierckx.Spline2D(alphas, REs, cds)
-    # Assume cls is filled appropriately: size = (length(alphas), length(REs))
-    
-    itpcl = Interpolations.interpolate((alphas, REs), cls, Interpolations.Gridded(Interpolations.Linear()))
-    clspl = Interpolations.extrapolate(itpcl, Interpolations.Flat())  
+    if nRe == 0
+        throw(ArgumentError("No Reynolds-number airfoil tables were found in $(repr(filename))."))
+    elseif nRe == 1
+        itpcl = Interpolations.interpolate((alphas,), cls[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cl_alpha = Interpolations.extrapolate(itpcl, Interpolations.Flat())
 
-    itpcd = Interpolations.interpolate((alphas, REs), cds, Interpolations.Gridded(Interpolations.Linear()))
-    cdspl = Interpolations.extrapolate(itpcd, Interpolations.Flat())  
+        itpcd = Interpolations.interpolate((alphas,), cds[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cd_alpha = Interpolations.extrapolate(itpcd, Interpolations.Flat())
 
-    aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
-    aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+        itpcm = Interpolations.interpolate((alphas,), cms[:,1], Interpolations.Gridded(Interpolations.Linear()))
+        cm_alpha = Interpolations.extrapolate(itpcm, Interpolations.Flat())
+
+        clspl = (alpha, Re) -> cl_alpha(alpha)
+        cdspl = (alpha, Re) -> cd_alpha(alpha)
+        cmspl = (alpha, Re) -> cm_alpha(alpha)
+        aoaStallPosspl = Re -> aoaStallPosVec[1]
+        aoaStallNegspl = Re -> aoaStallNegVec[1]
+    else
+        # clspl = Dierckx.Spline2D(alphas, REs, cls)
+        # cdspl = Dierckx.Spline2D(alphas, REs, cds)
+        # Assume cls is filled appropriately: size = (length(alphas), length(REs))
+        itpcl = Interpolations.interpolate((alphas, REs), cls, Interpolations.Gridded(Interpolations.Linear()))
+        clspl = Interpolations.extrapolate(itpcl, Interpolations.Flat())
+
+        itpcd = Interpolations.interpolate((alphas, REs), cds, Interpolations.Gridded(Interpolations.Linear()))
+        cdspl = Interpolations.extrapolate(itpcd, Interpolations.Flat())
+
+        itpcm = Interpolations.interpolate((alphas, REs), cms, Interpolations.Gridded(Interpolations.Linear()))
+        cmspl = Interpolations.extrapolate(itpcm, Interpolations.Flat())
+
+        aoaStallPosspl = FLOWMath.Akima(REs,aoaStallPosVec)
+        aoaStallNegspl = FLOWMath.Akima(REs,aoaStallNegVec)
+    end
 
     # Create the base airfoil wrapper function
-    function af2(alpha,Re,umach=0.0,family_factor=1.0)
+    function af2(alpha,Re,umach=0.0,family_factor=1.0; return_cm=false)
 
         # if length(REs)>1
             # cl = Dierckx.evaluate(clspl,alpha, Re)
             # cd = Dierckx.evaluate(cdspl,alpha, Re)
             cl = clspl(alpha, Re)
             cd = cdspl(alpha, Re)
+            cm = cmspl(alpha, Re)
             # cl = FLOWMath.interp2d(safeakima, alphas, REs, cls, [alpha], [Re])[1]
             # cd = FLOWMath.interp2d(safeakima, alphas, REs, cds, [alpha], [Re])[1]
         # else
@@ -262,12 +313,15 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         #     cd = safeakima(alphaOrig*pi/180, cdOrig,alpha)
         # end
 
-        return cl, cd, 0.0
+        return return_cm ? (cl, cd, cm) : (cl, cd)
     end
 
     # end
 
-    function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1)
+    af2_with_cm(alpha, Re, umach=0.0, family_factor=1.0) =
+        af2(alpha, Re, umach, family_factor; return_cm=true)
+
+    function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
         if idx==1
             idxmin1 = length(env.alpha_last)
         else
@@ -282,13 +336,13 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         #     aoaStallPos = aoaStallPosVec[1]
         #     aoaStallNeg = aoaStallNegVec[1]
         # end
-        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[idxmin1], env.BV_DynamicFlagD[idxmin1] = OWENSAero.Boeing_Vertol(af2,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idxmin1],env.BV_DynamicFlagD[idxmin1], family_factor = 0.0)
+        CL_BV, CD_BV, CM_BV, env.BV_DynamicFlagL[idxmin1], env.BV_DynamicFlagD[idxmin1] = OWENSAero.Boeing_Vertol(af2_with_cm,alpha,adotnorm,M,Re,aoaStallPos,aoaStallNeg,AOA0,tc,env.BV_DynamicFlagL[idxmin1],env.BV_DynamicFlagD[idxmin1], family_factor = 0.0)
         if !solvestep #don't update this while it is in the DMS independent solve loop #TODO: should we include the flags as well?
             env.alpha_last[idx] = alpha
             env.BV_DynamicFlagL[idx] = env.BV_DynamicFlagL[idxmin1]
             env.BV_DynamicFlagD[idx] = env.BV_DynamicFlagD[idxmin1]
         end
-        return CL_BV, CD_BV #TODO: add CM
+        return return_cm ? (CL_BV, CD_BV, CM_BV) : (CL_BV, CD_BV)
     end
 
     if DynamicStallModel == "BV"

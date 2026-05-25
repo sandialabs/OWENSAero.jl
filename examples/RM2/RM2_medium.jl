@@ -1,6 +1,6 @@
 using Plots
 using DelimitedFiles: readdlm
-import OWENSAero: setupTurb, steadyTurb
+import OWENSAero: cpValidationMetrics, setupTurb, steadyTurb
 import FLOWMath: akima
 
 path,_ = splitdir(@__FILE__)
@@ -31,20 +31,21 @@ Vinf = 1.2
 rho = 1025.0
 mu = 1.08E-3
 
-# Calculate Reynolds
-TSR = 3.0
-radius = 1.0
-Vinf = 2.0
-chord = 0.3
-omega = Vinf/radius*TSR
-rot_velocity = omega*radius
-Re_check = rho*rot_velocity*chord/mu
-Re_plus = rho*(rot_velocity+Vinf)*chord/mu
-Re_minus = rho*(rot_velocity-Vinf)*chord/mu
+# Calculate representative Reynolds numbers without overwriting the RM2 setup.
+TSR_check = 3.0
+radius_check = radius
+Vinf_check = Vinf
+chord_check = chordmid
+omega_check = Vinf_check / radius_check * TSR_check
+rot_velocity_check = omega_check * radius_check
+Re_check = rho * rot_velocity_check * chord_check / mu
+Re_plus = rho * (rot_velocity_check + Vinf_check) * chord_check / mu
+Re_minus = rho * (rot_velocity_check - Vinf_check) * chord_check / mu
 
 # Model
 ifw = false
-aeromodels = ["DMS", "AC"]
+model_setting = get(ENV, "OWENSAERO_RM2_MODELS", "DMS")
+aeromodels = lowercase(model_setting) == "all" ? ["DMS", "AC"] : String.(strip.(split(model_setting, ",")))
 Aero_AddedMass_Actives = [false,true]
 Aero_Buoyancy_Actives = [false,true]
 
@@ -97,6 +98,18 @@ end
 expdata_path = "$path/exp_data"
 exp_0p9 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_0.9E6.csv"), ',', Float64)
 exp_1p3 = readdlm(joinpath(expdata_path, "RM2_0.538D_RE_D_1.3E6.csv"), ',', Float64)
+
+validation_metrics = Dict{String,NamedTuple}()
+println("RM2 CP validation metrics against Re=1.3 experimental data")
+for (label, result) in sort(collect(results); by = first)
+    metrics = cpValidationMetrics(tsr, result["cₚ"], exp_1p3[:, 1], exp_1p3[:, 2])
+    validation_metrics[label] = metrics
+    println(
+        "  $(label): n=$(metrics.n), RMSE=$(round(metrics.rmse; digits=4)), " *
+        "bias=$(round(metrics.mean_bias; digits=4)), max_abs=$(round(metrics.max_abs_error; digits=4)), " *
+        "peak_cp_error=$(round(metrics.peak_cp_error; digits=4))",
+    )
+end
 
 # Plot
 fig_path = "$path/figures"

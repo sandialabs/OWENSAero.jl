@@ -37,7 +37,9 @@ jobs:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
       - name: Workaround Pkg.jl bug
-        run: sed -i -e 's/^OWENSAero = {.*}//' downstream/Project.toml
+        run: |
+          sed -i -e 's/^OWENSAero = {.*}//' downstream/Project.toml
+          sed -i -e '/^\[sources\.OWENSAero\]$/,+1d' downstream/Project.toml
       - name: Load this and run the downstream tests
         shell: julia --project=downstream {0}
         run: |

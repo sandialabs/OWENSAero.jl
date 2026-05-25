@@ -1,13 +1,26 @@
 module OWENSAero
-import Statistics:mean
+import CCBlade
+import Statistics: mean
 import Interpolations
 import OWENSOpenFASTWrappers
 # Common
 export Unsteady_Step
 export Turbine, Environment, UnsteadyParams
+export cpValidationMetrics
+export wholeRevolutionIndexRange, wholeRevolutionMean
+export jointDragForce
+export towerShadowVelocity
+export liftingStrutForce
+export prandtlTipLossFactor
+export oyeDynamicInflowTimeConstants, oyeDynamicInflowDerivative, oyeDynamicInflowStep
+export readAeroDynPrimaryFile, readAeroDynBladeFile, readAeroDynAirfoilInfo
+export readAeroDynDriverFile
+export aeroDynAirfoilFunction, aeroDynHAWTCCBladeInputs, ccbladeHAWTSolveFromAeroDyn
+export ccbladeHAWTSolveFromAeroDynDriver
+export ccbladeHAWTSections, ccbladeHAWTOperatingPoints, ccbladeHAWTSolve
 
 # Actuator Cylinder
-export AC_steady, radialforce, pInt
+export AC, radialforce, pInt
 
 # DMS
 export DMS, streamtube, readaerodyn, readaerodyn_BV
@@ -20,9 +33,41 @@ export Boeing_Vertol
 export Unsteady_Step
 
 # Module Path
-const path,_ = splitdir(@__FILE__)
+const path, _ = splitdir(@__FILE__)
 
 # Common Structs
+
+function _canonical_dynamic_stall_model(model)
+    token = lowercase(strip(string(model)))
+    if token in ("bv", "boeing-vertol", "boeing_vertol")
+        return "BV"
+    elseif token in ("none", "no", "off", "nods", "no_ds", "no-ds")
+        return "none"
+    elseif token == "analytic"
+        return "analytic"
+    elseif token in ("lb", "leishman-beddoes", "leishman_beddoes")
+        throw(
+            ArgumentError(
+                "DynamicStallModel = \"LB\" is not implemented; use \"BV\" or \"none\".",
+            ),
+        )
+    end
+    throw(
+        ArgumentError(
+            "DynamicStallModel must be \"BV\", \"none\", or the internal \"analytic\" test mode; got $(repr(model)).",
+        ),
+    )
+end
+
+function _canonical_aero_model(model)
+    token = uppercase(strip(string(model)))
+    if token == "DMS"
+        return "DMS"
+    elseif token == "AC"
+        return "AC"
+    end
+    throw(ArgumentError("AeroModel must be \"DMS\" or \"AC\"; got $(repr(model))."))
+end
 
 """
     Turbine(R::TF,r::TAF,z::TF,chord::TAF3,twist::TAF5,delta::TAF,omega::TAF4,B::TI,af::TFN,ntheta::TI,r_delta_influence::TB,centerX::TAF2,centerY::TAF2)
@@ -69,8 +114,42 @@ struct Turbine{TF1,TF2,TI1,TI2,TAF0,TAF1,TAF2,TAF3,TAF4,TAF5,TAF6,TAF7,TFN,TB,TA
     rhoA::TAF7
 end
 
-Turbine(R,r,z,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,z,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1),zeros(Real,size(R)))
-Turbine(R,r,chord,twist,delta,omega,B,af,ntheta,r_delta_infl) = Turbine(R,r,1.0,chord,0.18,twist,delta,omega,B,af,ntheta,r_delta_infl,zeros(Real,size(R)),zeros(Real,size(R)),zeros(1),zeros(Real,size(R)))
+Turbine(R, r, z, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine(
+    R,
+    r,
+    z,
+    chord,
+    0.18,
+    twist,
+    delta,
+    omega,
+    B,
+    af,
+    ntheta,
+    r_delta_infl,
+    zeros(Real, size(R)),
+    zeros(Real, size(R)),
+    zeros(1),
+    zeros(Real, size(R)),
+)
+Turbine(R, r, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine(
+    R,
+    r,
+    1.0,
+    chord,
+    0.18,
+    twist,
+    delta,
+    omega,
+    B,
+    af,
+    ntheta,
+    r_delta_infl,
+    zeros(Real, size(R)),
+    zeros(Real, size(R)),
+    zeros(1),
+    zeros(Real, size(R)),
+)
 
 """
 Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DynamicStallModel::TS,AeroModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
@@ -97,12 +176,14 @@ Contains specications for turbine slice environment/operating conditions as well
 * `BV_DynamicFlagD::TAI`: Boeing-vertol dynamic stall drag flag
 * `alpha_last::TAF2`: Boeing-vertol dynamic stall prior step's angle of attack
 * `suction::TB`: DMS flag for alternate induction model
+* `speed_of_sound::TF`: sound speed used to form Mach number for DMS and AC
+  airfoil polar callbacks (m/s)
 
 # Outputs:
 * `none`:
 
 """
-struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
+struct Environment{TF,TB,TAFx,TAFy,TAF2,TS1,TS2,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     rho::TF
     mu::TF
     V_x::TAFx #Vinf is Vx
@@ -110,8 +191,8 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     V_z::TAF3
     V_twist::TAF3
     windangle::TF #radians
-    DynamicStallModel::TS
-    AeroModel::TS
+    DynamicStallModel::TS1
+    AeroModel::TS2
     Aero_AddedMass_Active::TB
     Aero_Buoyancy_Active::TB
     Aero_RotAccel_Active::TB
@@ -128,10 +209,142 @@ struct Environment{TF,TB,TAFx,TAFy,TAF2,TS,TVF,TVF2,TAI,TAF3,TAF4,TAF5}
     accel_flap::TAF4
     accel_edge::TAF4
     gravity::TAF5
+    speed_of_sound::TF
 end
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
-Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,false,false,false,1.0,false,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,length(V_x)),zeros(Int,length(V_x)),zeros(Real,length(V_x)),false,zeros(Real,length(V_x)),zeros(Real,length(V_x)),[0.0,0.0,-9.81])
+
+function _validated_speed_of_sound(speed_of_sound)
+    speed_of_sound isa Real && !(speed_of_sound isa Bool) ||
+        throw(ArgumentError("speed_of_sound must be a finite positive real value"))
+    isfinite(speed_of_sound) ||
+        throw(ArgumentError("speed_of_sound must be finite; got $(repr(speed_of_sound))"))
+    speed_of_sound > zero(speed_of_sound) ||
+        throw(ArgumentError("speed_of_sound must be greater than zero; got $(repr(speed_of_sound))"))
+    return speed_of_sound
+end
+
+Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    aw_warm,
+;
+    speed_of_sound = 343.0,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    false,
+    false,
+    false,
+    1.0,
+    false,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
+)
+Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    DynamicStallModel,
+    AeroModel,
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+;
+    speed_of_sound = 343.0,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    V_y,
+    V_z,
+    V_twist,
+    windangle,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    Aero_AddedMass_Active,
+    Aero_Buoyancy_Active,
+    Aero_RotAccel_Active,
+    AddedMass_Coeff_Ca,
+    centrifugal_force_flag,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
+)
+Environment(
+    rho,
+    mu,
+    V_x,
+    DynamicStallModel,
+    AeroModel,
+    aw_warm;
+    speed_of_sound = 343.0,
+) = Environment(
+    rho,
+    mu,
+    V_x,
+    zeros(Real, size(V_x)),
+    zeros(Real, size(V_x)),
+    zeros(Real, size(V_x)),
+    0.0,
+    _canonical_dynamic_stall_model(DynamicStallModel),
+    _canonical_aero_model(AeroModel),
+    false,
+    false,
+    false,
+    1.0,
+    false,
+    aw_warm,
+    zeros(Int, 1),
+    zeros(Int, length(V_x)),
+    deepcopy(V_x),
+    zeros(Int, length(V_x)),
+    zeros(Int, length(V_x)),
+    zeros(Real, length(V_x)),
+    false,
+    zeros(Real, length(V_x)),
+    zeros(Real, length(V_x)),
+    [0.0, 0.0, -9.81],
+    _validated_speed_of_sound(speed_of_sound),
+)
 
 """
 UnsteadyParams(RPI::TB,tau::TAF,ifw::TB,IECgust::TB,nominalVinf::TF,G_amp::TF,gustX0::TF,gustT::TF)
@@ -164,10 +377,429 @@ struct UnsteadyParams{TB,TF,TAF}
     gustT::TF
 end
 
-UnsteadyParams(RPI,tau,ifw) = UnsteadyParams(RPI,tau,ifw,false,1.0,0.0,1.0,1.0)
+UnsteadyParams(RPI, tau, ifw) = UnsteadyParams(RPI, tau, ifw, false, 1.0, 0.0, 1.0, 1.0)
 
 """
-    steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
+    added_mass_flap_volume_per_unit_span(chord)
+
+Return the current OWENSAero flap-direction added-mass reference volume per
+unit span. The model uses a circular projected section with diameter equal to
+the local chord.
+"""
+added_mass_flap_volume_per_unit_span(chord) = pi * (chord / 2)^2
+
+"""
+    added_mass_edge_volume_per_unit_span(thickness)
+
+Return the current OWENSAero edge-direction added-mass reference volume per
+unit span. This preserves the legacy `thickness / 10` projected-diameter
+convention so the formula is explicit and test-pinned.
+"""
+added_mass_edge_volume_per_unit_span(thickness) = pi * ((thickness / 10) / 2)^2
+
+"""
+    buoyancy_section_area_per_unit_span(chord, thickness)
+
+Return the current triangular-section buoyancy area per unit span used by the
+DMS and actuator-cylinder paths.
+"""
+buoyancy_section_area_per_unit_span(chord, thickness) = chord * thickness / 2
+
+function _prandtl_loss_factor(exponent)
+    return (2 / pi) * acos(clamp(exp(exponent), zero(exponent), one(exponent)))
+end
+
+function _validated_finite_span_factor(finite_span_factor, ntheta)
+    if finite_span_factor isa Real
+        isfinite(finite_span_factor) && finite_span_factor >= zero(finite_span_factor) ||
+            throw(ArgumentError("finite_span_factor must be finite and nonnegative"))
+        return finite_span_factor
+    elseif finite_span_factor isa AbstractVector
+        length(finite_span_factor) == ntheta || throw(
+            ArgumentError("finite_span_factor must be a scalar or have length ntheta"),
+        )
+        all(x -> x isa Real && isfinite(x) && x >= zero(x), finite_span_factor) || throw(
+            ArgumentError(
+                "finite_span_factor must contain only finite nonnegative real values",
+            ),
+        )
+        return collect(finite_span_factor)
+    end
+    throw(ArgumentError("finite_span_factor must be a scalar or vector"))
+end
+
+@inline function _finite_span_factor_at(finite_span_factor, idx)
+    return finite_span_factor isa AbstractVector ? finite_span_factor[idx] :
+           finite_span_factor
+end
+
+"""
+    prandtlTipLossFactor(num_blades, radial_position, rotor_radius, inflow_angle;
+                         hub_radius=0.0, include_root=false)
+
+Return a Prandtl finite-blade loss factor for an axial-flow blade element.
+`radial_position`, `rotor_radius`, and `hub_radius` are dimensional radii in
+the same units, and `inflow_angle` is the local flow angle in radians. With
+`include_root=true`, the returned value is the product of the tip-loss factor
+and the matching root-loss factor.
+
+This helper is a validated primitive for caller-side studies and future HAWT
+or finite-span work. It is not coupled into the current DMS or actuator-cylinder
+VAWT solvers, which remain stacked two-dimensional slice models unless a caller
+explicitly applies a correction outside those solvers.
+"""
+function prandtlTipLossFactor(
+    num_blades,
+    radial_position,
+    rotor_radius,
+    inflow_angle;
+    hub_radius = 0.0,
+    include_root = false,
+)
+    num_blades isa Integer && num_blades > 0 ||
+        throw(ArgumentError("num_blades must be a positive integer"))
+    radial_position isa Real && isfinite(radial_position) ||
+        throw(ArgumentError("radial_position must be a finite real value"))
+    rotor_radius isa Real && isfinite(rotor_radius) && rotor_radius > 0 ||
+        throw(ArgumentError("rotor_radius must be a finite positive real value"))
+    inflow_angle isa Real && isfinite(inflow_angle) ||
+        throw(ArgumentError("inflow_angle must be a finite real value in radians"))
+    hub_radius isa Real && isfinite(hub_radius) && hub_radius >= 0 ||
+        throw(ArgumentError("hub_radius must be a finite nonnegative real value"))
+    include_root isa Bool || throw(ArgumentError("include_root must be a Bool"))
+    zero(radial_position) < radial_position <= rotor_radius || throw(
+        ArgumentError("radial_position must satisfy 0 < radial_position <= rotor_radius"),
+    )
+    hub_radius < rotor_radius ||
+        throw(ArgumentError("hub_radius must be smaller than rotor_radius"))
+    include_root &&
+        radial_position < hub_radius &&
+        throw(
+            ArgumentError(
+                "radial_position must be at least hub_radius when include_root=true",
+            ),
+        )
+
+    loss_zero = (radial_position + rotor_radius + inflow_angle + hub_radius) * 0
+    radial_position == rotor_radius && return loss_zero
+    include_root && hub_radius > 0 && radial_position == hub_radius && return loss_zero
+
+    sin_phi = abs(sin(inflow_angle))
+    if sin_phi <= sqrt(eps(Float64))
+        return (radial_position + rotor_radius + inflow_angle) * 0 + 1.0
+    end
+
+    blade_count = float(num_blades)
+    tip_exponent =
+        -(blade_count / 2) * (rotor_radius - radial_position) / (radial_position * sin_phi)
+    loss_factor = _prandtl_loss_factor(tip_exponent)
+
+    if include_root && hub_radius > 0
+        root_exponent =
+            -(blade_count / 2) * (radial_position - hub_radius) / (hub_radius * sin_phi)
+        loss_factor *= _prandtl_loss_factor(root_exponent)
+    end
+
+    return loss_factor
+end
+
+"""
+    jointDragForce(rho, velocity, CdA)
+
+Return the lumped bluff-body drag force vector for a joint or other ancillary
+body in the same frame as `velocity`. `CdA` is the drag coefficient times
+reference area in square meters, and the returned force opposes the supplied
+relative velocity. This helper is not coupled into DMS or AC induction.
+"""
+function jointDragForce(rho, velocity, CdA)
+    rho isa Real && isfinite(rho) && rho >= 0 ||
+        throw(ArgumentError("rho must be a finite nonnegative real value"))
+    CdA isa Real && isfinite(CdA) && CdA >= 0 ||
+        throw(ArgumentError("CdA must be a finite nonnegative real value"))
+    velocity isa AbstractVector && length(velocity) in (2, 3) ||
+        throw(ArgumentError("velocity must be a two- or three-component vector"))
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+
+    speed = sqrt(sum(abs2, velocity))
+    return @. -0.5 * rho * CdA * speed * velocity
+end
+
+"""
+    towerShadowVelocity(velocity, relative_position; active=false,
+                        tower_radius=0.0, wake_expansion=0.0,
+                        centerline_deficit=0.0)
+
+Return the inflow velocity after an optional tower-shadow deficit. `velocity`
+is the undisturbed local flow vector, and `relative_position` points from the
+tower center to the evaluation point in the same frame. With `active=false`,
+the input velocity is returned unchanged. With `active=true`, a Gaussian
+downstream deficit is applied along the supplied wind direction. This helper is
+not coupled into DMS or AC induction.
+"""
+function towerShadowVelocity(
+    velocity,
+    relative_position;
+    active = false,
+    tower_radius = 0.0,
+    wake_expansion = 0.0,
+    centerline_deficit = 0.0,
+)
+    active isa Bool || throw(ArgumentError("active must be a Bool"))
+    velocity isa AbstractVector && relative_position isa AbstractVector ||
+        throw(ArgumentError("velocity and relative_position must be vectors"))
+    length(velocity) == length(relative_position) && length(velocity) in (2, 3) || throw(
+        ArgumentError(
+            "velocity and relative_position must both have two or three components",
+        ),
+    )
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+    all(x -> x isa Real && isfinite(x), relative_position) ||
+        throw(ArgumentError("relative_position must contain only finite real values"))
+    tower_radius isa Real && isfinite(tower_radius) && tower_radius >= 0 ||
+        throw(ArgumentError("tower_radius must be a finite nonnegative real value"))
+    wake_expansion isa Real && isfinite(wake_expansion) && wake_expansion >= 0 ||
+        throw(ArgumentError("wake_expansion must be a finite nonnegative real value"))
+    centerline_deficit isa Real &&
+    isfinite(centerline_deficit) &&
+    0 <= centerline_deficit < 1 || throw(
+        ArgumentError(
+            "centerline_deficit must be finite and satisfy 0 <= centerline_deficit < 1",
+        ),
+    )
+
+    active || return collect(velocity)
+    tower_radius == 0 && return collect(velocity)
+    centerline_deficit == 0 && return collect(velocity)
+
+    speed = sqrt(sum(abs2, velocity))
+    speed == 0 && return collect(velocity)
+
+    wind_direction = velocity ./ speed
+    downstream_distance = sum(relative_position .* wind_direction)
+    downstream_distance > 0 || return collect(velocity)
+
+    lateral = relative_position .- downstream_distance .* wind_direction
+    wake_radius = tower_radius + wake_expansion * downstream_distance
+    deficit =
+        centerline_deficit *
+        (tower_radius / wake_radius)^2 *
+        exp(-0.5 * sum(abs2, lateral) / wake_radius^2)
+    return @. velocity * (1 - deficit)
+end
+
+"""
+    liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
+
+Return the integrated force for a lifting strut segment in the same frame as
+`velocity`. The supplied `lift_direction` defines the caller-projected positive
+lift direction and must be perpendicular to the relative velocity when the
+velocity is nonzero. Drag opposes the relative velocity. This helper is not
+coupled into DMS or AC induction.
+"""
+function liftingStrutForce(rho, velocity, chord, span, cl, cd, lift_direction)
+    rho isa Real && isfinite(rho) && rho >= 0 ||
+        throw(ArgumentError("rho must be a finite nonnegative real value"))
+    chord isa Real && isfinite(chord) && chord >= 0 ||
+        throw(ArgumentError("chord must be a finite nonnegative real value"))
+    span isa Real && isfinite(span) && span >= 0 ||
+        throw(ArgumentError("span must be a finite nonnegative real value"))
+    cl isa Real && isfinite(cl) || throw(ArgumentError("cl must be a finite real value"))
+    cd isa Real && isfinite(cd) && cd >= 0 ||
+        throw(ArgumentError("cd must be a finite nonnegative real value"))
+    velocity isa AbstractVector && lift_direction isa AbstractVector ||
+        throw(ArgumentError("velocity and lift_direction must be vectors"))
+    length(velocity) == length(lift_direction) && length(velocity) in (2, 3) || throw(
+        ArgumentError("velocity and lift_direction must both have two or three components"),
+    )
+    all(x -> x isa Real && isfinite(x), velocity) ||
+        throw(ArgumentError("velocity must contain only finite real values"))
+    all(x -> x isa Real && isfinite(x), lift_direction) ||
+        throw(ArgumentError("lift_direction must contain only finite real values"))
+
+    speed = sqrt(sum(abs2, velocity))
+    speed == 0 && return zero.(velocity)
+    lift_norm = sqrt(sum(abs2, lift_direction))
+    lift_norm > 0 ||
+        throw(ArgumentError("lift_direction must be nonzero when velocity is nonzero"))
+
+    velocity_hat = velocity ./ speed
+    lift_hat = lift_direction ./ lift_norm
+    abs(sum(velocity_hat .* lift_hat)) <= 1e-8 ||
+        throw(ArgumentError("lift_direction must be perpendicular to velocity"))
+
+    q_area = 0.5 * rho * speed^2 * chord * span
+    return @. q_area * (cl * lift_hat - cd * velocity_hat)
+end
+
+function _finite_real_vector(values, name)
+    values isa AbstractVector || throw(ArgumentError("$(name) must be a vector"))
+    isempty(values) && throw(ArgumentError("$(name) must not be empty"))
+    all(x -> x isa Real, values) ||
+        throw(ArgumentError("$(name) must contain only real values"))
+    vector = Float64.(collect(values))
+    all(isfinite, vector) || throw(ArgumentError("$(name) must contain only finite values"))
+    return vector
+end
+
+function _sorted_curve_points(x, y, label; minimum_points = 1)
+    x_vector = _finite_real_vector(x, "$(label)_x")
+    y_vector = _finite_real_vector(y, "$(label)_y")
+    length(x_vector) == length(y_vector) ||
+        throw(ArgumentError("$(label) x and y vectors must have the same length"))
+    length(x_vector) >= minimum_points ||
+        throw(ArgumentError("$(label) must contain at least $(minimum_points) points"))
+
+    order = sortperm(x_vector)
+    x_sorted = x_vector[order]
+    y_sorted = y_vector[order]
+    all(diff(x_sorted) .> 0.0) || throw(ArgumentError("$(label) x values must be unique"))
+    return x_sorted, y_sorted
+end
+
+function _linear_interpolate_sorted(x, y, x_query)
+    if x_query < first(x) || x_query > last(x)
+        throw(ArgumentError("query point $(x_query) is outside the model curve range"))
+    end
+    idx = searchsortedlast(x, x_query)
+    idx == length(x) && return y[end]
+    idx == 0 && return y[1]
+    x0 = x[idx]
+    x1 = x[idx+1]
+    y0 = y[idx]
+    y1 = y[idx+1]
+    fraction = (x_query - x0) / (x1 - x0)
+    return y0 + fraction * (y1 - y0)
+end
+
+"""
+    cpValidationMetrics(model_tsr, model_cp, reference_tsr, reference_cp)
+
+Compare a modeled CP curve against reference CP data on the overlapping
+reference TSR points. The model curve is linearly interpolated to each
+reference point, and the returned named tuple includes RMSE, bias, mean
+absolute error, maximum absolute error, and peak-CP diagnostics.
+"""
+function cpValidationMetrics(model_tsr, model_cp, reference_tsr, reference_cp)
+    model_x, model_y =
+        _sorted_curve_points(model_tsr, model_cp, "model"; minimum_points = 2)
+    reference_x, reference_y =
+        _sorted_curve_points(reference_tsr, reference_cp, "reference")
+
+    overlap = findall(x -> first(model_x) <= x <= last(model_x), reference_x)
+    isempty(overlap) && throw(ArgumentError("reference curve does not overlap model curve"))
+
+    reference_x_overlap = reference_x[overlap]
+    reference_y_overlap = reference_y[overlap]
+    model_on_reference =
+        [_linear_interpolate_sorted(model_x, model_y, x) for x in reference_x_overlap]
+    error = model_on_reference .- reference_y_overlap
+    abs_error = abs.(error)
+
+    model_peak_idx = argmax(model_y)
+    reference_peak_idx = argmax(reference_y_overlap)
+    return (
+        n = length(reference_x_overlap),
+        rmse = sqrt(mean(error .^ 2)),
+        mean_bias = mean(error),
+        mean_abs_error = mean(abs_error),
+        max_abs_error = maximum(abs_error),
+        model_peak_tsr = model_x[model_peak_idx],
+        model_peak_cp = model_y[model_peak_idx],
+        reference_peak_tsr = reference_x_overlap[reference_peak_idx],
+        reference_peak_cp = reference_y_overlap[reference_peak_idx],
+        peak_cp_error = model_y[model_peak_idx] - reference_y_overlap[reference_peak_idx],
+        model_cp_on_reference = model_on_reference,
+        reference_tsr = reference_x_overlap,
+        reference_cp = reference_y_overlap,
+    )
+end
+
+"""
+    wholeRevolutionIndexRange(azimuth; revolutions=nothing, period=2*pi, atol=1e-10, allow_partial=false)
+
+Return a suffix index range that covers complete revolutions in a monotonically
+increasing azimuth history. The terminal repeated phase is excluded so arithmetic
+means do not double-count the revolution boundary.
+
+When `revolutions` is omitted, all complete revolutions available at the end of
+the signal are used. If `revolutions` exceeds the number available, the request
+is clamped to the available count.
+"""
+function wholeRevolutionIndexRange(
+    azimuth;
+    revolutions = nothing,
+    period = 2*pi,
+    atol = 1e-10,
+    allow_partial = false,
+)
+    isempty(azimuth) && throw(ArgumentError("azimuth history must not be empty"))
+    period <= 0 && throw(ArgumentError("period must be positive"))
+
+    az = collect(float.(azimuth))
+    all(isfinite, az) ||
+        throw(ArgumentError("azimuth history must contain only finite values"))
+    if any(diff(az) .< -atol)
+        throw(ArgumentError("azimuth history must be monotonically increasing"))
+    end
+
+    available_revolutions = floor(Int, max((az[end] - az[1]) / period, 0.0) + atol)
+    if available_revolutions < 1
+        allow_partial || throw(
+            ArgumentError("azimuth history must span at least one complete revolution"),
+        )
+        return firstindex(azimuth):lastindex(azimuth)
+    end
+
+    requested_revolutions = if isnothing(revolutions)
+        available_revolutions
+    else
+        requested = try
+            Int(revolutions)
+        catch
+            throw(ArgumentError("revolutions must be an integer count"))
+        end
+        requested == revolutions ||
+            throw(ArgumentError("revolutions must be an integer count"))
+        requested
+    end
+    n_revolutions = min(requested_revolutions, available_revolutions)
+    n_revolutions < 1 && throw(ArgumentError("revolutions must be at least 1"))
+
+    stop_azimuth = az[end]
+    start_azimuth = stop_azimuth - n_revolutions * period
+    local_start = findfirst(x -> x >= start_azimuth - atol, az)
+    local_stop = findlast(x -> x < stop_azimuth - atol, az)
+    isnothing(local_start) &&
+        throw(ArgumentError("whole-revolution window has no start sample"))
+    isnothing(local_stop) &&
+        throw(ArgumentError("whole-revolution window has no stop sample"))
+
+    idx_start = firstindex(azimuth) + local_start - 1
+    idx_stop = firstindex(azimuth) + local_stop - 1
+    idx_start <= idx_stop || throw(
+        ArgumentError("whole-revolution window has no samples before the terminal phase"),
+    )
+    return idx_start:idx_stop
+end
+
+"""
+    wholeRevolutionMean(values, azimuth; kwargs...)
+
+Compute the arithmetic mean of `values` over the window returned by
+[`wholeRevolutionIndexRange`](@ref). This is intended for unsteady CP, torque,
+and load histories where partial revolutions should not bias validation metrics.
+"""
+function wholeRevolutionMean(values, azimuth; kwargs...)
+    length(values) == length(azimuth) ||
+        throw(ArgumentError("values and azimuth must have the same length"))
+    window = wholeRevolutionIndexRange(azimuth; kwargs...)
+    return mean(values[window])
+end
+
+"""
+    steady(turbine::Turbine, env::Env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta, solve=true, ifw=false, finite_span_factor=1.0)
 
 Calculates steady state aerodynamics for a single VAWT slice
 
@@ -178,6 +810,7 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `idx_RPI::Array(<:Int)`: Optional, used to specify the azimuthal indices needed for a partial solve (i.e. not every azimuthal index), such as is used in the RPI method
 * `solve::Bool`: Optional, False is used when you want the model outputs for a given set of induction factors without resolving them.
 * `ifw::Bool`: Optional, used to tell the Vinf lookup to attempt to use the dynamic inflow wind library, requires preprocessing as is shown in the test cases.
+* `finite_span_factor::Union{Real,AbstractVector}`: Optional caller-supplied finite-span scaling factor. It must be a finite nonnegative scalar or length-`ntheta` vector and scales aerodynamic blade loads, induction source terms, torque, thrust, and pitching moment without scaling added mass, buoyancy, or centrifugal terms.
 
 
 # Outputs:
@@ -198,28 +831,87 @@ Calculates steady state aerodynamics for a single VAWT slice
 * `thetavec`: Azimuthal location of each discretization (rad)
 * `Re`: Reynolds number for each azimuthal position
 """
-function steady(turbine, env; w=zeros(Real,2*turbine.ntheta), idx_RPI=1:2*turbine.ntheta,solve=true,ifw=false)
+function steady(
+    turbine,
+    env;
+    w = zeros(Real, 2*turbine.ntheta),
+    idx_RPI = 1:(2*turbine.ntheta),
+    solve = true,
+    ifw = false,
+    finite_span_factor = 1.0,
+)
     if env.AeroModel=="DMS"
-        return DMS(turbine, env; w, idx_RPI, solve)
+        return DMS(turbine, env; w, idx_RPI, solve, finite_span_factor)
     elseif env.AeroModel=="AC"
-        turbines = Array{OWENSAero.Turbine}(undef,1)
+        turbines = Array{OWENSAero.Turbine}(undef, 1)
         turbines[1] = turbine
-        return AC(turbines, env; w, idx_RPI, solve, ifw)
+        return AC(turbines, env; w, idx_RPI, solve, ifw, finite_span_factor)
         # return AC_steady(turbines, env)
     else
         error("AeroModel not recognized, choose DMS or AC")
     end
 end
 
-@inline function safeakima(x,y,xpt)
-    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) || maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
+@inline function safeakima(x, y, xpt)
+    if minimum(xpt)<(minimum(x)-abs(minimum(x))*0.1) ||
+       maximum(xpt)>(maximum(x)+abs(maximum(x))*0.1)
         msg="Extrapolating on akima spline results in undefined solutions minimum(xpt)<minimum(x) $(minimum(xpt))<$(minimum(x)) or maximum(xpt)<maximum(x) $(maximum(xpt))>$(maximum(x))"
         throw(OverflowError(msg))
     end
-    return FLOWMath.akima(x,y,xpt)
+    return FLOWMath.akima(x, y, xpt)
+end
+
+_zero_like(x) = zero(x)
+
+function _split_airfoil_coefficients(coefficients)
+    cl = coefficients[1]
+    cd = coefficients[2]
+    cm = length(coefficients) >= 3 ? coefficients[3] : _zero_like(cl)
+    return cl, cd, cm
+end
+
+function _airfoil_coefficients(af, alpha, Re, mach)
+    coefficients = try
+        af(alpha, Re, mach; return_cm = true)
+    catch err
+        if err isa MethodError
+            af(alpha, Re, mach)
+        else
+            rethrow()
+        end
+    end
+    return _split_airfoil_coefficients(coefficients)
+end
+
+function _airfoil_coefficients(
+    af,
+    alpha,
+    Re,
+    mach,
+    env,
+    V_twist,
+    chord,
+    dt,
+    U;
+    solvestep = false,
+    idx = 1,
+)
+    coefficients = try
+        af(alpha, Re, mach, env, V_twist, chord, dt, U; solvestep, idx, return_cm = true)
+    catch err
+        if err isa MethodError
+            af(alpha, Re, mach, env, V_twist, chord, dt, U; solvestep, idx)
+        else
+            rethrow()
+        end
+    end
+    return _split_airfoil_coefficients(coefficients)
 end
 
 include("DMS.jl")
+include("DynamicInflow.jl")
+include("AeroDynInputs.jl")
+include("CCBladeHAWT.jl")
 include("./vawt-ac/src/airfoilread.jl") #TODO: switch for the CCBlade airfoil reading library
 include("./vawt-ac/src/acmultiple.jl")
 include("Unsteady_Step.jl")

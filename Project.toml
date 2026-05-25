@@ -4,6 +4,7 @@ authors = ["Kevin R. Moore <kevmoor@sandia.gov> and contributors"]
 version = "1.0.1"
 
 [deps]
+CCBlade = "e1828068-15df-11e9-03e4-ef195ea46fa4"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FLOWMath = "6cb5d3fb-0fe8-4cc2-bd89-9fe0b19a99d3"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
@@ -22,6 +23,7 @@ OWENSOpenFASTWrappers = {url = "https://github.com/sandialabs/OWENSOpenFASTWrapp
 OWENSOpenFAST_jll = {url = "https://github.com/sandialabs/OWENSOpenFAST_jll.jl"}
 
 [compat]
+CCBlade = "1.0.0"
 DelimitedFiles = "1"
 FLOWMath = "0.3, 0.4"
 FiniteDiff = "2"

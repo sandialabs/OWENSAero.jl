@@ -25,12 +25,46 @@ calls inflow wind init
 * `alpha`: Local angle of attack array for each azimuthal position (includes induction) (rad) at this step
 * `cl`: Local lift coefficient used for each azimuthal position at this step
 * `cd_af`: Local drag coefficient used for each azimuthal position at this step
+* `cm_af`: Local Cm25 coefficient used for each azimuthal position at this step
+* `M25`: Local airfoil pitching moment per span used for each azimuthal position at this step (N-m/m)
 * `thetavec`: Azimuthal location of each discretization (rad)
 * `Re`: Reynolds number for each azimuthal position at this step
 
 """
+function _unsteady_rotation_direction(omega, RPI)
+    RPI isa Bool || throw(ArgumentError("RPI must be a Bool"))
+    omega isa AbstractVector || throw(ArgumentError("turbine.omega must be a vector"))
+    isempty(omega) && throw(ArgumentError("turbine.omega must not be empty"))
+    all(x -> x isa Real && isfinite(x), omega) ||
+        throw(ArgumentError("turbine.omega must contain only finite real values"))
+
+    mean_omega = mean(omega)
+    mean_omega != 0 || throw(ArgumentError("mean turbine.omega must be nonzero"))
+    if RPI && mean_omega < 0
+        throw(ArgumentError(
+            "RPI unsteady solves with negative mean turbine.omega are not validated; set RPI=false or use a positive rotation convention.",
+        ))
+    end
+    return sign(mean_omega)
+end
+
+function _positive_unsteady_wake_speed(wake_speed)
+    wake_speed isa Real && isfinite(wake_speed) ||
+        throw(ArgumentError("V_wake_old must contain a finite real value"))
+    wake_speed_floor = sqrt(eps(Float64))
+    magnitude = abs(wake_speed)
+    return magnitude > wake_speed_floor ? magnitude : wake_speed_floor
+end
+
+function _validated_unsteady_tau(tau)
+    tau isa AbstractVector && length(tau) == 2 ||
+        throw(ArgumentError("UnsteadyParams.tau must be a two-component vector"))
+    all(x -> x isa Real && isfinite(x) && x > 0, tau) ||
+        throw(ArgumentError("UnsteadyParams.tau must contain two finite positive real values"))
+    return tau
+end
+
 function Unsteady_Step(turbine,env,us_param,mystep)
-    #TODO: RPI run with negative omega has a hard time converging, fix this
     # Unpack
     RPI = us_param.RPI
     ifw = us_param.ifw
@@ -38,20 +72,20 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     dtheta = 2*pi/(ntheta)
     thetavec = collect(dtheta/2:dtheta:2*pi-dtheta/2)
     AeroModel = env.AeroModel
-    rotation = sign(mean(turbine.omega))
+    rotation = _unsteady_rotation_direction(turbine.omega, RPI)
 
     # Check that ntheta is divisible by nblades and 2
     if ntheta%turbine.B!=0 || ntheta%2!=0
         error("ntheta must be wholly divisible by the number of blades and by 2, e.g for 3 blades, the options would be 3*even numbers, or 6,12,18,24,30...")
     end
 
-    tau = us_param.tau
+    tau = _validated_unsteady_tau(us_param.tau)
     R = turbine.R
     Vinf = env.V_x
     aw_warm = zeros(Real,ntheta*2)
     aw_warm[:] = env.aw_warm[:] #Mutate, do not link
     V_wake_old = zeros(Real,1,1)
-    V_wake_old[1] = max(0,env.V_wake_old[1]) # TODO: smooth max? Prevent numerical issues associated with negative wake
+    V_wake_old[1] = _positive_unsteady_wake_speed(env.V_wake_old[1])
 
     # setup
     awnew = zeros(Real,size(aw_warm))
@@ -111,7 +145,7 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     aw_filtered = aw_warm[:] .* exp.(-[dt;dt] ./ tau_near) .+ awnew[:] .* (1.0 .- exp.(-[dt;dt] ./ tau_near))
 
     # Get the actual performance using the filtered induction factors
-    CP, Th, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy = steady(turbine, env; w=aw_filtered,idx_RPI,solve=false,ifw)
+    CP, Th, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25 = steady(turbine, env; w=aw_filtered,idx_RPI,solve=false,ifw)
 
     if env.steplast[1] != mystep
         env.aw_warm[:] = aw_filtered[:] #Mutate, do not link
@@ -121,5 +155,5 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     # env.idx_RPI[:] = idx_RPI_half #Mutate, do not link, TODO: fix this, is used for indexing outputs
     theta_temp = thetavec[idx_RPI_half[1]]
 
-    return CP,Th,Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy
+    return CP,Th,Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc, CD, CT, a, awstar, alpha, cl, cd, thetavec, Re, M_addedmass_Np, M_addedmass_Tp, F_addedmass_Np, F_addedmass_Tp, F_buoy, cm_af, M25
 end

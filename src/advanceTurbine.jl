@@ -27,6 +27,10 @@ global clL
 global clU
 global cd_afL
 global cd_afU
+global cm_afL
+global cm_afU
+global M25L
+global M25U
 global VlocL
 global VlocU
 global ReL
@@ -56,6 +60,25 @@ global aziL_save = nothing
 global aziU_save = nothing
 global startingtwist
 
+_blade_azimuth_index(bld1_idx, dstep_bld, ibld, ntheta) = mod1(bld1_idx + dstep_bld * (ibld - 1), ntheta)
+
+function _helical_azimuth_offset_bins(shape_x, shape_y, ntheta)
+    length(shape_x) == length(shape_y) ||
+        throw(ArgumentError("helical shape x/y arrays must have the same length"))
+    ntheta > 0 || throw(ArgumentError("ntheta must be positive"))
+
+    offset = round.(Int, atan.(shape_y, shape_x) ./ (2 * pi) .* ntheta)
+    !isempty(offset) && (offset[1] = 0)
+    return offset
+end
+
+function _helical_blade_index(step, helical_offset, iblade, B, ntheta)
+    ntheta % B == 0 ||
+        throw(ArgumentError("ntheta must be divisible by the number of blades"))
+    dstep_bld = div(ntheta, B)
+    return mod1(Int(step) + Int(helical_offset) + dstep_bld * (Int(iblade) - 1), ntheta)
+end
+
 """
 setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     Height = maximum(bld_z),
@@ -64,6 +87,7 @@ setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     twist = 0.0, #or array{Float,Nslices}
     rho = 1.225,
     mu = 1.7894e-5,
+    speed_of_sound = 343.0,
     RPI = true,
     tau = [0.3,3.0],
     ntheta = 30,
@@ -95,6 +119,8 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `twist`: 0.0, #or array{Float,Nslices}
 * `rho`: working fluid density (kg/m^3)
 * `mu`:  working fluid dynamic viscosity (Pa*s)
+* `speed_of_sound`: sound speed used to form Mach numbers for airfoil callbacks
+  (m/s)
 * `RPI`: RPI method flag
 * `tau`: Unsteady wake propogation time constants [0.3,3.0],
 * `ntheta`: Number of azimuthal discretizations
@@ -103,7 +129,7 @@ Initializes aerodynamic models and sets up backend persistent memory to simplify
 * `DynamicStallModel`:  Dynamic stall model "BV" or "none" or "LB" when we get it working
 * `AeroModel`:  Aerodynamic model "DMS" or "AC"
 * `windangle_D`:  Inflow wind angle (degrees)
-* `afname`: airfoil path and name e.g. "(path)/airfoils/NACA_0015_RE3E5.dat"
+* `afname`: airfoil path and name e.g. "examples/airfoils/NACA_0015_RE3E5.dat"
 * `turbsim_filename`: turbsim path and name e.g. "(path)/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
 * `ifw_libfile`:  inflow wind dynamic library location e.g. joinpath(dirname(@__FILE__), "../../../openfast/build/modules/inflowwind/libifw_c_binding"))
 * `Aero_AddedMass_Active::bool`: flag to turn on added mass effects
@@ -124,6 +150,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     twist = 0.0,
     rho = 1.225,
     mu = 1.7894e-5,
+    speed_of_sound = 343.0,
     RPI = true,
     tau = [0.3,3.0],
     ntheta = 30,
@@ -132,7 +159,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     DynamicStallModel = "BV",
     AeroModel = "DMS",
     windangle_D = 0.0,
-    afname = "$(path)/airfoils/NACA_0015_RE3E5.dat", #TODO: analytical airfoil as default
+    afname = joinpath(dirname(path), "examples", "airfoils", "NACA_0015_RE3E5.dat"), #TODO: analytical airfoil as default
     turbsim_filename = "$path/data/ifw/turb_DLC1p3_13mps_330m_seed1.bts",
     ifw_libfile = nothing,
     Aero_AddedMass_Active = false,
@@ -142,6 +169,9 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     AddedMass_Coeff_Ca = 1.0,
     af_thick = 0.18,
     rhoA_in=zeros(length(bld_x)))
+
+    DynamicStallModel = _canonical_dynamic_stall_model(DynamicStallModel)
+    AeroModel = _canonical_aero_model(AeroModel)
 
     global dt = 0.0 #might not be used
     global last_step1 = 0
@@ -170,8 +200,9 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
     shapeY = safeakima(bld_z, bld_y, shapeZ)
     rhoA = safeakima(bld_z,rhoA_in,shapeZ)
 
-    blade_helical = round.(Int,atan.(shapeY,shapeX)./(2*pi).*ntheta) # this is the blade local helical azimuth offset in degrees, divide by 2pi to unitize it against a full revolution, and multiply by the number of azimuthal discretizations
-    blade_helical[1] = 0 # enforce the blade starting at the 0 connection point
+    # Local helical azimuth offset in discrete azimuth bins. The first node is
+    # anchored at the root connection so downstream indexing has a fixed phase.
+    blade_helical = _helical_azimuth_offset_bins(shapeX, shapeY, ntheta)
 
     global z3D = (shapeZ[2:end] + shapeZ[1:end-1])/2.0
     global z3Dnorm = (z3D)./Height
@@ -232,7 +263,7 @@ function setupTurb(bld_x,bld_z,B,chord,omega,Vinf;
         twist = ones(Real,ntheta).*twist3D[islice]
         delta = ones(Real,ntheta).*delta3D[islice]
         turbslices[islice] = OWENSAero.Turbine(Radius,r,[z3D[islice]],chord[islice],thickness[islice],twist,delta,omega,B,af,ntheta,false,zeros(Real,size(Radius)),zeros(Real,size(Radius)),blade_helical[islice],rhoA[islice])
-        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2))
+        envslices[islice] = OWENSAero.Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,Aero_AddedMass_Active,Aero_Buoyancy_Active,Aero_RotAccel_Active,AddedMass_Coeff_Ca,centrifugal_force_flag,zeros(Real,ntheta*2); speed_of_sound)
     end
 end
 
@@ -337,10 +368,7 @@ steady=false) # each of these is size ntheta x nslices
             envslices[islice].gravity[:] = gravity[:]
             for ibld = 1:turbslices[1].B
 
-                bld_idx = (bld1_idx+dstep_bld*(ibld-1))%(ntheta-1)
-                if bld_idx == 0
-                    bld_idx = 1
-                end
+                bld_idx = _blade_azimuth_index(bld1_idx, dstep_bld, ibld, ntheta)
 
                 if bld_x!=-1 && bld_z!=-1 && bld_twist!=-1
                     turbslices[islice].r[bld_idx] = bld_x[ibld,islice]
@@ -392,6 +420,8 @@ Runs a previously initialized aero model (see ?setupTurb) in the unsteady mode (
 * `alpha`: Array(B,Nslices,n_steps) of angle of attack (rad)
 * `cl`: Array(B,Nslices,n_steps) of airfoil cl used
 * `cd_af`: Array(B,Nslices,n_steps) of airfoil cd used
+* `cm_af`: Array(Nslices,n_steps) of airfoil Cm25 used
+* `M25`: Array(B,Nslices,n_steps) of airfoil pitching moment per span (N-m/m)
 * `Vloc`: Array(B,Nslices,n_steps) of airfoil local velocity used
 * `Re`: Array(B,Nslices,n_steps) of airfoil Reynolds number used
 * `thetavec`: Azimuthal discretization location (rad)
@@ -453,6 +483,8 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
     delta = zeros(TT, B, Nslices)
     cl = zeros(TT, Nslices, n_steps)
     cd_af = zeros(Nslices,n_steps)
+    cm_af = zeros(TT, Nslices, n_steps)
+    M25 = zeros(TT, B, Nslices, n_steps)
     Re = zeros(TT, Nslices, n_steps)
     # thetavec = zeros(Nslices,n_steps)
     thetavec = zeros(B,n_steps)
@@ -517,15 +549,12 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc_temp,
             CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl_temp, cd_temp,
             thetavec_temp, Re_temp, M_addedmass_Np_temp, M_addedmass_Tp_temp, F_addedmass_Np_temp,
-            F_addedmass_Tp_temp, F_buoy_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1+helical_offset)
+            F_addedmass_Tp_temp, F_buoy_temp, cm_temp, M25_temp = OWENSAero.Unsteady_Step(turbslices[islice],envslices[islice],us_param,step1+helical_offset)
 
             # Intermediate base loads
             r = turbslices[islice].r
             for iblade = 1:B
-                bld_idx = Int(step1+helical_offset-floor(Int,(step1+helical_offset-1)/ntheta)*ntheta + (iblade-1)*ntheta/B)
-                if bld_idx>ntheta
-                    bld_idx = Int(bld_idx-ntheta)
-                end
+                bld_idx = _helical_blade_index(step1, helical_offset, iblade, B, ntheta)
 
                 Fx[islice] += Rp_temp[bld_idx].*sin.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*cos.(thetavec_temp[bld_idx])
                 Fy[islice] += -Rp_temp[bld_idx].*cos.(thetavec_temp[bld_idx]) - Tp_temp[bld_idx].*sin.(thetavec_temp[bld_idx])
@@ -541,6 +570,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
                 Zp[iblade,islice,step_idx] = Zp_temp[bld_idx]
                 Vloc[iblade,islice,step_idx] = Vloc_temp[bld_idx]
                 alpha[iblade,islice,step_idx] = alpha_temp[bld_idx]
+                M25[iblade,islice,step_idx] = M25_temp[bld_idx]
 
                 thetavec[iblade,istep] = thetavec_temp[bld_idx]+ntheta*dtheta*floor(Int,(step1-1)/ntheta) # thetavec[blade index] * revolution
                 delta[iblade,islice] = turbslices[islice].delta[bld_idx]
@@ -553,9 +583,11 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
             end
             integralpower[islice] = B/(2*pi)*OWENSAero.pInt(thetavec_temp, Tp_temp.*r.*omega)
 
-            cl[islice,step_idx] = cl_temp[rev_step]
-            cd_af[islice,step_idx] = cd_temp[rev_step]
-            Re[islice,step_idx] = Re_temp[rev_step]
+            scalar_output_idx = _helical_blade_index(step1, helical_offset, 1, B, ntheta)
+            cl[islice,step_idx] = cl_temp[scalar_output_idx]
+            cd_af[islice,step_idx] = cd_temp[scalar_output_idx]
+            cm_af[islice,step_idx] = cm_temp[scalar_output_idx]
+            Re[islice,step_idx] = Re_temp[scalar_output_idx]
 
         end
 
@@ -585,7 +617,7 @@ function advanceTurb(tnew;ts=2*pi/(turbslices[1].omega[1]*turbslices[1].ntheta),
         timelast = tnew
     end
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp,step1,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,n_steps,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,rev_step,z3Dnorm,delta,Xp,Yp,step1,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy,cm_af,M25
 end
 
 
@@ -607,6 +639,8 @@ Runs a previously initialized aero model (see ?setupTurb) in the steady state mo
 * `alpha`: Array(B,Nslices,ntheta) of angle of attack (rad)
 * `cl`: Array(B,Nslices,ntheta) of airfoil cl used
 * `cd_af`: Array(B,Nslices,ntheta) of airfoil cd used
+* `cm_af`: Array(Nslices,ntheta) of airfoil Cm25 used
+* `M25`: Array(B,Nslices,ntheta) of airfoil pitching moment per span (N-m/m)
 * `Vloc`: Array(B,Nslices,ntheta) of airfoil local velocity used
 * `Re`: Array(B,Nslices,ntheta) of airfoil Reynolds number used
 * `thetavec`: Azimuthal discretization location (rad)
@@ -640,6 +674,8 @@ function steadyTurb(;omega = -1,Vinf = -1)
     alpha = zeros(Real,B,Nslices,ntheta)
     cl = zeros(Real,Nslices,ntheta)
     cd_af = zeros(Real,Nslices,ntheta)
+    cm_af = zeros(Real,Nslices,ntheta)
+    M25 = zeros(Real,B,Nslices,ntheta)
     Vloc = zeros(Real,Nslices,ntheta)
     Re = zeros(Real,Nslices,ntheta)
     thetavec = zeros(Real,Nslices,ntheta)
@@ -674,7 +710,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
 
         CP_temp, Th_temp, Q_temp, Rp_temp, Tp_temp, Zp_temp, Vloc[islice,:],
         CD_temp, CT_temp, a_temp, awstar_temp, alpha_temp, cl[islice,:], cd_af[islice,:],
-        thetavec, Re[islice,:], M_addedmass_Np[islice,:], M_addedmass_Tp[islice,:], F_addedmass_Np[islice,:], F_addedmass_Tp[islice,:],F_buoy[islice,:,:] = OWENSAero.steady(turbslices[islice],envslices[islice])
+        thetavec, Re[islice,:], M_addedmass_Np[islice,:], M_addedmass_Tp[islice,:], F_addedmass_Np[islice,:], F_addedmass_Tp[islice,:],F_buoy[islice,:,:], cm_af[islice,:], M25_temp = OWENSAero.steady(turbslices[islice],envslices[islice])
 
         # Intermediate base loads
         r = turbslices[islice].r
@@ -697,6 +733,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
                 Tp[iblade,islice,step1] = Tp_temp[bld_idx]
                 Zp[iblade,islice,step1] = Zp_temp[bld_idx]
                 alpha[iblade,islice,step1] = alpha_temp[bld_idx]
+                M25[iblade,islice,step1] = M25_temp[bld_idx]
                 delta[iblade,islice] = turbslices[islice].delta[bld_idx]
             end
         end
@@ -731,7 +768,7 @@ function steadyTurb(;omega = -1,Vinf = -1)
     power2 = mean(Mz_base)*mean(abs.(omega))
 
     global z3Dnorm
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,torque,z3Dnorm,delta,Mz_base2,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy,cm_af,M25
 end
 
 function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
@@ -765,6 +802,10 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     global clU
     global cd_afL
     global cd_afU
+    global cm_afL
+    global cm_afU
+    global M25L
+    global M25U
     global VlocL
     global VlocU
     global ReL
@@ -818,6 +859,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
              alphaL[:,:,end] = alphaU[:,:,end]
              clL[:,end] = clU[:,end]
              cd_afL[:,end] = cd_afU[:,end]
+             cm_afL[:,end] = cm_afU[:,end]
+             M25L[:,:,end] = M25U[:,:,end]
              VlocL[:,:,end] = VlocU[:,:,end]
              ReL[:,end] = ReU[:,end]
              thetavecL[:,end] = thetavecU[:,end]
@@ -833,7 +876,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPL,RpL,TpL,ZpL,alphaL,clL,cd_afL,VlocL,ReL,thetavecL,ntheta,Fx_baseL,
             Fy_baseL,Fz_baseL,Mx_baseL,My_baseL,Mz_baseL,powerL,power2L,_,_,
-            delta,XpL,YpL,last_step,M_addedmass_Np_L,M_addedmass_Tp_L,F_addedmass_Np_L,F_addedmass_Tp_L,F_buoy_L = advanceTurb(t;azi=aziL,last_step=last_stepL)
+            delta,XpL,YpL,last_step,M_addedmass_Np_L,M_addedmass_Tp_L,F_addedmass_Np_L,F_addedmass_Tp_L,F_buoy_L,cm_afL,M25L = advanceTurb(t;azi=aziL,last_step=last_stepL)
             if aziL_save != aziL
                 last_stepL = last_step
             end
@@ -858,6 +901,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
         alphaU[:,:,end] = alphaL[:,:,end]
         clU[:,end] = clL[:,end]
         cd_afU[:,end] = cd_afL[:,end]
+        cm_afU[:,end] = cm_afL[:,end]
+        M25U[:,:,end] = M25L[:,:,end]
         VlocU[:,:,end] = VlocL[:,:,end]
         ReU[:,end] = ReL[:,end]
         thetavecU[:,end] = thetavecL[:,end]
@@ -874,7 +919,7 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
 
             CPU,RpU,TpU,ZpU,alphaU,clU,cd_afU,VlocU,ReU,thetavecU,ntheta,Fx_baseU,
             Fy_baseU,Fz_baseU,Mx_baseU,My_baseU,Mz_baseU,powerU,power2U,_,_,
-            delta,XpU,YpU,last_step,M_addedmass_Np_U,M_addedmass_Tp_U,F_addedmass_Np_U,F_addedmass_Tp_U,F_buoy_U = advanceTurb(t;azi=aziU,last_step=last_stepU)
+            delta,XpU,YpU,last_step,M_addedmass_Np_U,M_addedmass_Tp_U,F_addedmass_Np_U,F_addedmass_Tp_U,F_buoy_U,cm_afU,M25U = advanceTurb(t;azi=aziU,last_step=last_stepU)
             if aziU_save != aziU
                 last_stepU = last_step
             end
@@ -902,6 +947,8 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     alpha = zeros(Real,NBlade,Nslices,n_steps)
     cl = zeros(Real,Nslices,n_steps)
     cd_af = zeros(Real,Nslices,n_steps)
+    cm_af = zeros(Real,Nslices,n_steps)
+    M25 = zeros(Real,NBlade,Nslices,n_steps)
     Re = zeros(Real,Nslices,n_steps)
     thetavec = zeros(Real,NBlade,n_steps)
 
@@ -925,12 +972,14 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
             F_addedmass_Tp[iblade,islice,:] .= F_addedmass_Tp_L[iblade,islice,end] .+ fraction.*(F_addedmass_Tp_U[iblade,islice,end].-F_addedmass_Tp_L[iblade,islice,end])
             F_buoy[iblade,islice,1,:] .= F_buoy_L[iblade,islice,end,:] .+ fraction.*(F_buoy_U[iblade,islice,end,:].-F_buoy_L[iblade,islice,end,:])
             alpha[iblade,islice,:] .= alphaL[iblade,islice,end] .+ fraction.*(alphaU[iblade,islice,end].-alphaL[iblade,islice,end])
+            M25[iblade,islice,:] .= M25L[iblade,islice,end] .+ fraction.*(M25U[iblade,islice,end].-M25L[iblade,islice,end])
             Vloc[iblade,islice,:] .= VlocL[iblade,islice,end] .+ fraction.*(VlocU[iblade,islice,end].-VlocL[iblade,islice,end])
             thetavec[iblade,:] .= thetavecL[iblade,end] .+ fraction.*(thetavecU[iblade,end].-thetavecL[iblade,end])
         end
         CP[islice,:] .= CPL[islice,end] .+ fraction.*(CPU[islice,end].-CPL[islice,end])
         cl[islice,:] .= clL[islice,end] .+ fraction.*(clU[islice,end].-clL[islice,end])
         cd_af[islice,:] .= cd_afL[islice,end] .+ fraction.*(cd_afU[islice,end].-cd_afL[islice,end])
+        cm_af[islice,:] .= cm_afL[islice,end] .+ fraction.*(cm_afU[islice,end].-cm_afL[islice,end])
         Re[islice,:] .= ReL[islice,end] .+ fraction.*(ReU[islice,end].-ReL[islice,end])
     end
 
@@ -943,5 +992,5 @@ function AdvanceTurbineInterpolate(t;azi=-1,alwaysrecalc=false)
     power = powerL[end] + fraction*(powerU[end]-powerL[end])
     power2 = power2L[end] + fraction*(power2U[end]-power2L[end])
 
-    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,nothing,z3Dnorm,delta,Xp,Yp,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy
+    return CP,Rp,Tp,Zp,alpha,cl,cd_af,Vloc,Re,thetavec,ntheta,Fx_base,Fy_base,Fz_base,Mx_base,My_base,Mz_base,power,power2,nothing,z3Dnorm,delta,Xp,Yp,M_addedmass_Np,M_addedmass_Tp,F_addedmass_Np,F_addedmass_Tp,F_buoy,cm_af,M25
 end
