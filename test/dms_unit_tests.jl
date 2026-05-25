@@ -237,3 +237,44 @@ end
     @test rotated[7] ≈ baseline[7] atol=1e-14
     @test rotated[12] ≈ baseline[12] atol=1e-14
 end
+
+@testset "DMS large wind-angle diagnostic" begin
+    @test OWENSAero._warn_if_large_dms_windangle("invalid") === nothing
+    @test OWENSAero._warn_if_large_dms_windangle(NaN) === nothing
+    @test OWENSAero._warn_if_large_dms_windangle(30.0 * pi / 180.0) === nothing
+
+    ntheta = 8
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
+    windangle = 80.0 * pi / 180.0
+    freestream = 5.0
+    turbine = OWENSAero.Turbine(
+        1.5,
+        fill(1.5, ntheta),
+        1.0,
+        fill(0.2, ntheta),
+        fill(0.1, ntheta),
+        fill(0.05, ntheta),
+        fill(2.0, ntheta),
+        2,
+        af,
+        ntheta,
+        false,
+    )
+    env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(freestream * cos(windangle), ntheta),
+        fill(freestream * sin(windangle), ntheta),
+        zeros(ntheta),
+        zeros(ntheta),
+        windangle,
+        "none",
+        "DMS",
+        zeros(2 * ntheta),
+    )
+
+    @test_logs(
+        (:warn, r"DMS windangle is near cross-flow"),
+        OWENSAero.DMS(turbine, env; w = zeros(2 * ntheta), solve = false),
+    )
+end
