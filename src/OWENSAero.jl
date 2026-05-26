@@ -36,6 +36,11 @@ export Unsteady_Step
 # Module Path
 const path, _ = splitdir(@__FILE__)
 
+_default_numeric_type(x) = x isa AbstractArray ? eltype(x) : typeof(x)
+_default_float_type(xs...) = promote_type(Float64, map(_default_numeric_type, xs)...)
+_zero_like_shape(x) = zeros(_default_float_type(x), size(x))
+_zero_like_length(x) = zeros(_default_float_type(x), length(x))
+
 # Common Structs
 
 function _canonical_dynamic_stall_model(model)
@@ -163,10 +168,10 @@ Turbine(R, r, z, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turb
     af,
     ntheta,
     r_delta_infl,
-    zeros(Real, size(R)),
-    zeros(Real, size(R)),
+    _zero_like_shape(R),
+    _zero_like_shape(R),
     zeros(1),
-    zeros(Real, size(R)),
+    _zero_like_shape(R),
 )
 Turbine(R, r, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine(
     R,
@@ -181,16 +186,16 @@ Turbine(R, r, chord, twist, delta, omega, B, af, ntheta, r_delta_infl) = Turbine
     af,
     ntheta,
     r_delta_infl,
-    zeros(Real, size(R)),
-    zeros(Real, size(R)),
+    _zero_like_shape(R),
+    _zero_like_shape(R),
     zeros(1),
-    zeros(Real, size(R)),
+    _zero_like_shape(R),
 )
 
 """
 Environment(rho::TF,mu::TF,V_x::TAF #Vinf is Vx,V_y::TAF,V_z::TAF,V_twist::TAF,windangle::TF #radians,DynamicStallModel::TS,AeroModel::TS,aw_warm::TVF,steplast::TAI,idx_RPI::TAI,V_wake_old::TVF2,BV_DynamicFlagL::TAI,BV_DynamicFlagD::TAI,alpha_last::TAF2,suction::TB)
-Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
-Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,zeros(Real,size(V_x)),zeros(Real,size(V_x)),zeros(Real,size(V_x)),0.0,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),zeros(Real,1),false)
+Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,V_y,V_z,V_twist,windangle,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),_zero_like_length(V_x),false)
+Environment(rho,mu,V_x,DynamicStallModel,AeroModel,aw_warm) = Environment(rho,mu,V_x,_zero_like_shape(V_x),_zero_like_shape(V_x),_zero_like_shape(V_x),0.0,DynamicStallModel,AeroModel,aw_warm,zeros(Int,1),zeros(Int,length(V_x)),deepcopy(V_x),zeros(Int,1),zeros(Int,1),_zero_like_length(V_x),false)
 
 Contains specications for turbine slice environment/operating conditions as well as some backend memory for dynamic stall and unsteady calculations
 
@@ -354,11 +359,11 @@ Environment(
     deepcopy(V_x),
     zeros(Int, length(V_x)),
     zeros(Int, length(V_x)),
-    zeros(Real, length(V_x)),
+    _zero_like_length(V_x),
     LeishmanBeddoesState(length(V_x)),
     false,
-    zeros(Real, length(V_x)),
-    zeros(Real, length(V_x)),
+    _zero_like_length(V_x),
+    _zero_like_length(V_x),
     [0.0, 0.0, -9.81],
     _validated_speed_of_sound(speed_of_sound),
 )
@@ -401,11 +406,11 @@ Environment(
     deepcopy(V_x),
     zeros(Int, length(V_x)),
     zeros(Int, length(V_x)),
-    zeros(Real, length(V_x)),
+    _zero_like_length(V_x),
     LeishmanBeddoesState(length(V_x)),
     false,
-    zeros(Real, length(V_x)),
-    zeros(Real, length(V_x)),
+    _zero_like_length(V_x),
+    _zero_like_length(V_x),
     [0.0, 0.0, -9.81],
     _validated_speed_of_sound(speed_of_sound),
 )
@@ -414,9 +419,9 @@ Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm; speed_of_sound 
         rho,
         mu,
         V_x,
-        zeros(Real, size(V_x)),
-        zeros(Real, size(V_x)),
-        zeros(Real, size(V_x)),
+        _zero_like_shape(V_x),
+        _zero_like_shape(V_x),
+        _zero_like_shape(V_x),
         0.0,
         _canonical_dynamic_stall_model(DynamicStallModel),
         _canonical_aero_model(AeroModel),
@@ -431,11 +436,11 @@ Environment(rho, mu, V_x, DynamicStallModel, AeroModel, aw_warm; speed_of_sound 
         deepcopy(V_x),
         zeros(Int, length(V_x)),
         zeros(Int, length(V_x)),
-        zeros(Real, length(V_x)),
+        _zero_like_length(V_x),
         LeishmanBeddoesState(length(V_x)),
         false,
-        zeros(Real, length(V_x)),
-        zeros(Real, length(V_x)),
+        _zero_like_length(V_x),
+        _zero_like_length(V_x),
         [0.0, 0.0, -9.81],
         _validated_speed_of_sound(speed_of_sound),
     )
@@ -967,7 +972,7 @@ Calculates steady state aerodynamics for a single VAWT slice
 function steady(
     turbine,
     env;
-    w = zeros(Real, 2*turbine.ntheta),
+    w = zeros(_default_float_type(turbine.R, turbine.r, turbine.omega, env.V_x, env.aw_warm), 2*turbine.ntheta),
     idx_RPI = 1:(2*turbine.ntheta),
     solve = true,
     ifw = false,

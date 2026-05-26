@@ -82,13 +82,14 @@ function Unsteady_Step(turbine,env,us_param,mystep)
     tau = _validated_unsteady_tau(us_param.tau)
     R = turbine.R
     Vinf = env.V_x
-    aw_warm = zeros(Real,ntheta*2)
+    T = _dms_output_type(turbine, env, env.aw_warm)
+    aw_warm = zeros(T,ntheta*2)
     aw_warm[:] = env.aw_warm[:] #Mutate, do not link
-    V_wake_old = zeros(Real,1,1)
+    V_wake_old = zeros(T,1,1)
     V_wake_old[1] = _positive_unsteady_wake_speed(env.V_wake_old[1])
 
     # setup
-    awnew = zeros(Real,size(aw_warm))
+    awnew = zeros(T,size(aw_warm))
 
     # Calculate the RPI indices
     circular_mystep = mystep-floor((mystep-1)/ntheta*turbine.B)*ntheta/turbine.B
