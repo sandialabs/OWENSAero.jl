@@ -399,14 +399,14 @@ function DMS(
 
     finite_span_factor = _validated_finite_span_factor(finite_span_factor, ntheta)
 
-    astar = zeros(Real, ntheta * 2)#env.aw_warm[1:ntheta] #zeros(ntheta)
+    T = _dms_output_type(turbine, env, a_in)
+    astar = zeros(T, ntheta * 2)#env.aw_warm[1:ntheta] #zeros(ntheta)
 
     if a_in == 0
         idx_RPI = 1:ntheta
     else
         astar[1:ntheta] = a_in[1:ntheta]
     end
-    T = _dms_output_type(turbine, env, a_in)
     Th = zeros(T, ntheta)
     Q = zeros(T, ntheta)
     Rp = zeros(T, ntheta)
