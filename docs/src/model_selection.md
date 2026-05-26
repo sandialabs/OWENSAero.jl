@@ -96,7 +96,7 @@ Model option strings are normalized at construction and setup time: `BV`/`boeing
 
 ## Tower Shadow Scope
 
-`towerShadowVelocity(velocity, relative_position; active=false, ...)` provides a pinned, off-by-default inflow-deficit primitive for tower shadow studies. The active model applies a Gaussian downstream velocity deficit in the supplied wind frame. It is intentionally not coupled into DMS or AC induction yet; callers must explicitly use the returned velocity in their own load-building workflow until a validated solver-integrated tower-shadow option is added.
+`towerShadowVelocity(velocity, relative_position; active=false, ...)` provides a pinned, off-by-default inflow-deficit primitive for tower shadow studies. The active model applies a Gaussian downstream velocity deficit in the supplied wind frame. DMS also accepts `tower_shadow = (tower_radius = ..., wake_expansion = ..., centerline_deficit = ...)` to apply that primitive before the streamtube solve. This DMS hook is opt-in and is intended for validation development; AC integration and end-to-end OWENS structural mapping remain open work.
 
 ## Lifting Strut Scope
 
