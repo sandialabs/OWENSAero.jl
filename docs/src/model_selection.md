@@ -70,6 +70,10 @@ through `tip_correction`; the default is `CCBlade.PrandtlTipHub()`, and
 The returned `F` and `G` arrays are CCBlade's load and effective wake-loss
 factors.
 
+The AeroDyn input bridge converts AeroDyn blade-root span (`BlSpn`) to CCBlade
+rotor radius using the driver hub radius and has a steady Basic HAWT validation
+case against AeroDyn-driver rotor totals and selected interior station channels.
+
 `oyeDynamicInflowTimeConstants`, `oyeDynamicInflowDerivative`, and
 `oyeDynamicInflowStep` provide the matching tested Oye dynamic-inflow primitive.
 The helper follows the AeroDyn DBEMT continuous state-space form and advances
@@ -80,9 +84,9 @@ CCBlade induction arrays with the Oye state update when building unsteady HAWT
 studies.
 
 The HAWT path is not yet coupled into OWENS structural dynamics. Structural load
-mapping, global rotor/tower frame bookkeeping, and OpenFAST/AeroDyn validation
-remain open work before this should be treated as a production aeroelastic HAWT
-solver.
+mapping, global rotor/tower frame bookkeeping, and unsteady/moving-frame
+OpenFAST/AeroDyn validation remain open work before this should be treated as a
+production aeroelastic HAWT solver.
 
 ## Dynamic Stall
 

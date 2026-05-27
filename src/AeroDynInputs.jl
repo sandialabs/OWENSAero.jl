@@ -179,6 +179,11 @@ function _aerodyn_required_bool(lines, keyword)
     return _aerodyn_parse_bool(_aerodyn_find_keyword_value(lines, keyword), keyword)
 end
 
+function _aerodyn_optional_bool(lines, keyword)
+    raw_value = _aerodyn_find_optional_keyword_value(lines, keyword)
+    return raw_value === nothing ? nothing : _aerodyn_parse_bool(raw_value, keyword)
+end
+
 function _aerodyn_required_float(lines, keyword)
     value = tryparse(Float64, _aerodyn_find_keyword_value(lines, keyword))
     value === nothing &&
@@ -455,8 +460,11 @@ wind (`CompInflow=0`) or an InflowWind `WindType=1` steady-wind file
 
 The returned named tuple includes resolved AeroDyn/InflowWind filenames,
 environment properties, rotor speed in rpm and rad/s, blade pitch in degrees
-and radians, and driver hub-radius metadata. The driver `VTKHubRad` is retained
-for traceability but is not treated as a physical BEM hub radius.
+and radians, Basic HAWT geometry when present, and driver hub-radius metadata.
+For Basic HAWT drivers, `HubRad` is returned as the blade-root offset used by
+CCBlade; for advanced drivers, the per-blade `BldHubRad_bl` values are retained.
+The driver `VTKHubRad` is retained for traceability but is not treated as a
+physical BEM hub radius.
 """
 function readAeroDynDriverFile(
     filename;
@@ -501,20 +509,49 @@ function readAeroDynDriverFile(
 
     num_blades = _aerodyn_required_int(lines, "NumBlades($turbine_index)")
     num_blades > 0 || throw(ArgumentError("AeroDyn driver NumBlades must be positive"))
-    pitch_deg = [
-        _aerodyn_required_float(lines, "BldPitch($(turbine_index)_$blade_index)") for
-        blade_index = 1:num_blades
-    ]
+
+    basic_hawt_format =
+        something(_aerodyn_optional_bool(lines, "BasicHAWTFormat($turbine_index)"), false)
+    hub_radius = nothing
+    hub_height = nothing
+    overhang = nothing
+    shaft_tilt_deg = nothing
+    precone_deg = 0.0
+    tower_to_shaft = nothing
+    if basic_hawt_format
+        hub_radius = _aerodyn_required_float(lines, "HubRad($turbine_index)")
+        hub_radius > 0.0 || throw(ArgumentError("AeroDyn driver HubRad must be positive"))
+        hub_height = _aerodyn_required_float(lines, "HubHt($turbine_index)")
+        overhang = _aerodyn_required_float(lines, "Overhang($turbine_index)")
+        shaft_tilt_deg = _aerodyn_required_float(lines, "ShftTilt($turbine_index)")
+        precone_deg = _aerodyn_required_float(lines, "Precone($turbine_index)")
+        tower_to_shaft = _aerodyn_required_float(lines, "Twr2Shft($turbine_index)")
+    end
+
+    pitch_deg = if basic_hawt_format
+        fill(_aerodyn_required_float(lines, "BldPitch($turbine_index)"), num_blades)
+    else
+        [
+            _aerodyn_required_float(lines, "BldPitch($(turbine_index)_$blade_index)")
+            for blade_index = 1:num_blades
+        ]
+    end
     uniform_pitch_deg = _aerodyn_uniform_driver_pitch(pitch_deg)
-    blade_hub_radius = [
-        _aerodyn_required_float(lines, "BldHubRad_bl($(turbine_index)_$blade_index)")
-        for blade_index = 1:num_blades
-    ]
+    blade_hub_radius = if basic_hawt_format
+        fill(hub_radius, num_blades)
+    else
+        [
+            _aerodyn_required_float(lines, "BldHubRad_bl($(turbine_index)_$blade_index)") for blade_index = 1:num_blades
+        ]
+    end
+    all(>=(0.0), blade_hub_radius) ||
+        throw(ArgumentError("AeroDyn driver blade hub radii must be nonnegative"))
 
     rot_speed_rpm = _aerodyn_required_float(lines, "RotSpeed($turbine_index)")
     fluid_density = _aerodyn_required_float(lines, "FldDens")
     kinematic_viscosity = _aerodyn_required_float(lines, "KinVisc")
     speed_of_sound = _aerodyn_required_float(lines, "SpdSound")
+    nac_yaw_deg = _aerodyn_optional_float(lines, "NacYaw($turbine_index)")
 
     return (
         source = filename,
@@ -525,6 +562,7 @@ function readAeroDynDriverFile(
         comp_inflow = comp_inflow,
         num_turbines = num_turbines,
         turbine_index = turbine_index,
+        basic_hawt_format = basic_hawt_format,
         num_blades = num_blades,
         fluid_density = fluid_density,
         kinematic_viscosity = kinematic_viscosity,
@@ -538,6 +576,16 @@ function readAeroDynDriverFile(
         pitch_deg = uniform_pitch_deg,
         pitch_rad = deg2rad(uniform_pitch_deg),
         blade_hub_radius = blade_hub_radius,
+        hub_radius = basic_hawt_format ? hub_radius : maximum(blade_hub_radius),
+        hub_height = hub_height,
+        overhang = overhang,
+        shaft_tilt_deg = shaft_tilt_deg,
+        shaft_tilt_rad = shaft_tilt_deg === nothing ? nothing : deg2rad(shaft_tilt_deg),
+        precone_deg = precone_deg,
+        precone_rad = deg2rad(precone_deg),
+        tower_to_shaft = tower_to_shaft,
+        nac_yaw_deg = nac_yaw_deg,
+        nac_yaw_rad = nac_yaw_deg === nothing ? nothing : deg2rad(nac_yaw_deg),
         vtk_hub_radius = _aerodyn_optional_float(lines, "VTKHubRad"),
     )
 end
@@ -613,6 +661,9 @@ Build the geometry, airfoil callables, and metadata needed to run OWENSAero's
 CCBlade HAWT adapter from AeroDyn primary, blade, and AirfoilInfo files.
 `root_station_policy=:drop_zero_span` removes the common AeroDyn root station at
 zero span because CCBlade sections require positive radial positions.
+`hub_radius` is added to AeroDyn `BlSpn` values because AeroDyn blade files store
+span from the blade root, while CCBlade sections use rotor radii from the
+center of rotation.
 
 The returned named tuple does not run the BEM solve. It keeps the parsed
 AeroDyn primary options, blade data, polar tables, resolved files, station
@@ -627,6 +678,7 @@ function aeroDynHAWTCCBladeInputs(
     tip_correction = :from_aerodyn,
     hub_radius = 0.0,
 )
+    _validate_nonnegative_real_input(hub_radius, "hub_radius")
     primary = readAeroDynPrimaryFile(primary_file)
     primary.wake_model == 1 ||
         throw(ArgumentError("Only AeroDyn WakeMod=1 BEM inputs are supported"))
@@ -672,12 +724,14 @@ function aeroDynHAWTCCBladeInputs(
         airfoil_files = airfoil_files,
         blade_file = blade_file,
         station_indices = station_indices,
-        radial_positions = blade.span[station_indices],
+        radial_positions = blade.span[station_indices] .+ hub_radius,
+        blade_span = blade.span[station_indices],
         chord = blade.chord[station_indices],
         twist = blade.twist_rad[station_indices],
         airfoils = station_airfoils,
         num_blades = length(primary.blade_files),
-        tip_radius = maximum(blade.span[station_indices]),
+        hub_radius = hub_radius,
+        tip_radius = maximum(blade.span) + hub_radius,
         tip_correction = selected_tip_correction,
         root_station_policy = root_station_policy,
         comparison_notes = _aerodyn_hawt_comparison_notes(primary, hub_radius),
@@ -776,13 +830,14 @@ function ccbladeHAWTSolveFromAeroDynDriver(
     root_station_policy = :drop_zero_span,
     hub_radius = nothing,
     tip_radius = nothing,
-    precone = 0.0,
+    precone = nothing,
     npts = 10,
     tip_correction = :from_aerodyn,
 )
     driver = readAeroDynDriverFile(driver_file; base_directory, turbine_index)
     solve_hub_radius =
         hub_radius === nothing ? maximum(driver.blade_hub_radius) : hub_radius
+    solve_precone = precone === nothing ? driver.precone_rad : precone
     result = ccbladeHAWTSolveFromAeroDyn(
         driver.aero_file,
         driver.rotor_speed_rad_per_s,
@@ -794,7 +849,7 @@ function ccbladeHAWTSolveFromAeroDynDriver(
         hub_radius = solve_hub_radius,
         tip_radius,
         pitch = driver.pitch_rad,
-        precone,
+        precone = solve_precone,
         mu = driver.dynamic_viscosity,
         asound = driver.speed_of_sound,
         npts,

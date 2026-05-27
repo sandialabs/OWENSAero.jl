@@ -6,9 +6,10 @@ and then advances one Oye dynamic-inflow state update from the steady axial
 induction.
 
 The example intentionally stays rigid and aerodynamic only. It does not map
-loads into OWENSFEA, rotate a stationary tower in the global frame, or compare
-against OpenFAST yet. Those are the next validation steps before this path
-should be treated as an aeroelastic HAWT solver.
+loads into OWENSFEA or rotate a stationary tower in the global frame. A separate
+API validation test runs AeroDyn's Basic HAWT driver and compares CCBlade rotor
+totals plus selected station channels, but structural load mapping remains
+required before this path should be treated as an aeroelastic HAWT solver.
 
 Run it from the package root with:
 
@@ -43,9 +44,10 @@ driver = readAeroDynDriverFile("HAWT_standalone_test.dvr")
 ```
 
 Those helpers are input-normalization tools, not a completed OpenFAST
-validation by themselves. The comparison still needs an explicit root-station
-policy, wind-source selection, drag-in-induction setting, and torque/power sign
-convention.
+validation by themselves. The checked Basic HAWT comparison uses `HubRad` as
+the blade-root offset, drops the zero-span root station, and compares interior
+station `Alpha`, `Cl`, `Cd`, `Cx`, `Cy`, `Fxp`, and `-Fyp` channels against the
+CCBlade solve.
 
 The Oye state update uses the steady CCBlade axial induction as the
 quasi-steady input. This keeps the future dynamic-inflow coupling explicit:
