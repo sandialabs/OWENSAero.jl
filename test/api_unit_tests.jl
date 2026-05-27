@@ -2269,6 +2269,84 @@ end
     @test rotated[15] ≈ baseline[15] .- pi / 6 atol=1e-14
 end
 
+@testset "AC influence matrix assembly" begin
+    theta = [pi / 4, 3pi / 4, 5pi / 4, 7pi / 4]
+    expected_dx_self = [
+        -0.375 0.125 0.125 0.125
+        0.125 -0.375 0.125 0.125
+        0.125 0.125 0.625 0.125
+        0.125 0.125 0.125 0.625
+    ]
+    expected_wx_self = [
+        0.0 0.0 0.0 0.0
+        0.0 0.0 0.0 0.0
+        0.0 -1.0 0.0 0.0
+        -1.0 0.0 0.0 0.0
+    ]
+    expected_wx_probe = [
+        0.0 0.0 0.0 0.0
+        -1.0 0.0 0.0 1.0
+        0.0 0.0 0.0 0.0
+    ]
+
+    @test OWENSAero.Ayintegrand(0.0, 1.0, 0.0, -1.0, 0.0) == 0.0
+    @test OWENSAero.DxII(theta) ≈ expected_dx_self atol=1e-15
+    @test OWENSAero.WxII(theta) == expected_wx_self
+    @test OWENSAero.WxIJ([0.5, 2.0, -0.5], [0.0, 0.5, 0.0], theta) ==
+          expected_wx_probe
+
+    af(alpha, Re, M) = (2.0 * alpha, 0.01 + alpha^2)
+    turbine = OWENSAero.Turbine(
+        1.5,
+        fill(1.5, 4),
+        1.0,
+        fill(0.2, 4),
+        fill(0.1, 4),
+        fill(0.05, 4),
+        fill(2.0, 4),
+        2,
+        af,
+        4,
+        false,
+    )
+
+    expected_ax_cross = [
+        -0.07965291684195769 -0.027043361992348195 0.05954591618166424 0.047150362652641636
+        -0.027043361992348178 -0.0796529168419577 0.04715036265264162 0.05954591618166424
+        0.040663351653273026 -0.22295663800765178 0.0830657275569744 0.0992275587974044
+        -0.22295663800765186 0.04066335165327302 0.0992275587974044 0.08306572755697443
+    ]
+    expected_ay_cross = [
+        -0.061708488162186076 0.08742478814151494 0.026235169600880882 -0.051951469580209735
+        -0.08742478814151494 0.061708488162186076 0.051951469580209755 -0.026235169600880855
+        -0.16375146610804667 0.08742478814151489 0.09443192958807739 -0.018105251621545596
+        -0.08742478814151497 0.16375146610804675 0.018105251621545637 -0.09443192958807733
+    ]
+
+    mktempdir() do dir
+        cd(dir) do
+            Ax, Ay, assembled_theta = OWENSAero.matrixAssemble(
+                turbine,
+                [0.0, 3.0],
+                [0.0, 0.0],
+                [1.5, 1.5],
+                4,
+            )
+            Ax = Float64.(Ax)
+            Ay = Float64.(Ay)
+
+            @test assembled_theta ≈ theta atol=1e-15
+            @test size(Ax) == (8, 8)
+            @test size(Ay) == (8, 8)
+            @test Ax[1:4, 1:4] ≈ expected_dx_self + expected_wx_self atol=1e-15
+            @test Ax[1:4, 5:8] ≈ expected_ax_cross atol=1e-15
+            @test Ay[1:4, 5:8] ≈ expected_ay_cross atol=1e-15
+            @test sum(Ax) ≈ 0.0 atol=1e-14
+            @test sum(Ay) ≈ 0.0 atol=1e-14
+        end
+    end
+end
+
 @testset "DMS and AC no tip-loss finite-span baseline" begin
     ntheta = 8
     theta = collect(((2*pi/ntheta)/2):(2*pi/ntheta):(2*pi))

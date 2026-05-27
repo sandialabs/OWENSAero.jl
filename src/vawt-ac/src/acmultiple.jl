@@ -93,7 +93,7 @@ function WxIJ(xvec, yvec, thetavec)
            xvec[i]^2 + yvec[i]^2 >= 1.0
             # if yvec[i] >= -1.0 && yvec[i] <= 1.0 && (xvec[i] >= 0.0 || (xvec[i] >= -1 && xvec[i]^2 + yvec[i]^2 <= 1.0))
             thetak = acos(yvec[i])
-            k = findfirst(thetavec + dtheta/2 .> thetak)  # index of intersection
+            k = findfirst(thetavec .+ dtheta/2 .> thetak)  # index of intersection
             Wx[i, k] = -1.0
             Wx[i, ntheta-k+1] = 1.0
         end
