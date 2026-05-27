@@ -1,8 +1,55 @@
 using Test
 import ForwardDiff
 using OWENSAero
+import OWENSOpenFASTWrappers
+using OWENSOpenFAST_jll
 
 const API_TEST_DIR, _ = splitdir(@__FILE__)
+
+function _read_aerodyn_output_table(filename)
+    text = replace(read(filename, String), Char(0) => ' ')
+    lines = split(text, '\n')
+    header_index = findfirst(line -> startswith(strip(line), "Time"), lines)
+    header_index === nothing &&
+        throw(ArgumentError("AeroDyn output table header was not found"))
+
+    channels = split(strip(lines[header_index]))
+    rows = Vector{Vector{Float64}}()
+    for line in lines[(header_index+2):end]
+        tokens = split(strip(line))
+        length(tokens) == length(channels) || continue
+        values = tryparse.(Float64, tokens)
+        any(isnothing, values) && continue
+        push!(rows, [value::Float64 for value in values])
+    end
+    isempty(rows) && throw(ArgumentError("AeroDyn output table has no numeric rows"))
+
+    data = Matrix{Float64}(undef, length(rows), length(channels))
+    for (row_index, row) in enumerate(rows)
+        data[row_index, :] .= row
+    end
+    return (channels = channels, data = data)
+end
+
+function _channel(table, row, name)
+    index = findfirst(==(name), table.channels)
+    index === nothing && throw(ArgumentError("channel $(repr(name)) was not found"))
+    return table.data[row, index]
+end
+
+function _hawt_verification_source_dir()
+    local_dir = normpath(
+        joinpath(API_TEST_DIR, "..", "..", "OWENSOpenFASTWrappers.jl", "test", "HAWT_verification"),
+    )
+    isdir(local_dir) && return local_dir
+
+    dep_dir = normpath(
+        joinpath(dirname(pathof(OWENSOpenFASTWrappers)), "..", "test", "HAWT_verification"),
+    )
+    isdir(dep_dir) ||
+        throw(ArgumentError("OWENSOpenFASTWrappers HAWT verification fixture was not found"))
+    return dep_dir
+end
 
 @testset "public API bindings" begin
     exported = names(OWENSAero)
@@ -439,11 +486,13 @@ end
             joinpath(solve_airfoil_dir, "af3.dat"),
         ]
         @test inputs.station_indices == [2, 3, 4]
-        @test inputs.radial_positions == [2.0, 4.0, 6.0]
+        @test inputs.radial_positions == [3.0, 5.0, 7.0]
+        @test inputs.blade_span == [2.0, 4.0, 6.0]
         @test inputs.chord == [0.5, 0.45, 0.35]
         @test inputs.twist ≈ deg2rad.([12.0, 8.0, 3.0]) atol=1e-16
         @test inputs.num_blades == 3
-        @test inputs.tip_radius == 6.0
+        @test inputs.hub_radius == 1.0
+        @test inputs.tip_radius == 7.0
         @test inputs.tip_correction isa OWENSAero.CCBlade.PrandtlTipHub
         @test inputs.root_station_policy == :drop_zero_span
         @test length(inputs.comparison_notes) == 1
@@ -496,12 +545,12 @@ end
         @test solve_result.aerodyn_station_indices == [2, 3, 4]
         @test solve_result.aerodyn_primary.airfoil_files == inputs.primary.airfoil_files
         @test solve_result.root_station_policy == :drop_zero_span
-        @test solve_result.thrust ≈ 146.23764040110723 atol=1e-10
-        @test solve_result.torque ≈ 536.0766995656568 atol=1e-10
-        @test solve_result.power ≈ 1072.1533991313136 atol=1e-10
-        @test solve_result.CP ≈ 0.022209302533387956 atol=1e-15
-        @test solve_result.CT ≈ 0.02423411426065314 atol=1e-15
-        @test solve_result.CQ ≈ 0.012691030019078833 atol=1e-15
+        @test solve_result.thrust ≈ 121.74094064594065 atol=1e-10
+        @test solve_result.torque ≈ 448.3220699790818 atol=1e-10
+        @test solve_result.power ≈ 896.6441399581636 atol=1e-10
+        @test solve_result.CP ≈ 0.018573686363588474 atol=1e-15
+        @test solve_result.CT ≈ 0.020174586089606927 atol=1e-15
+        @test solve_result.CQ ≈ 0.0106135350649077 atol=1e-15
 
         inflow_path = joinpath(tmpdir, "ifw_primary.dat")
         write(
@@ -671,6 +720,148 @@ end
             hub_only_primary_path;
             base_directory = tmpdir,
         )
+    end
+end
+
+@testset "AeroDyn Basic HAWT CCBlade validation" begin
+    mktempdir() do tmpdir
+        source_dir = _hawt_verification_source_dir()
+        cp(joinpath(source_dir, "ad_primary.dat"), joinpath(tmpdir, "ad_primary.dat"))
+        cp(joinpath(source_dir, "ifw_primary.dat"), joinpath(tmpdir, "ifw_primary.dat"))
+        cp(
+            joinpath(source_dir, "NRELOffshrBsline5MW_AeroDyn_blade.dat"),
+            joinpath(tmpdir, "NRELOffshrBsline5MW_AeroDyn_blade.dat"),
+        )
+        cp(joinpath(source_dir, "OLAF.dat"), joinpath(tmpdir, "OLAF.dat"))
+        cp(joinpath(source_dir, "Airfoils"), joinpath(tmpdir, "Airfoils"))
+
+        driver_path = joinpath(tmpdir, "basic_hawt_validation.dvr")
+        write(
+            driver_path,
+            """
+            ----- AeroDyn Driver Input File ---------------------------------------------------------
+            Basic HAWT CCBlade validation
+            ----- Input Configuration ---------------------------------------------------------------
+            True           Echo
+                     0     MHK
+            1              AnalysisType
+            0.5            TMax
+            0.01           DT
+            ./ad_primary.dat     AeroFile
+            ----- Environmental Conditions ----------------------------------------------------------
+            1.225          FldDens
+            1.4639E-05     KinVisc
+            335            SpdSound
+            103500         Patm
+            1700           Pvap
+            0              WtrDpth
+            ----- Inflow Data -----------------------------------------------------------------------
+            1              CompInflow
+            "./ifw_primary.dat" InflowFile
+            8              HWindSpeed
+            90.0           RefHt
+            0              PLExp
+            ----- Turbine Data ----------------------------------------------------------------------
+            1              NumTurbines
+            ----- Turbine(1) Geometry----------------------------------------------------------------
+            True           BasicHAWTFormat(1)
+            0,0,0          BaseOriginInit(1)
+            3              NumBlades(1)
+            1.5            HubRad(1)
+            90.0           HubHt(1)
+            0.0            Overhang(1)
+            0.0            ShftTilt(1)
+            0.0            Precone(1)
+            0.0            Twr2Shft(1)
+            ----- Turbine(1) Motion [used only when AnalysisType=1] ---------------------------------
+            0              BaseMotionType(1)
+            1              DegreeOfFreedom(1)
+            0              Amplitude(1)
+            0              Frequency(1)
+            "unused"       BaseMotionFileName(1)
+            0              NacYaw(1)
+            6.0            RotSpeed(1)
+            0              BldPitch(1)
+            ----- Time-dependent Analysis [used only when AnalysisType=2, numTurbines=1] ------------
+            "unused"       TimeAnalysisFileName
+            ----- Combined-Case Analysis [used only when AnalysisType=3, numTurbines=1] -------------
+                     0     NumCases
+            HWndSpeed    PLExp       RotSpd        Pitch         Yaw     dT      Tmax  DOF  Amplitude Frequency
+            (m/s)        (-)          (rpm)        (deg)        (deg)   (s)     (s)    (-)     (-)     (Hz)
+            ----- Output Settings -------------------------------------------------------------------
+            ES15.8E2       OutFmt
+            1              OutFileFmt
+            0              WrVTK
+            3              WrVTK_Type
+            2.0            VTKHubRad
+            -7,-4,0,21,8,8 VTKNacDim
+            """,
+        )
+
+        driver_log_path = joinpath(tmpdir, "aerodyn_driver.log")
+        try
+            open(driver_log_path, "w") do io
+                cd(tmpdir) do
+                    run(
+                        pipeline(
+                            `$(OWENSOpenFAST_jll.aerodyn_driver()) $(basename(driver_path))`;
+                            stdout = io,
+                            stderr = io,
+                        ),
+                    )
+                end
+            end
+        catch
+            print(read(driver_log_path, String))
+            rethrow()
+        end
+
+        driver = OWENSAero.readAeroDynDriverFile(driver_path; base_directory = tmpdir)
+        @test driver.basic_hawt_format == true
+        @test driver.hub_radius == 1.5
+        @test driver.blade_hub_radius == fill(1.5, 3)
+        @test driver.hub_height == 90.0
+        @test driver.precone_rad == 0.0
+        @test driver.pitch_rad == 0.0
+
+        ccblade = OWENSAero.ccbladeHAWTSolveFromAeroDynDriver(
+            driver_path;
+            base_directory = tmpdir,
+            npts = 20,
+        )
+        aerodyn = _read_aerodyn_output_table(joinpath(tmpdir, "basic_hawt_validation.out"))
+        row = size(aerodyn.data, 1)
+
+        @test ccblade.CP ≈ _channel(aerodyn, row, "RtAeroCp") rtol=5e-3
+        @test ccblade.CQ ≈ _channel(aerodyn, row, "RtAeroCq") rtol=5e-3
+        @test ccblade.CT ≈ _channel(aerodyn, row, "RtAeroCt") rtol=2.5e-2
+        @test ccblade.power ≈ _channel(aerodyn, row, "RtAeroPwr") rtol=5e-3
+        @test ccblade.thrust ≈ _channel(aerodyn, row, "RtAeroFxh") rtol=2.5e-2
+        @test ccblade.torque ≈ _channel(aerodyn, row, "RtAeroMxh") rtol=5e-3
+
+        for node in (9, 13, 17)
+            station_index = findfirst(==(node), ccblade.aerodyn_station_indices)
+            station_index === nothing &&
+                throw(ArgumentError("AeroDyn node $node was not present in CCBlade solve"))
+            prefix = "AB1N" * lpad(string(node), 3, "0")
+            @test rad2deg(ccblade.alpha[station_index]) ≈
+                  _channel(aerodyn, row, prefix * "Alpha") atol=5e-2
+            @test ccblade.cl[station_index] ≈
+                  _channel(aerodyn, row, prefix * "Cl") atol=2e-3
+            @test ccblade.cd[station_index] ≈
+                  _channel(aerodyn, row, prefix * "Cd") atol=5e-4
+            @test ccblade.cn[station_index] ≈
+                  _channel(aerodyn, row, prefix * "Cx") atol=2e-3
+            @test ccblade.ct[station_index] ≈
+                  _channel(aerodyn, row, prefix * "Cy") atol=1e-3
+            @test ccblade.a[station_index] ≈
+                  -_channel(aerodyn, row, prefix * "Vindx") /
+                  _channel(aerodyn, row, prefix * "Vx") atol=3e-3
+            @test ccblade.Np[station_index] ≈
+                  _channel(aerodyn, row, prefix * "Fxp") rtol=1e-2
+            @test ccblade.Tp[station_index] ≈
+                  -_channel(aerodyn, row, prefix * "Fyp") rtol=1e-2
+        end
     end
 end
 

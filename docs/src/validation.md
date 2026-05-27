@@ -13,6 +13,7 @@ OWENSAero validation has two layers: pinned regression tests for code behavior a
 | Gradients | steady DMS gradient checks compare AD behavior for representative calls; AC gradient coverage remains open. |
 | Full turbine | `test/full_turb.jl` and `test/full_turb_undersampling.jl` exercise the stateful turbine workflow. |
 | API sanity | `test/api_unit_tests.jl` pins constructors, types, selected helper behavior, AeroDyn blade/polar readers, the HAWT CCBlade adapter, and the standalone Prandtl tip/root-loss primitive. |
+| HAWT AeroDyn BEM | `test/api_unit_tests.jl` runs the native AeroDyn Basic HAWT driver on the NREL 5 MW aerodynamic fixture and compares CCBlade rotor totals plus interior station `Alpha`, `Cl`, `Cd`, axial induction, coefficient, and mapped load channels. |
 
 See [Aero Model Audit](@ref) for the current coupled-versus-helper status of each aerodynamic addition.
 
@@ -26,4 +27,4 @@ See [Aero Model Audit](@ref) for the current coupled-versus-helper status of eac
 
 ## Open Validation Gaps
 
-The RM2 and SNL example scripts are useful physics references, but not every comparison is currently a CI-quality validation. Remaining hardening work includes expanding added-mass and buoyancy baselines beyond aggregate values, normalizing the HAWT OpenFAST/AeroDyn root-station and torque/power frame conventions before comparing against CCBlade, and pinning mode/coupled-load transformations in OWENS integration tests.
+The RM2 and SNL example scripts are useful physics references, but not every comparison is currently a CI-quality validation. Remaining hardening work includes expanding added-mass and buoyancy baselines beyond aggregate values, extending the HAWT AeroDyn comparison beyond steady Basic HAWT BEM into DBEMT and moving-frame cases, and pinning mode/coupled-load transformations in OWENS integration tests.

@@ -13,7 +13,7 @@ polar = readAeroDynAirfoilInfo("Airfoils/DU40_A17.dat")
 airfoil = aeroDynAirfoilFunction(polar)
 
 sections = ccbladeHAWTSections(
-    blade.span[2:end],
+    blade.span[2:end] .+ hub_radius,
     blade.chord[2:end],
     blade.twist_rad[2:end],
     airfoil,
@@ -62,9 +62,10 @@ working directory.
 (`CompInflow = 0`) and steady InflowWind files (`CompInflow = 1`,
 `WindType = 1`), and returns the resolved AeroDyn/InflowWind filenames,
 density, dynamic viscosity, sound speed, rotor speed, uniform blade pitch, and
-driver hub-radius metadata. It intentionally rejects non-steady inflow and
-nonuniform blade pitch because those need a time-marching validation harness
-rather than a single rigid CCBlade solve.
+driver hub-radius metadata. `BasicHAWTFormat=true` drivers are supported; their
+`HubRad` value is used as the physical blade-root radius. It intentionally
+rejects non-steady inflow and nonuniform blade pitch because those need a
+time-marching validation harness rather than a single rigid CCBlade solve.
 
 `readAeroDynBladeFile` consumes exactly `NumBlNds` blade rows. This matters for
 the checked NREL 5 MW fixture, which carries a historical note and an extra
@@ -83,14 +84,18 @@ extrapolating.
 For HAWT comparisons, keep the frame conventions explicit:
 
 - AeroDyn blade twist is stored in degrees; the CCBlade adapter expects radians.
-- AeroDyn blade files can include a root station at zero span, while CCBlade
-  sections require positive radial positions. The validation setup must state
-  whether it drops the root station or applies a documented hub/root policy.
+- AeroDyn blade files store `BlSpn` from the blade root, while CCBlade sections
+  use rotor radius from the center of rotation. `aeroDynHAWTCCBladeInputs`
+  therefore adds `hub_radius` to each retained span station.
+- AeroDyn blade files can include a root station at zero span. The validation
+  setup must state whether it drops the root station or applies a documented
+  hub/root policy.
 - AeroDyn BEM option flags are not one-to-one with CCBlade defaults. In
   particular, drag-in-induction and hub-loss settings need explicit matching
   before comparing coefficients.
 - OpenFAST driver files may delegate wind to InflowWind; do not assume the
   driver's `HWindSpeed` is the operating wind speed when `CompInflow = 1`.
-- Existing wrapper fixtures can report torque and power with the OpenFAST
-  output-channel sign convention. Native CCBlade comparisons should normalize
-  the torque/power frame before computing validation metrics.
+- For station outputs in the Basic HAWT validation fixture, CCBlade `cn`/`ct`
+  map to AeroDyn `Cx`/`Cy`, and CCBlade `Np`/`Tp` map to AeroDyn `Fxp`/`-Fyp`.
+  Root and exact-tip stations are treated separately because hub/tip-loss
+  behavior is singular there.
