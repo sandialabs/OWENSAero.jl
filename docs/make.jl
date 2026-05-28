@@ -15,6 +15,7 @@ makedocs(;
         "Rigid HAWT CCBlade Example" => "hawt_ccblade_example.md",
         "Frames, Units, and Outputs" => joinpath("theory", "frames_units.md"),
         "Validation and Testing" => "validation.md",
+        "Developer Guide" => "developer_guide.md",
         "API Reference" => joinpath("reference", "reference.md"),
     ],
     sitename = "OWENSAero.jl",

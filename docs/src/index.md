@@ -13,6 +13,10 @@ The package contains two primary VAWT aerodynamic paths:
 
 Both paths share the `Turbine`, `Environment`, and `UnsteadyParams` data structures. The high-level turbine workflow in `setupTurb`, `steadyTurb`, and `advanceTurb` builds one or more vertical slices, stores model state, and returns distributed aerodynamic loads for coupling to OWENS structural dynamics.
 
+For horizontal-axis verification work, OWENSAero also includes a CCBlade-based
+adapter used by the AeroDyn Basic HAWT tests. That path follows AeroDyn station
+conventions rather than the VAWT slice workflow.
+
 ## Documentation Map
 
 - [Quickstart](quickstart.md) shows the smallest direct slice and full-turbine calls.
@@ -20,6 +24,9 @@ Both paths share the `Turbine`, `Environment`, and `UnsteadyParams` data structu
 - [Full Turbine Workflow](full_turbine_workflow.md) documents the stateful `setupTurb`/`steadyTurb`/`advanceTurb` path used by coupled OWENS runs.
 - [Dynamic Stall](dynamic_stall.md) documents the Boeing-Vertol test/example path.
 - [RM2 Example](rm2_example.md) points to the standalone RM2 aerodynamic example.
+- [AeroDyn Input Readers](aerodyn_inputs.md) documents the AeroDyn blade and polar file readers.
+- [Rigid HAWT CCBlade Example](hawt_ccblade_example.md) documents the Basic HAWT BEM verification workflow.
 - [Frames, Units, and Outputs](theory/frames_units.md) records load directions and expected SI units.
 - [Validation and Testing](validation.md) identifies the tests that currently pin model behavior and the remaining validation gaps.
+- [Developer Guide](developer_guide.md) gives the review checklist for aerodynamic model changes, tests, examples, and documentation.
 - [API Reference](reference/reference.md) is the generated function and type index.
