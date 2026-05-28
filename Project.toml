@@ -1,7 +1,7 @@
 name = "OWENSAero"
 uuid = "ac8500f8-acb1-479a-8630-5dcb97b7c093"
 authors = ["Kevin R. Moore <kevmoor@sandia.gov> and contributors"]
-version = "1.0.1"
+version = "1.0.2"
 
 [deps]
 CCBlade = "e1828068-15df-11e9-03e4-ef195ea46fa4"
