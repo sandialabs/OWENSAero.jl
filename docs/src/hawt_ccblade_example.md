@@ -69,6 +69,26 @@ need explicit normalization before comparing to OpenFAST output channels, so the
 current bridge is a reproducible input path, not yet an OpenFAST validation
 baseline.
 
+## AeroDyn comparison guardrails
+
+`readAeroDynDriverFile` resolves relative `AeroFile` and `InflowFile` paths from
+the driver file's directory unless a different `base_directory` is supplied.
+This is pinned for nested driver paths, including paths with spaces.
+
+For multi-turbine driver files, pass `turbine_index` explicitly. The reader then
+selects `NumBlades(i)`, `RotSpeed(i)`, `BldPitch(i_j)`, and
+`BldHubRad_bl(i_j)` from that turbine and rejects out-of-range indices. The
+CCBlade bridge uses the selected turbine metadata and, by default, the largest
+selected `BldHubRad_bl` as the BEM hub radius.
+
+Keep `root_station_policy` visible in validation scripts. The default
+`:drop_zero_span` policy removes AeroDyn's common zero-span root station before
+building CCBlade sections; `:strict_positive` instead requires every blade
+station to be positive. Drag-in-induction settings and torque/power signs also
+need explicit normalization before comparing to OpenFAST output channels, so the
+current bridge is a reproducible input path, not yet an OpenFAST validation
+baseline.
+
 The Oye state update uses the steady CCBlade axial induction as the
 quasi-steady input. This keeps the future dynamic-inflow coupling explicit:
 the HAWT solver must own induction state, time constants, and load mapping
