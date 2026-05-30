@@ -39,6 +39,8 @@ DMS computes `CP` from the signed torque history `Q`, not `abs(Q)`. Negative tor
 
 Airfoil reader functions expect angle-of-attack and coefficient tables compatible with the selected model. Tables may include a fourth `Cm25` column. The readers keep the older `cl, cd = af(alpha, Re, Mach)` call pattern intact, and `af(alpha, Re, Mach; return_cm=true)` returns `cl`, `cd`, and `Cm25`. For DMS and AC, `Mach` is computed from the local relative speed divided by `Environment.speed_of_sound`; set this keyword when constructing `Environment` for water, temperature-sensitive air cases, or validation data with a specified sound speed.
 
+The AeroDyn-format readers preserve the historical out-of-range interpolation behavior by default with `extrapolation=:legacy`. Validation cases and optimization studies that should fail fast on unsupported polar queries can build callbacks with `extrapolation=:error`, which throws when angle of attack is outside the lookup table and, for multi-Reynolds-number tables, when Reynolds number is outside the tabulated range. Single-Reynolds-number tables keep the existing Reynolds-insensitive semantics.
+
 DMS and AC convert `Cm25` to a distributed section moment with `M25 = Cm25 * q * chord^2`, where `q = 0.5 * rho * Vloc^2`. That moment is returned with the aerodynamic loads for coupled OWENS runs. If a user-supplied airfoil function only returns `cl, cd`, OWENSAero uses `Cm25 = 0.0`.
 
 The dynamic-stall path carries additional state for prior angle of attack and Boeing-Vertol flags. Because these state variables affect transient loads, unsteady tests should pin the full output vector for a named input file and time history.

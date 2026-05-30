@@ -641,6 +641,82 @@ end
         @test driver_result.CT ≈ solve_result.CT atol=1e-15
         @test driver_result.CQ ≈ solve_result.CQ atol=1e-15
 
+        nested_driver_dir = joinpath(tmpdir, "nested driver case with spaces")
+        mkpath(nested_driver_dir)
+        multi_driver_path = joinpath(nested_driver_dir, "two turbine hawt driver.dvr")
+        write(
+            multi_driver_path,
+            """
+            True           Echo
+                      1    AnalysisType
+                    0.5    TMax
+                   0.01    DT
+            "../solve_primary.dat"     AeroFile
+                  1.225    FldDens
+            1.460734693877551E-05     KinVisc
+                    335    SpdSound
+                      1    CompInflow
+            "../ifw_primary.dat"       InflowFile
+                     10    HWindSpeed
+                    200    RefHt
+                      0    PLExp
+                      2    NumTurbines
+            False         BasicHAWTFormat(1)
+            True          HAWTprojection(1)
+                      2   NumBlades(1)
+                    0.5   BldHubRad_bl(1_1)
+                    0.5   BldHubRad_bl(1_2)
+                      0   RotMotionType(1)
+                   10.0   RotSpeed(1)
+                      0   BldMotionType(1)
+                    5.0   BldPitch(1_1)
+                    5.0   BldPitch(1_2)
+            False         BasicHAWTFormat(2)
+            True          HAWTprojection(2)
+                      3   NumBlades(2)
+                    1.0   BldHubRad_bl(2_1)
+                    1.0   BldHubRad_bl(2_2)
+                    1.0   BldHubRad_bl(2_3)
+                      0   RotMotionType(2)
+            19.09859317102744 RotSpeed(2)
+                      0   BldMotionType(2)
+                    1.0   BldPitch(2_1)
+                    1.0   BldPitch(2_2)
+                    1.0   BldPitch(2_3)
+                    2.0   VTKHubRad
+            """,
+        )
+        selected_driver = OWENSAero.readAeroDynDriverFile(
+            multi_driver_path;
+            turbine_index = 2,
+        )
+        @test selected_driver.base_directory == nested_driver_dir
+        @test selected_driver.aero_file == solve_primary_path
+        @test selected_driver.inflow_file == inflow_path
+        @test selected_driver.num_turbines == 2
+        @test selected_driver.turbine_index == 2
+        @test selected_driver.num_blades == 3
+        @test selected_driver.rot_speed_rpm ≈ 19.09859317102744 atol=1e-14
+        @test selected_driver.rotor_speed_rad_per_s ≈ 2.0 atol=1e-15
+        @test selected_driver.blade_pitch_deg == [1.0, 1.0, 1.0]
+        @test selected_driver.blade_hub_radius == [1.0, 1.0, 1.0]
+
+        selected_result = OWENSAero.ccbladeHAWTSolveFromAeroDynDriver(
+            multi_driver_path;
+            turbine_index = 2,
+            tip_radius = 7.0,
+            npts = 8,
+        )
+        @test selected_result.aerodyn_driver_file == multi_driver_path
+        @test selected_result.driver_hub_radius_used == 1.0
+        @test selected_result.aerodyn_driver.turbine_index == 2
+        @test selected_result.thrust ≈ solve_result.thrust atol=1e-10
+        @test selected_result.torque ≈ solve_result.torque atol=1e-10
+        @test selected_result.power ≈ solve_result.power atol=1e-10
+        @test selected_result.CP ≈ solve_result.CP atol=1e-15
+        @test selected_result.CT ≈ solve_result.CT atol=1e-15
+        @test selected_result.CQ ≈ solve_result.CQ atol=1e-15
+
         steady_driver_path = joinpath(tmpdir, "steady_driver.dvr")
         write(
             steady_driver_path,
@@ -690,6 +766,41 @@ end
             driver_path;
             base_directory = tmpdir,
             turbine_index = 2,
+        )
+
+        transient_driver_path = joinpath(tmpdir, "transient_driver.dvr")
+        write(
+            transient_driver_path,
+            replace(read(driver_path, String), "1    AnalysisType" => "2    AnalysisType"),
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynDriverFile(
+            transient_driver_path;
+            base_directory = tmpdir,
+        )
+
+        unsupported_comp_inflow_path = joinpath(tmpdir, "unsupported_comp_inflow.dvr")
+        write(
+            unsupported_comp_inflow_path,
+            replace(read(driver_path, String), "1    CompInflow" => "2    CompInflow"),
+        )
+        @test_throws ArgumentError OWENSAero.readAeroDynDriverFile(
+            unsupported_comp_inflow_path;
+            base_directory = tmpdir,
+        )
+
+        stopped_driver_path = joinpath(tmpdir, "stopped_driver.dvr")
+        write(
+            stopped_driver_path,
+            replace(
+                read(driver_path, String),
+                "19.09859317102744 RotSpeed(1)" => "0.0 RotSpeed(1)",
+            ),
+        )
+        @test_throws ArgumentError OWENSAero.ccbladeHAWTSolveFromAeroDynDriver(
+            stopped_driver_path;
+            base_directory = tmpdir,
+            tip_radius = 7.0,
+            npts = 8,
         )
 
         @test_throws ArgumentError OWENSAero.aeroDynHAWTCCBladeInputs(
@@ -2862,6 +2973,7 @@ end
 
 @testset "AeroDyn airfoil readers" begin
     filename = joinpath(API_TEST_DIR, "airfoils", "NACA_0015_RE3E5.dat")
+    multire_filename = joinpath(API_TEST_DIR, "airfoils", "NACA_0015.dat")
 
     af = OWENSAero.readaerodyn(filename)
     cl0, cd0 = af(0.0, 3.0e5, 0.0)
@@ -2875,11 +2987,40 @@ end
     @test clm5 ≈ -0.55 atol=1e-14
     @test cdm5 ≈ 0.0114 atol=1e-14
 
+    af_strict = OWENSAero.readaerodyn(filename; extrapolation = :error)
+    cl_strict, cd_strict, cm_strict =
+        af_strict(5 * pi / 180, 3.0e5, 0.0; return_cm = true)
+    @test cl_strict ≈ 0.55 atol=1e-14
+    @test cd_strict ≈ 0.0114 atol=1e-14
+    @test cm_strict == 0.0
+    @test_throws ArgumentError af_strict(181 * pi / 180, 3.0e5, 0.0)
+    @test_throws ArgumentError OWENSAero.readaerodyn(filename; extrapolation = :flat)
+    @test_throws ArgumentError OWENSAero.readaerodyn(filename; extrapolation = "error")
+
     af_new_static = OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "NONE")
     cl_new, cd_new, cm_new = af_new_static(5 * pi / 180, 3.0e5, 0.0; return_cm = true)
     @test cl_new ≈ 0.55 atol=1e-14
     @test cd_new ≈ 0.0114 atol=1e-14
     @test cm_new == 0.0
+
+    af_new_static_strict =
+        OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "NONE", extrapolation = :error)
+    cl_new_strict, cd_new_strict =
+        af_new_static_strict(5 * pi / 180, 1.0e2, 0.0)
+    @test cl_new_strict ≈ 0.55 atol=1e-14
+    @test cd_new_strict ≈ 0.0114 atol=1e-14
+    @test_throws ArgumentError af_new_static_strict(181 * pi / 180, 3.0e5, 0.0)
+
+    af_new_multire_strict = OWENSAero.readaerodyn_BV_NEW(
+        multire_filename;
+        DynamicStallModel = "NONE",
+        extrapolation = :error,
+    )
+    cl_multire_strict, cd_multire_strict =
+        af_new_multire_strict(5 * pi / 180, 3.6e5, 0.0)
+    @test cl_multire_strict ≈ 0.55 atol=1e-14
+    @test cd_multire_strict ≈ 0.0114 atol=1e-14
+    @test_throws ArgumentError af_new_multire_strict(5 * pi / 180, 1.0, 0.0)
 
     af_lb = OWENSAero.readaerodyn_BV_NEW(filename; DynamicStallModel = "LB")
     env_lb = OWENSAero.Environment(
@@ -2958,6 +3099,34 @@ end
     @test env.alpha_last[2] ≈ 5 * pi / 180 atol=1e-14
     @test env.BV_DynamicFlagL[2] == 0
     @test env.BV_DynamicFlagD[2] == 0
+
+    af_bv_strict = OWENSAero.readaerodyn_BV(filename; extrapolation = :error)
+    strict_env = OWENSAero.Environment(
+        1.225,
+        1.7894e-5,
+        fill(5.0, 4),
+        zeros(4),
+        zeros(4),
+        zeros(4),
+        0.0,
+        "BV",
+        "DMS",
+        zeros(8),
+    )
+    @test_throws ArgumentError af_bv_strict(
+        181 * pi / 180,
+        3.0e5,
+        0.0,
+        strict_env,
+        0.0,
+        0.2,
+        0.1,
+        5.0;
+        idx = 2,
+    )
+    @test strict_env.alpha_last[2] == 0.0
+    @test strict_env.BV_DynamicFlagL[2] == 0
+    @test strict_env.BV_DynamicFlagD[2] == 0
 
     stall_env = OWENSAero.Environment(
         1.225,

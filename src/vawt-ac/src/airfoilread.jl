@@ -6,7 +6,43 @@
 import FLOWMath
 import Interpolations
 
+const _AIRFOIL_EXTRAPOLATION_POLICIES = (:legacy, :error)
+
 _parse_airfoil_header_number(line) = parse(Float64, split(strip(line))[end])
+
+function _validate_airfoil_extrapolation_policy(extrapolation)
+    extrapolation isa Symbol ||
+        throw(ArgumentError("airfoil extrapolation policy must be a Symbol; got $(repr(extrapolation))"))
+    extrapolation in _AIRFOIL_EXTRAPOLATION_POLICIES ||
+        throw(ArgumentError("unsupported airfoil extrapolation policy $(repr(extrapolation)); supported policies are :legacy and :error"))
+    return extrapolation
+end
+
+function _check_airfoil_alpha_bounds(alphain, alpha_min, alpha_max, extrapolation, filename)
+    extrapolation === :legacy && return nothing
+    isfinite(alphain) ||
+        throw(ArgumentError("airfoil angle of attack must be finite; got $(repr(alphain))"))
+    if alphain < alpha_min || alphain > alpha_max
+        throw(ArgumentError(
+            "airfoil angle of attack $(alphain) rad is outside the tabulated range " *
+            "[$(alpha_min), $(alpha_max)] rad for $(repr(filename))",
+        ))
+    end
+    return nothing
+end
+
+function _check_airfoil_reynolds_bounds(Re, Re_min, Re_max, extrapolation, filename)
+    extrapolation === :legacy && return nothing
+    isfinite(Re) ||
+        throw(ArgumentError("airfoil Reynolds number must be finite; got $(repr(Re))"))
+    if Re < Re_min || Re > Re_max
+        throw(ArgumentError(
+            "airfoil Reynolds number $(Re) is outside the tabulated range " *
+            "[$(Re_min), $(Re_max)] for $(repr(filename))",
+        ))
+    end
+    return nothing
+end
 
 function _read_first_reynolds_airfoil_table(filename)
     alpha = Float64[]
@@ -65,25 +101,30 @@ function _read_first_reynolds_airfoil_table(filename)
 end
 
 """
-    readaerodyn(filename)
+    readaerodyn(filename; extrapolation = :legacy)
 
 create airfoil lookup for the first Reynolds-number table in an OWENSAero
 airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
+* `extrapolation::Symbol`: `:legacy` preserves historical out-of-range
+  interpolation/extrapolation; `:error` throws if alpha is outside the table.
 
 # Outputs:
 * `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad. Use
   `af(alpha,re,mach; return_cm=true)` to also return Cm25.
 
 """
-function readaerodyn(filename)
+function readaerodyn(filename; extrapolation = :legacy)
+    extrapolation = _validate_airfoil_extrapolation_policy(extrapolation)
     table = _read_first_reynolds_airfoil_table(filename)
     alpha = table.alpha
     cl = table.cl
     cd = table.cd
     cm = table.cm
+    alpha_min = minimum(alpha) * pi / 180
+    alpha_max = maximum(alpha) * pi / 180
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -97,6 +138,7 @@ function readaerodyn(filename)
     afcm = FLOWMath.Akima(alpha*pi/180, cm)
 
     function af(alphain,re,mach; return_cm=false)
+        _check_airfoil_alpha_bounds(alphain, alpha_min, alpha_max, extrapolation, filename)
         # if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
         #     @error "aoa is greater or less than what is defined"
         # end
@@ -111,24 +153,29 @@ function readaerodyn(filename)
 end
 
 """
-    readaerodyn_BV(filename)
+    readaerodyn_BV(filename; extrapolation = :legacy)
 
 create airfoil lookup function with Boeing-Vertol dynamic stall metadata from
 the first Reynolds-number table in an OWENSAero airfoil file
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
+* `extrapolation::Symbol`: `:legacy` preserves historical out-of-range
+  interpolation/extrapolation; `:error` throws if alpha is outside the table.
 
 # Outputs:
 * `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop. Use `return_cm=true` to also return Cm25.
 
 """
-function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
+function readaerodyn_BV(filename; extrapolation = :legacy) #TODO: use multiple dispatch to simplify this
+    extrapolation = _validate_airfoil_extrapolation_policy(extrapolation)
     table = _read_first_reynolds_airfoil_table(filename)
     alpha = table.alpha
     cl = table.cl
     cd = table.cd
     cm = table.cm
+    alpha_min = minimum(alpha) * pi / 180
+    alpha_max = maximum(alpha) * pi / 180
 
     # af = AirfoilData(alpha*pi/180.0, cl, cd)
 
@@ -142,6 +189,7 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     afcm = FLOWMath.Akima(alpha*pi/180, cm)
     cl=0.0
     function af(alphain,Re,umach,family_factor)
+        _check_airfoil_alpha_bounds(alphain, alpha_min, alpha_max, extrapolation, filename)
         if alphain>maximum(alpha)*pi/180 || alphain<minimum(alpha)*pi/180
             @error "aoa is greater or less than what is defined"
         end
@@ -159,6 +207,7 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
     tc = table.thickness_to_chord
 
     function af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
+        _check_airfoil_alpha_bounds(alpha, alpha_min, alpha_max, extrapolation, filename)
         if idx==1
             idxmin1 = length(env.alpha_last)
         else
@@ -179,20 +228,24 @@ function readaerodyn_BV(filename) #TODO: use multiple dispatch to simplify this
 end
 
 """
-    readaerodyn_BV_NEW(filename;DynamicStallModel="BV")
+    readaerodyn_BV_NEW(filename; DynamicStallModel = "BV", extrapolation = :legacy)
 
 for a file with multiple reynolds numbers create airfoil lookup function with boeing vertol dynamic stall model and wrap interpolation
 
 # Inputs
 * `filename::string`: file path/name to airfoil file formatted like in the test folder
 * `DynamicStallModel::string`: "BV", "LB", or "none"
+* `extrapolation::Symbol`: `:legacy` preserves historical out-of-range
+  interpolation/extrapolation; `:error` throws if alpha is outside the lookup
+  grid and, for multi-Re tables, if Re is outside the tabulated range.
 
 # Outputs:
 * `af::function`: cl, cd = af_BV(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false) with alpha in rad, OWENSAero.Env, V_twist in rad/s, c chord in m, dt in sec, U Vloc in m/s, solvestep true during solve loop. Use `return_cm=true` to also return Cm25.
 * `af::function`: cl, cd = af(alpha,re,mach) with alpha in rad. Use `return_cm=true` to also return Cm25.
 """
-function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple dispatch to simplify this
+function readaerodyn_BV_NEW(filename;DynamicStallModel="BV", extrapolation = :legacy) #TODO: use multiple dispatch to simplify this
     DynamicStallModel = _canonical_dynamic_stall_model(DynamicStallModel)
+    extrapolation = _validate_airfoil_extrapolation_policy(extrapolation)
 
     # Loop through the file and determine how many Reynolds numbers there are
     nRe = 0
@@ -206,6 +259,8 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
 
     # Set up arrays
     alphas = [collect(-180:1:-21);collect(-20:0.5:20);collect(21:1:180)].*pi/180
+    alpha_min = minimum(alphas)
+    alpha_max = maximum(alphas)
     cls = zeros(length(alphas),nRe)
     cds = zeros(length(alphas),nRe)
     cms = zeros(length(alphas),nRe)
@@ -265,7 +320,11 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
 
     if nRe == 0
         throw(ArgumentError("No Reynolds-number airfoil tables were found in $(repr(filename))."))
-    elseif nRe == 1
+    end
+    Re_min = minimum(REs)
+    Re_max = maximum(REs)
+
+    if nRe == 1
         itpcl = Interpolations.interpolate((alphas,), cls[:,1], Interpolations.Gridded(Interpolations.Linear()))
         cl_alpha = Interpolations.extrapolate(itpcl, Interpolations.Flat())
 
@@ -305,6 +364,10 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
 
     # Create the base airfoil wrapper function
     function af2(alpha,Re,umach=0.0,family_factor=1.0; return_cm=false)
+        _check_airfoil_alpha_bounds(alpha, alpha_min, alpha_max, extrapolation, filename)
+        if nRe > 1
+            _check_airfoil_reynolds_bounds(Re, Re_min, Re_max, extrapolation, filename)
+        end
 
         # if length(REs)>1
             # cl = Dierckx.evaluate(clspl,alpha, Re)
@@ -328,6 +391,10 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
         af2(alpha, Re, umach, family_factor; return_cm=true)
 
     function af_BV2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
+        _check_airfoil_alpha_bounds(alpha, alpha_min, alpha_max, extrapolation, filename)
+        if nRe > 1
+            _check_airfoil_reynolds_bounds(Re, Re_min, Re_max, extrapolation, filename)
+        end
         if idx==1
             idxmin1 = length(env.alpha_last)
         else
@@ -352,6 +419,10 @@ function readaerodyn_BV_NEW(filename;DynamicStallModel="BV") #TODO: use multiple
     end
 
     function af_LB2(alpha,Re,M,env,V_twist,c,dt,U;solvestep=false,idx=1,return_cm=false)
+        _check_airfoil_alpha_bounds(alpha, alpha_min, alpha_max, extrapolation, filename)
+        if nRe > 1
+            _check_airfoil_reynolds_bounds(Re, Re_min, Re_max, extrapolation, filename)
+        end
         idxmin1 = idx == 1 ? length(env.lb_state.cl_ref_last) : idx - 1
         U_safe = FLOWMath.ksmax([U, 0.001])
         ds = 2.0 * U_safe * dt / c
