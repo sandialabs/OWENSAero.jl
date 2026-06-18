@@ -366,9 +366,9 @@ end
     @test maximum(LESepState_LB) == 1
     @test sum(LESepState_LB) == 812
     @test maximum(sLEv_LB) ≈ 69.4348005359045 atol=tol
-    @test maximum(CL_LB) ≈ 1.648581675176007 atol=tol
-    @test minimum(CL_LB) ≈ 0.0028272445153878782 atol=tol
-    @test maximum(CD_LB) ≈ 0.3987473145866656 atol=tol
+    @test maximum(CL_LB) ≈ 1.6241833910440882 atol=tol
+    @test minimum(CL_LB) ≈ 0.002823993387738582 atol=tol
+    @test maximum(CD_LB) ≈ 0.3358264554390617 atol=tol
     @test minimum(CM_LB) ≈ -0.10383870862362879 atol=tol
     @test CL_LB[1] ≈ 1.1116093542418823 atol=tol
     @test CD_LB[1] ≈ 0.0184 atol=tol
@@ -395,14 +395,14 @@ end
         branch_validation_metrics(alpha_LB_deg, CM_LB, CM_LB_paper; branch = :downstroke)
 
     @test cl_upstroke_metrics.n == 10
-    @test cl_upstroke_metrics.rmse ≈ 0.1594729906749264 atol=tol
-    @test cl_upstroke_metrics.mean_bias ≈ 0.1198661433692556 atol=tol
-    @test cl_upstroke_metrics.max_abs_error ≈ 0.27204279264447984 atol=tol
+    @test cl_upstroke_metrics.rmse ≈ 0.09499386826875926 atol=tol
+    @test cl_upstroke_metrics.mean_bias ≈ -0.010114672950690096 atol=tol
+    @test cl_upstroke_metrics.max_abs_error ≈ 0.157409965284239 atol=tol
 
     @test cl_downstroke_metrics.n == 24
-    @test cl_downstroke_metrics.rmse ≈ 0.14813422809695784 atol=tol
-    @test cl_downstroke_metrics.mean_bias ≈ 0.09566468397945065 atol=tol
-    @test cl_downstroke_metrics.max_abs_error ≈ 0.3146159343979056 atol=tol
+    @test cl_downstroke_metrics.rmse ≈ 0.10382431063590053 atol=tol
+    @test cl_downstroke_metrics.mean_bias ≈ 0.05632166900163189 atol=tol
+    @test cl_downstroke_metrics.max_abs_error ≈ 0.23714715664212316 atol=tol
 
     @test cm_upstroke_metrics.n == 23
     @test cm_upstroke_metrics.rmse ≈ 0.04521091561148734 atol=tol

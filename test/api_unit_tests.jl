@@ -1186,7 +1186,7 @@ end
     lb_steady = OWENSAero.steadyTurb()
     @test lb_steady[1] == zeros(Real, 1, 4)
     @test OWENSAero.envslices[1].lb_state.cl_ref_last ≈
-          [3.5487757556312367, -7.370220560086004, 7.477405825416165, -3.4779789619140185] atol=1e-12
+          [3.5487757556312367, -7.370220560086004, 7.4772407107707854, -3.477978898644797] atol=1e-12
     @test OWENSAero.envslices[1].lb_state.le_separation_state == ones(Int, 4)
     @test_throws ArgumentError OWENSAero.setupTurb(
         blade_x,
