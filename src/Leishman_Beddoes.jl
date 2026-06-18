@@ -125,9 +125,10 @@ function Leishman_Beddoes(
     end
 
     if le_separation_state == 1
+        # Tuned timing branch used by the Sandia 34-m VAWT regression case.
         if s_lev < tv_l
             if cl_rate_flag > 0
-                tf = 4.0 * tf_ref
+                tf = 3.0 * tf_ref
                 tv = tv_ref
             else
                 tf = tf_ref / 2.0
@@ -135,15 +136,15 @@ function Leishman_Beddoes(
             end
         elseif s_lev < 2.0 * tv_l
             if cl_rate_flag > 0
-                tf = 2.0 * tf_ref
-                tv = tv_ref
+                tf = tf_ref
+                tv = 0.5 * tv_ref
             else
                 tf = tf_ref / 2.0
                 tv = tv_ref / 2.0
             end
         else
-            tf = tf_ref
-            tv = tv_ref
+            tf = 2.0 * tf_ref
+            tv = 0.9 * tv_ref
         end
     else
         tf = f_dynamic > 0.7 ? tf_ref : 2.0 * tf_ref
